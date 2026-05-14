@@ -34,6 +34,56 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-14 - AlphaGenome Converted Weight Load Sanity Check on HY-GPU
+
+- Run type: sanity check
+- Purpose: Verify that the converted `alphagenome-pytorch` all-folds safetensors checkpoint can be loaded on HY-GPU GPU 2 without running training.
+- Git commit: Not recorded in terminal output
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; `alphagenome-pytorch` `0.3.1`; PyTorch `2.11.0+cu128`; CUDA `12.8`; `CUDA_VISIBLE_DEVICES=2`
+- Command:
+
+```bash
+conda activate alphagenome
+cd /home/zelinli6/Alphagenome
+
+python -m pip install -U "huggingface_hub[cli]"
+
+mkdir -p weights/alphagenome_pytorch
+hf download gtca/alphagenome_pytorch model_all_folds.safetensors \
+  --local-dir weights/alphagenome_pytorch
+
+CUDA_VISIBLE_DEVICES=2 python - <<'PY'
+import torch
+from alphagenome_pytorch import AlphaGenome
+
+path = "weights/alphagenome_pytorch/model_all_folds.safetensors"
+
+print("cuda_available", torch.cuda.is_available())
+print("device", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda")
+print("loading", path)
+
+model = AlphaGenome.from_pretrained(path, device="cuda")
+model.eval()
+
+n_params = sum(p.numel() for p in model.parameters())
+print("loaded", type(model).__name__)
+print("n_params", n_params)
+print("device_first_param", next(model.parameters()).device)
+PY
+```
+
+- Input data: `weights/alphagenome_pytorch/model_all_folds.safetensors`
+- Output path: Interactive terminal output; no log file was captured for this run. The checkpoint is stored in the ignored `weights/` directory.
+- Result summary: Completed successfully. The converted all-folds AlphaGenome checkpoint loaded on CUDA without running training.
+- Verification: Observed `cuda_available=True`, `device=NVIDIA A100 80GB PCIe`, `loaded=AlphaGenome`, `n_params=450452613`, and `device_first_param=cuda:0`.
+- Failures or warnings: None reported in the provided terminal output.
+- Next actions: Inspect model methods and output heads, then design a minimal C. elegans 11-track RNA-seq head adaptation plan before making code changes.
+- Claim status: verified
+
 ## 2026-05-14 - alphagenome-pytorch Import Sanity Check on HY-GPU
 
 - Run type: sanity check
