@@ -33,6 +33,33 @@ Large or local assets that should not be committed directly to Git:
 - model weights and checkpoints such as `*.safetensors`, `*.pt`, `*.pth`, and `*.ckpt`
 - logs, run outputs, and temporary results
 
+## HY-GPU Migration State
+
+`HY-GPU` is a separate non-Slurm GPU server with local A100 80GB GPUs. It is now the preferred execution host for CUDA smoke tests and later PyTorch fine-tuning work, while the original EEHPC server remains the source of some archived large assets.
+
+Assets that should be present on `HY-GPU` for the current PyTorch route:
+
+- Git-tracked code, metadata, interval files, and documentation.
+- `alphagenome_custom/datasets/rna_seq_npz_pilot_train`
+- `alphagenome_custom/datasets/rna_seq_npz_train`
+- `alphagenome_custom/datasets/rna_seq_npz_valid`
+- `alphagenome_custom/datasets/rna_seq_npz_test`
+- `weights/alphagenome_pytorch/model_all_folds.safetensors`
+
+Assets recommended to transfer to `HY-GPU` if direct BigWig/FASTA inspection or loader work is needed:
+
+- `alphagenome_custom/reference/`
+- `alphagenome_custom/tracks/rna_seq_grouped/`
+
+Assets that can remain on the original EEHPC server unless preprocessing must be reproduced from raw inputs:
+
+- `training_input_bigwig/`
+- `shared/`
+- `shared.zip`
+- original spreadsheet files such as `Samples.xlsx` and `remote_inventory/Samples.drive.xlsx`
+
+Do not copy large assets just to make the two servers identical. Transfer only the assets needed for the next approved task, and record the transfer in `docs/experiment_log.md` when it affects reproducibility.
+
 ## Current Data Contract
 
 The tracked metadata documents the current processed data contract:
