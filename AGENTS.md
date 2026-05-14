@@ -45,6 +45,9 @@ The current repository evidence shows:
 - `login1` is a login node. Do not run training, long preprocessing, large bigWig operations, or GPU workloads on it.
 - Use Slurm for GPU work. Prefer `sbatch` for production runs and short `srun` commands for controlled smoke tests.
 - Before running GPU work, check `hostname`, `sinfo`, and, inside compute jobs, `nvidia-smi`.
+- Never cancel or modify Slurm jobs that do not belong to the current AlphaGenome project. Before cancelling any job, verify its `WorkDir` and `Command`, confirm that it belongs to this repository, and get explicit user approval.
+- Prefer finding an available GPU partition or waiting in queue over cancelling jobs.
+- Prefer A100 80GB GPUs on `gpu2` for AlphaGenome smoke tests and fine-tuning when available. If `gpu2` is blocked by queue or QoS limits, check available partitions and ask before changing the target partition.
 - Record Slurm job ID, partition, CPU/GPU request, command, Git commit, input data paths, output path, and result summary.
 - Recommended starting point for short GPU checks is a single GPU with `--cpus-per-task=16`.
 - Do not submit long jobs, download large weights, or install large dependencies without explicit user approval.
