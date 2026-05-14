@@ -34,6 +34,49 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-14 - alphagenome-pytorch Import Sanity Check on HY-GPU
+
+- Run type: sanity check
+- Purpose: Verify that `alphagenome-pytorch` installs and imports in the HY-GPU `alphagenome` conda environment without downloading model weights or running training.
+- Git commit: Not recorded in terminal output
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; `alphagenome-pytorch` `0.3.1`; PyTorch `2.11.0+cu128`; CUDA `12.8`; `CUDA_VISIBLE_DEVICES=2`
+- Command:
+
+```bash
+conda activate alphagenome
+cd /home/zelinli6/Alphagenome
+
+CUDA_VISIBLE_DEVICES=2 python - <<'PY'
+import importlib.metadata as md
+import torch
+
+print("python_package_alphagenome_pytorch", md.version("alphagenome-pytorch"))
+print("torch", torch.__version__)
+print("cuda_available", torch.cuda.is_available())
+print("torch_cuda", torch.version.cuda)
+print("device_count", torch.cuda.device_count())
+print("device", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no cuda")
+
+import alphagenome_pytorch
+print("import_alphagenome_pytorch", "ok")
+
+from alphagenome_pytorch import AlphaGenome
+print("import_AlphaGenome", "ok")
+PY
+```
+
+- Input data: None
+- Output path: Interactive terminal output; no log file was captured for this run
+- Result summary: Completed successfully. `alphagenome-pytorch` imported and `AlphaGenome` imported successfully. No model weights were downloaded or loaded.
+- Verification: Observed `python_package_alphagenome_pytorch=0.3.1`, `torch=2.11.0+cu128`, `cuda_available=True`, `torch_cuda=12.8`, `device_count=1`, `device=NVIDIA A100 80GB PCIe`, `import_alphagenome_pytorch=ok`, and `import_AlphaGenome=ok`.
+- Failures or warnings: None reported in the provided terminal output.
+- Next actions: Inspect official `alphagenome-pytorch` demo and weight-loading API before downloading any safetensors weights.
+- Claim status: verified
+
 ## 2026-05-14 - Full Train NPZ PyTorch CUDA Smoke Test on HY-GPU GPU 2
 
 - Run type: smoke test
