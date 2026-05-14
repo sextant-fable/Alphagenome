@@ -1,13 +1,85 @@
+# Local environments
+.env
+.env.*
+.venv/
+venv/
+env/
+ag_torch_venv/
+conda-meta/
+
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+build/
+dist/
+*.egg-info/
+
+# Secrets and local credentials
+*.pem
+*.key
+*.token
+*.secret
+secrets/
+
+# Raw, processed, and generated data assets
+training_input_bigwig/
 alphagenome_custom/datasets/
 alphagenome_custom/tracks/
-training_input_bigwig/
+alphagenome_custom/reference/
 shared/
 shared.zip
 *.bw
 *.bigWig
 *.npz
+*.fa
+*.fasta
+*.fna
+*.gtf
+*.gff
+*.gff3
+*.2bit
+*.h5
+*.hdf5
+*.parquet
 *.xlsx
-__pycache__/
-*.pyc
-alphagenome_custom/reference/
-.claude/
+
+# Model weights and checkpoints
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+checkpoints/
+weights/
+models/
+
+# Logs, runs, and temporary outputs
+logs/
+runs/
+outputs/
+results/
+tmp/
+temp/
+wandb/
+mlruns/
+slurm-*.out
+*.out
+*.err
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Claude local-only settings
+.claude/settings.local.json
+.claude/local/
+.claude/tmp/
