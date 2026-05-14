@@ -34,6 +34,38 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-14 - Full Train NPZ PyTorch CUDA Smoke Test on HY-GPU GPU 2
+
+- Run type: smoke test
+- Purpose: Verify that the full train NPZ dataset can be read on the HY-GPU non-Slurm server and that the PyTorch dataloader, tiny Conv1d model, forward pass, backward pass, and optimizer step work for two CUDA steps.
+- Git commit: Not recorded in terminal output
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; CUDA device restricted with `CUDA_VISIBLE_DEVICES=2`; PyTorch version previously observed as `2.11.0+cu128` with CUDA `12.8`
+- Command:
+
+```bash
+conda activate alphagenome
+cd /home/zelinli6/Alphagenome
+
+CUDA_VISIBLE_DEVICES=2 python scripts/torch_smoke_train.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --batch-size 1 \
+  --max-steps 2 \
+  --hidden-channels 16 \
+  --device auto
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train`
+- Output path: Interactive terminal output; no log file was captured for this run
+- Result summary: Completed successfully. The full train NPZ dataset loaded and the tiny PyTorch model completed two CUDA forward/backward/optimizer steps using the allowed HY-GPU GPU 2 policy.
+- Verification: Observed `n_examples=116`, `n_tracks=11`, `device=cuda`, `dna_sequence_shape=1x4x1048576`, `rna_seq_shape=1x11x1048576`, `prediction_shape=1x11x1048576`, `step=1`, `step=2`, and loss values `4.7324` and `2.84982`.
+- Failures or warnings: None reported in the provided terminal output.
+- Next actions: Verify that valid and test NPZ datasets are present on HY-GPU, then prepare the next stage for `alphagenome-pytorch` installation and official model sanity checks.
+- Claim status: verified
+
 ## 2026-05-14 - Pilot NPZ PyTorch CUDA Smoke Test on HY-GPU GPU 2
 
 - Run type: smoke test
