@@ -1,0 +1,13 @@
+alphagenome_custom/datasets/
+alphagenome_custom/tracks/
+training_input_bigwig/
+shared/
+shared.zip
+*.bw
+*.bigWig
+*.npz
+*.xlsx
+__pycache__/
+*.pyc
+alphagenome_custom/reference/
+.claude/

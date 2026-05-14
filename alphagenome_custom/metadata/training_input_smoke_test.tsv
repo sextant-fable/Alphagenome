@@ -1,0 +1,2 @@
+chromosome	start	end	sequence_length	dna_shape	rna_seq_shape	n_tracks	dna_non_acgt_bases	rna_seq_min	rna_seq_max	rna_seq_mean
+I	0	1048576	1048576	1048576x4	1048576x11	11	0	0	8113.5	16.3761

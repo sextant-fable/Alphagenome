@@ -1,0 +1,21 @@
+component	path	status	notes
+reference_fasta	alphagenome_custom/reference/genome.fa	ready	WBcel235 toplevel FASTA, unmasked
+reference_fai	alphagenome_custom/reference/genome.fa.fai	ready	Generated from FASTA
+annotation_gtf	alphagenome_custom/reference/annotation.gtf	ready	Ensembl/WormBase WBcel235 release 115 GTF
+chrom_sizes	alphagenome_custom/metadata/chrom_sizes.tsv	ready	Matches bigWig chromosome names and lengths
+rna_seq_tracks_grouped	alphagenome_custom/tracks/rna_seq_grouped	ready	11 grouped RNA_SEQ bigWig tracks
+rna_seq_track_metadata	alphagenome_custom/metadata/track_metadata_grouped.tsv	ready	Grouped AlphaGenome-style RNA_SEQ metadata
+train_intervals	alphagenome_custom/intervals/train.bed	ready	1Mb windows, stride 524288, chromosomes I-II-III-IV
+valid_intervals	alphagenome_custom/intervals/valid.bed	ready	1Mb windows, stride 524288, chromosome V
+test_intervals	alphagenome_custom/intervals/test.bed	ready	1Mb windows, stride 524288, chromosome X
+rna_seq_npz_pilot_train	alphagenome_custom/datasets/rna_seq_npz_pilot_train	ready	4 train examples; AlphaGenome-like NPZ fields
+rna_seq_npz_pilot_readback	alphagenome_custom/metadata/npz_pilot_readback.tsv	ready	Read-back validation for pilot batch
+rna_seq_npz_train	alphagenome_custom/datasets/rna_seq_npz_train	ready	116 train examples; float32 RNA_SEQ targets
+rna_seq_npz_valid	alphagenome_custom/datasets/rna_seq_npz_valid	ready	39 valid examples; float32 RNA_SEQ targets
+rna_seq_npz_test	alphagenome_custom/datasets/rna_seq_npz_test	ready	33 test examples; float32 RNA_SEQ targets
+rna_seq_npz_train_readback	alphagenome_custom/metadata/npz_train_readback.tsv	ready	Full train read-back scan; nonfinite RNA_SEQ count 0
+rna_seq_npz_valid_readback	alphagenome_custom/metadata/npz_valid_readback.tsv	ready	Full valid read-back scan; nonfinite RNA_SEQ count 0
+rna_seq_npz_test_readback	alphagenome_custom/metadata/npz_test_readback.tsv	ready	Full test read-back scan; nonfinite RNA_SEQ count 0
+pytorch_dataset_loader	scripts/torch_rna_seq_dataset.py	ready	PyTorch Dataset/DataLoader for NPZ inputs
+pytorch_smoke_train	scripts/torch_smoke_train.py	ready	Tiny Conv1d smoke training script for remote server validation
+pytorch_remote_notes	alphagenome_custom/metadata/torch_remote_training.md	ready	Remote transfer, install, and smoke-test notes

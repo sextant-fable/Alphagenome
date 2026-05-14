@@ -1,0 +1,2 @@
+dataset_dir	n_examples_manifest	batch_size	dna_sequence_shape	rna_seq_shape	rna_seq_mask_shape	rna_seq_strand_shape	dna_dtype_after_load	rna_seq_dtype_after_load	rna_seq_min	rna_seq_max	rna_seq_mean	first_interval	format	scan_all_examples	examples_scanned	rna_seq_all_min	rna_seq_all_max	rna_seq_all_mean	rna_seq_nonfinite_count
+alphagenome_custom/datasets/rna_seq_npz_train	116	2	2x1048576x4	2x1048576x11	2x1x11	2x1x11	float32	float32	0	8113.5	13.9925	I:0-1048576	alphagenome_custom_rna_seq_npz	true	116	0	506671	26.7011	0
