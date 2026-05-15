@@ -130,3 +130,19 @@ srun -p gpu2 --gres=gpu:1 --cpus-per-task=16 \
 - Keep generated data, model weights, checkpoints, logs, and local settings out of Git.
 - Use concise English commit messages that describe the maintenance or research change.
 - Prefer small commits that separate documentation, scripts, metadata updates, and experiment records.
+
+## Git Coordination
+
+- The active development host is `HY-GPU` at `/home/zelinli6/Alphagenome`.
+- The old EEHPC/login1 checkout at `/home/zelinli6/Alphagenome` is now archival/source-data only.
+- Both checkouts use the same GitHub remote: `https://github.com/sextant-fable/Alphagenome.git`.
+- Work on branch `setup/agent-maintenance`.
+- On `HY-GPU`, after approved file edits:
+  - run `git status --short --branch`
+  - run `git add <explicit files>`
+  - run `git commit -m "English commit message"`
+  - run `git push`
+- On `login1`, do not make new edits unless explicitly requested. Use only `git pull` to sync documentation/code from GitHub.
+- Do not edit the same files on both hosts at the same time.
+- Do not use `git add .`.
+- Do not commit ignored large assets such as datasets, bigWigs, references, weights, logs, or runs.

@@ -1,0 +1,316 @@
+# C. elegans RNA-seq 11-Track AlphaGenome Adapter Summary
+
+Date: 2026-05-15
+
+This document summarizes the current frozen AlphaGenome adapter experiment for
+custom C. elegans 11-track RNA-seq prediction. Full command records and run
+details are in `docs/experiment_log.md`.
+
+## Status
+
+- Current selected model: frozen AlphaGenome trunk plus 11-track RNA-seq adapter.
+- Selection rule: choose the checkpoint with lowest full-validation MSE.
+- Selected checkpoint: `runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt`
+- Selected step: 4250
+- Best validation MSE: `1.0609935`
+- Held-out test has now been evaluated once for this selected model.
+- Do not use the test split for additional model selection or tuning.
+
+## Data
+
+- Species/reference: C. elegans WBcel235.
+- Input intervals: 1,048,576 bp windows with 524,288 bp stride.
+- Terminology note: 1,048,576 bp is the sequence window length, not the model
+  resolution. In the current adapter run, the frozen AlphaGenome representation
+  is taken at 128 bp resolution and then interpolated back to the 1,048,576
+  output positions for comparison with the target arrays.
+- Chromosome split:
+  - train: chromosomes `I`, `II`, `III`, `IV`
+  - valid: chromosome `V`
+  - test: chromosome `X`
+  - `MtDNA` excluded
+- NPZ examples:
+  - train: `116`
+  - valid: `39`
+  - test: `33`
+- Targets:
+  - 20 original local sample-level RNA-seq bigWig files were grouped into 11
+    `RNA_SEQ` tracks.
+  - Targets are loaded as `rna_seq` arrays and transformed with `log1p` after
+    clipping negative values to zero.
+  - Tensor shapes during training/evaluation:
+    - DNA input: `[B, 4, 1048576]`
+    - RNA-seq target: `[B, 11, 1048576]`
+    - RNA-seq mask: `[B, 11, 1]`
+
+## Model
+
+The adapter model is implemented in `scripts/alphagenome_rna_seq11_adapter.py`.
+
+Construction:
+
+1. Load the converted PyTorch AlphaGenome weights with
+   `AlphaGenome.from_pretrained(weights/alphagenome_pytorch/model_all_folds.safetensors)`.
+2. Freeze all AlphaGenome base-model parameters with `requires_grad=False`.
+3. Run the frozen model in `torch.no_grad()` via `base_model.encode(...)`.
+4. Use 128 bp embeddings: `embeddings_128bp`.
+5. Apply a trainable 1x1 Conv1d head from 3072 embedding channels to 11 RNA-seq
+   tracks.
+6. Linearly interpolate the 128 bp-resolution adapter output back to the full
+   1,048,576 bp target length.
+
+So the evaluated prediction arrays have one value per base-position slot across
+the 1,048,576 bp window, but the adapter's learned signal is bottlenecked by the
+128 bp AlphaGenome embedding grid.
+
+Parameter counts for the selected setup:
+
+- frozen AlphaGenome base parameters: `450452613`
+- trainable adapter/head parameters: `33803`
+- total module parameters: `450486416`
+
+The trunk is not fine-tuned in the current result. This is adaptation from
+pretrained AlphaGenome-style weights to custom C. elegans grouped RNA-seq tracks
+using only the small adapter/head.
+
+## Loss And Metrics
+
+Training loss:
+
+- masked MSE over valid RNA-seq tracks and all base positions
+- denominator: number of valid masked tracks times sequence length
+
+Reported evaluation metrics:
+
+- MSE: exact pointwise masked mean squared error
+- MAE: exact pointwise masked mean absolute error
+- Pearson: exact pointwise Pearson correlation
+- Spearman: sampled per-track Spearman with deterministic sampling
+
+For Spearman runs reported here:
+
+- `spearman_sample_size=200000`
+- `spearman_seed=20260515`
+
+## Environment
+
+HY-GPU non-Slurm server:
+
+- host: `HY-GPU`
+- allowed GPU used: `CUDA_VISIBLE_DEVICES=2`
+- GPU: NVIDIA A100 80GB PCIe
+- conda environment: `alphagenome`
+- Python: `3.12.13`
+- PyTorch: `2.11.0+cu128`
+- PyTorch CUDA: `12.8`
+- NVIDIA driver CUDA reported by `nvidia-smi`: `13.2`
+- `alphagenome_pytorch`: `0.3.1`
+- Git commit recorded for these runs: `f36a2c816fbe780918a1e67cdd2bcc1c1646a85e`
+
+## Training Configuration
+
+Formal adapter-only training command:
+
+```bash
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome python -u scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp \
+  --batch-size 1 \
+  --max-steps 5000 \
+  --eval-every 250 \
+  --learning-rate 3e-4 \
+  --embedding-resolution 128 \
+  --seed 20260515 \
+  --device auto
+```
+
+Key settings:
+
+- optimizer: AdamW
+- learning rate: `3e-4`
+- weight decay: `0.0`
+- batch size: `1`
+- max steps: `5000`
+- validation interval: every `250` steps
+- target transform: `log1p`
+- embedding resolution: `128`
+- organism index: `0`
+- num workers: `0`
+- checkpoint selection: best full-validation MSE
+
+During training, logs repeatedly confirmed:
+
+- `base_has_grad=False`
+- prediction shape: `1x11x1048576`
+- CUDA peak memory around `17665.2` MB during training
+
+## Baselines
+
+### Train-track mean baseline
+
+Implemented in `scripts/rna_seq11_mean_baseline.py`.
+
+- Estimate one global `log1p` mean per track from train.
+- Predict the train mean for every valid base position.
+- Valid MSE: `1.7282558`
+
+### Tiny Conv1d learned baseline
+
+Implemented through `TinyConvRnaSeqModel` in `scripts/torch_rna_seq_dataset.py`.
+
+Architecture:
+
+```text
+Conv1d(4 -> hidden_channels, kernel_size=15, padding=7)
+GELU
+Conv1d(hidden_channels -> hidden_channels, kernel_size=15, padding=7)
+GELU
+Conv1d(hidden_channels -> 11, kernel_size=1)
+```
+
+Small 500-step baseline:
+
+- hidden channels: `16`
+- trainable parameters: `5019`
+- learning rate: `3e-4`
+- max steps: `500`
+- valid MSE at step 500: `1.6399873`
+- valid MAE: `1.0042184`
+- valid Pearson: `0.19711665`
+
+Stronger 2000-step baseline:
+
+- hidden channels: `64`
+- trainable parameters: `66123`
+- learning rate: `1e-3`
+- max steps: `2000`
+- eval every: `200`
+- best valid MSE: `1.553865` at step 400
+- final valid MSE: `1.6456854`
+- final valid MAE: `1.0224008`
+- final valid Pearson: `0.27318148`
+
+## Main Results
+
+Validation-set development results:
+
+| model | split | selection | MSE | MAE | Pearson |
+|---|---:|---|---:|---:|---:|
+| train-track mean baseline | valid | fixed baseline | `1.7282558` | not computed | not computed |
+| tiny Conv1d h16 | valid | final step 500 | `1.6399873` | `1.0042184` | `0.19711665` |
+| tiny Conv1d h64 | valid | best step 400 | `1.553865` | not computed at best step | not computed at best step |
+| tiny Conv1d h64 | valid | final step 2000 | `1.6456854` | `1.0224008` | `0.27318148` |
+| frozen AlphaGenome adapter | valid | step 500 pilot | `1.2418628` | `0.84385942` | `0.52766246` |
+| frozen AlphaGenome adapter | valid | best step 4250 | `1.0609935` | `0.71866247` | `0.58809888` |
+
+Held-out test result for the selected checkpoint:
+
+| model | split | checkpoint | MSE | MAE | Pearson |
+|---|---:|---|---:|---:|---:|
+| frozen AlphaGenome adapter | test | best valid checkpoint, step 4250 | `1.1711332` | `0.76486897` | `0.55539986` |
+
+Relative validation MSE comparison:
+
+- adapter best vs train-track mean baseline:
+  - MSE reduction: `0.6672623`
+  - relative reduction: about `38.6%`
+- adapter best vs stronger tiny Conv1d best:
+  - MSE reduction: `0.4928715`
+  - relative reduction: about `31.7%`
+- adapter best vs 500-step adapter pilot:
+  - MSE reduction: `0.1808693`
+  - relative reduction: about `14.6%`
+
+## Formal Adapter Validation Curve
+
+Selected validation points from the 5000-step adapter-only run:
+
+| step | valid MSE |
+|---:|---:|
+| 500 | `1.2141448` |
+| 1000 | `1.1391212` |
+| 1500 | `1.1319546` |
+| 2000 | `1.1181387` |
+| 2500 | `1.0989698` |
+| 3000 | `1.0935162` |
+| 3250 | `1.0837174` |
+| 3500 | `1.1061893` |
+| 3750 | `1.0840694` |
+| 4000 | `1.0615692` |
+| 4250 | `1.0609935` |
+| 4500 | `1.0840007` |
+| 4750 | `1.0764805` |
+| 5000 | `1.1053824` |
+
+The final checkpoint was worse than the best validation checkpoint, so the
+selected model is `adapter_head_best.pt`, not `adapter_head.pt`.
+
+## Held-Out Test Per-Track Metrics
+
+Checkpoint: `runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt`
+
+| track | name | MSE | MAE | Pearson | sampled Spearman |
+|---|---|---:|---:|---:|---:|
+| RNA_SEQ_001 | Intestine (end1), Embryo T0 | `1.1087508` | `0.72696165` | `0.51305557` | `0.39898333` |
+| RNA_SEQ_002 | Intestine (end1), Embryo T1 | `1.2813301` | `0.80888759` | `0.51497802` | `0.4206953` |
+| RNA_SEQ_003 | Intestine (end1), Embryo T2 | `1.0176844` | `0.69805531` | `0.53053846` | `0.42976539` |
+| RNA_SEQ_004 | Intestine (end1), Embryo T3 | `1.2760303` | `0.8365687` | `0.53190608` | `0.42524173` |
+| RNA_SEQ_005 | Intestine (end1), Embryo T4 | `1.3059002` | `0.85648933` | `0.55922813` | `0.46137527` |
+| RNA_SEQ_006 | Muscle (hlh-1), Embryo T0 | `1.2404023` | `0.76799258` | `0.53393285` | `0.44893427` |
+| RNA_SEQ_007 | Muscle (hlh-1), Embryo T1 | `1.062132` | `0.69213948` | `0.55428168` | `0.47665318` |
+| RNA_SEQ_008 | Muscle (hlh-1), Embryo T2 | `1.1175543` | `0.71924756` | `0.57475091` | `0.49999499` |
+| RNA_SEQ_009 | Muscle (hlh-1), Embryo T3 | `1.1340388` | `0.73409846` | `0.59417222` | `0.52200972` |
+| RNA_SEQ_010 | Muscle (hlh-1), Embryo T4 | `1.2012671` | `0.78986845` | `0.59174095` | `0.50791787` |
+| RNA_SEQ_011 | Pharynx (pha-4), Embryo T4 | `1.1373745` | `0.78324954` | `0.54218363` | `0.46518732` |
+
+## Output Artifacts
+
+Ignored run directories:
+
+- formal adapter run:
+  `runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/`
+- stronger tiny Conv1d baseline:
+  `runs/rna_seq11_tiny_conv_baseline_20260515_2000steps_lr1e-3_h64/`
+
+Key ignored artifacts:
+
+- selected checkpoint:
+  `runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt`
+- final checkpoint:
+  `runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head.pt`
+- validation metrics:
+  `runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/valid_best_pointwise_metrics.tsv`
+- held-out test metrics:
+  `runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/test_best_pointwise_metrics.tsv`
+
+These files are generated artifacts and should not be committed to Git.
+
+## Interpretation And Limits
+
+Verified from current runs:
+
+- Frozen AlphaGenome embeddings plus a small 11-track adapter outperform both
+  the train-track mean baseline and the learned tiny Conv1d baseline on the
+  validation split.
+- The selected adapter checkpoint also gives a held-out test MSE of `1.1711332`
+  and test Pearson of `0.55539986`.
+- The held-out test MSE is worse than the selected validation MSE
+  (`1.1711332` vs `1.0609935`), so there is a generalization gap.
+
+Limits:
+
+- This does not reproduce original AlphaGenome training or benchmark protocol.
+- This is a species- and dataset-specific adapter experiment on custom
+  C. elegans RNA-seq tracks.
+- The trunk was frozen; only the small adapter/head was trained.
+- Spearman values are sampled, not exact over every base.
+- The held-out test split has now been used once and should not guide further
+  model selection.
+
+## Recommended Next Step
+
+For this experiment round, freeze the result above as the current benchmark and
+commit the scripts plus documentation. Future modeling changes should be treated
+as a new experiment round with validation-only model selection.
