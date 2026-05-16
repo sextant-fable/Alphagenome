@@ -24,6 +24,7 @@ class RnaSeq11Adapter(torch.nn.Module):
         n_tracks: int,
         embedding_resolution: int = 128,
         organism_index: int = 0,
+        encode_requires_grad: bool = False,
     ) -> None:
         super().__init__()
         if embedding_resolution not in {1, 128}:
@@ -32,6 +33,7 @@ class RnaSeq11Adapter(torch.nn.Module):
         self.base_model = base_model
         self.embedding_resolution = embedding_resolution
         self.organism_index = organism_index
+        self.encode_requires_grad = encode_requires_grad
         in_channels = 1536 if embedding_resolution == 1 else 3072
         self.head = torch.nn.Conv1d(in_channels, n_tracks, kernel_size=1)
 
@@ -50,7 +52,12 @@ class RnaSeq11Adapter(torch.nn.Module):
         )
         dna_sequence_nlc = dna_sequence.transpose(1, 2).contiguous()
 
-        with torch.no_grad():
+        grad_context = (
+            torch.enable_grad()
+            if self.encode_requires_grad and torch.is_grad_enabled()
+            else torch.no_grad()
+        )
+        with grad_context:
             embeddings = self.base_model.encode(
                 dna_sequence_nlc,
                 organism_index,

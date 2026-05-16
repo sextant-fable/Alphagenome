@@ -1,6 +1,6 @@
 # C. elegans RNA-seq 11-Track AlphaGenome Adapter Summary
 
-Date: 2026-05-15
+Date: 2026-05-16
 
 This document summarizes the current frozen AlphaGenome adapter experiment for
 custom C. elegans 11-track RNA-seq prediction. Full command records and run
@@ -15,6 +15,8 @@ details are in `docs/experiment_log.md`.
 - Best validation MSE: `1.0609935`
 - Held-out test has now been evaluated once for this selected model.
 - Do not use the test split for additional model selection or tuning.
+- A follow-up 128 bp last-block LoRA scheme C feasibility round did not improve
+  validation MSE, so the selected model remains unchanged.
 
 ## Data
 
@@ -72,6 +74,45 @@ Parameter counts for the selected setup:
 The trunk is not fine-tuned in the current result. This is adaptation from
 pretrained AlphaGenome-style weights to custom C. elegans grouped RNA-seq tracks
 using only the small adapter/head.
+
+Additional 1 bp pilot variant:
+
+- A follow-up validation-only pilot used `embeddings_1bp` instead of
+  `embeddings_128bp`.
+- The 1 bp adapter head is a trainable 1x1 Conv1d from 1536 embedding channels
+  to 11 RNA-seq tracks and has `16907` trainable parameters.
+- This variant was run with the same frozen trunk, but with two-process DDP on
+  HY-GPU GPUs 2 and 3, per-process batch size `1`, gradient accumulation `4`,
+  global effective batch size `8`, learning rate `1e-4`, 50-step warmup, cosine
+  decay, and gradient clipping at norm `1.0`.
+- The 1 bp pilot is not the selected model; the held-out test split was not used
+  for it.
+
+LoRA feasibility check:
+
+- A 128 bp last-block LoRA smoke test was added after the frozen-adapter pilots.
+- LoRA was applied only to `tower.blocks.8.mha` and `tower.blocks.8.mlp`, covering
+  six Linear layers in the final transformer block.
+- The smoke used rank `4`, alpha `8`, and added `72960` trainable LoRA parameters
+  on top of the `33803` trainable RNA-seq adapter-head parameters.
+- The run confirmed `base_non_lora_trainable_parameters=0`,
+  `base_non_lora_has_grad=False`, `lora_has_grad=True`, and
+  `head_has_grad=True` for a one-step 128 bp feasibility pass.
+- This is not a validation or test result. It only establishes that a
+  lightweight trunk-adaptation path can run.
+
+LoRA scheme C continuation pilots:
+
+- Both pilots initialized the 128 bp RNA-seq adapter head from
+  `runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt`.
+- Phase A froze that initialized adapter head and trained only final-block LoRA
+  parameters. Original non-LoRA AlphaGenome trunk weights stayed frozen.
+- Phase B trained both the final-block LoRA parameters and the initialized
+  adapter head. Original non-LoRA AlphaGenome trunk weights stayed frozen.
+- Both pilots used LoRA rank `4`, alpha `8`, learning rate `5e-5`, 20-step
+  warmup, cosine decay, gradient clipping at norm `1.0`, batch size `1`, and
+  100 total steps with full validation every 20 steps.
+- Neither pilot outperformed the selected frozen-trunk 128 bp adapter checkpoint.
 
 ## Loss And Metrics
 
@@ -146,6 +187,54 @@ During training, logs repeatedly confirmed:
 - prediction shape: `1x11x1048576`
 - CUDA peak memory around `17665.2` MB during training
 
+LoRA scheme C continuation commands used the same train/valid NPZ splits and
+the selected 5000-step adapter checkpoint as initialization:
+
+```bash
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome python -u scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_adapter_128bp_lora_phaseA_20260516_100steps_lr5e-5_freezehead \
+  --init-adapter-checkpoint runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt \
+  --batch-size 1 \
+  --max-steps 100 \
+  --eval-every 20 \
+  --learning-rate 5e-5 \
+  --embedding-resolution 128 \
+  --seed 20260516 \
+  --grad-accum-steps 1 \
+  --grad-clip-norm 1.0 \
+  --lr-schedule cosine \
+  --warmup-steps 20 \
+  --enable-last-block-lora \
+  --lora-rank 4 \
+  --lora-alpha 8 \
+  --freeze-head \
+  --device auto
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome python -u scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_adapter_128bp_lora_phaseB_20260516_100steps_lr5e-5_lora_head \
+  --init-adapter-checkpoint runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt \
+  --batch-size 1 \
+  --max-steps 100 \
+  --eval-every 20 \
+  --learning-rate 5e-5 \
+  --embedding-resolution 128 \
+  --seed 20260516 \
+  --grad-accum-steps 1 \
+  --grad-clip-norm 1.0 \
+  --lr-schedule cosine \
+  --warmup-steps 20 \
+  --enable-last-block-lora \
+  --lora-rank 4 \
+  --lora-alpha 8 \
+  --device auto
+```
+
 ## Baselines
 
 ### Train-track mean baseline
@@ -202,8 +291,11 @@ Validation-set development results:
 | tiny Conv1d h16 | valid | final step 500 | `1.6399873` | `1.0042184` | `0.19711665` |
 | tiny Conv1d h64 | valid | best step 400 | `1.553865` | not computed at best step | not computed at best step |
 | tiny Conv1d h64 | valid | final step 2000 | `1.6456854` | `1.0224008` | `0.27318148` |
+| frozen AlphaGenome 1 bp adapter | valid | best/final step 500 DDP pilot | `1.4771859` | not computed | not computed |
 | frozen AlphaGenome adapter | valid | step 500 pilot | `1.2418628` | `0.84385942` | `0.52766246` |
 | frozen AlphaGenome adapter | valid | best step 4250 | `1.0609935` | `0.71866247` | `0.58809888` |
+| 128 bp last-block LoRA, initialized from selected adapter, head frozen | valid | best step 20 | `1.0613562` | not computed | not computed |
+| 128 bp last-block LoRA, initialized from selected adapter, LoRA+head | valid | best step 40 | `1.067338` | not computed | not computed |
 
 Held-out test result for the selected checkpoint:
 

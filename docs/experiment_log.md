@@ -34,6 +34,344 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-16 - AlphaGenome 128 bp Last-Block LoRA Scheme C 100-Step Pilots on HY-GPU GPU 2
+
+- Run type: training
+- Purpose: Test scheme C for lightweight trunk adaptation: initialize from the selected 5000-step 128 bp RNA-seq adapter head, then compare LoRA-only continuation with the head frozen against LoRA-plus-head continuation, while keeping original non-LoRA AlphaGenome trunk weights frozen and keeping the held-out test split untouched.
+- Git commit: `b592b0426b158e4a13e8afd8f2c96eae86692423`; working tree contained uncommitted LoRA training-script updates and documentation updates.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; PyTorch CUDA `12.8`; driver CUDA `13.2`; `alphagenome_pytorch 0.3.1`; `CUDA_VISIBLE_DEVICES=2`
+- Command:
+
+```bash
+cd /home/zelinli6/Alphagenome
+
+RUN_DIR=runs/rna_seq11_adapter_128bp_lora_phaseA_20260516_100steps_lr5e-5_freezehead
+mkdir -p "$RUN_DIR"
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome \
+  python -u scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir "$RUN_DIR" \
+  --init-adapter-checkpoint runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt \
+  --batch-size 1 \
+  --max-steps 100 \
+  --eval-every 20 \
+  --learning-rate 5e-5 \
+  --embedding-resolution 128 \
+  --seed 20260516 \
+  --grad-accum-steps 1 \
+  --grad-clip-norm 1.0 \
+  --lr-schedule cosine \
+  --warmup-steps 20 \
+  --enable-last-block-lora \
+  --lora-rank 4 \
+  --lora-alpha 8 \
+  --freeze-head \
+  --device auto 2>&1 | tee "$RUN_DIR/train.log"
+
+RUN_DIR=runs/rna_seq11_adapter_128bp_lora_phaseB_20260516_100steps_lr5e-5_lora_head
+mkdir -p "$RUN_DIR"
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome \
+  python -u scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir "$RUN_DIR" \
+  --init-adapter-checkpoint runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt \
+  --batch-size 1 \
+  --max-steps 100 \
+  --eval-every 20 \
+  --learning-rate 5e-5 \
+  --embedding-resolution 128 \
+  --seed 20260516 \
+  --grad-accum-steps 1 \
+  --grad-clip-norm 1.0 \
+  --lr-schedule cosine \
+  --warmup-steps 20 \
+  --enable-last-block-lora \
+  --lora-rank 4 \
+  --lora-alpha 8 \
+  --device auto 2>&1 | tee "$RUN_DIR/train.log"
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` (`116` examples); `alphagenome_custom/datasets/rna_seq_npz_valid` (`39` examples); base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`; initialization checkpoint `runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt`. The held-out test split was not used.
+- Output path: `runs/rna_seq11_adapter_128bp_lora_phaseA_20260516_100steps_lr5e-5_freezehead/` and `runs/rna_seq11_adapter_128bp_lora_phaseB_20260516_100steps_lr5e-5_lora_head/`, each containing `config.json`, `metrics.tsv`, `adapter_head.pt`, and `adapter_head_best.pt`. These paths are ignored by Git.
+- Result summary: Both scheme C pilots completed successfully and confirmed gradients only through the intended trainable modules. Phase A trained only the final-block LoRA parameters with the previously selected adapter head frozen. Phase B trained final-block LoRA parameters plus the adapter head. Neither pilot improved on the selected frozen-trunk 128 bp adapter validation MSE of `1.0609935`.
+- Verification: Phase A reported `head_trainable_parameters=0`, `lora_trainable_parameters=72960`, and `optimizer_trainable_parameters=72960`; full-validation MSEs were `1.0613562` at step 20, `1.0625891` at step 40, `1.0640197` at step 60, `1.0650645` at step 80, and `1.0653593` at step 100. Phase B reported `head_trainable_parameters=33803`, `lora_trainable_parameters=72960`, and `optimizer_trainable_parameters=106763`; full-validation MSEs were `1.0698467` at step 20, `1.067338` at step 40, `1.0680136` at step 60, `1.0715059` at step 80, and `1.0727408` at step 100. Both runs used `embedding_resolution=128`, LoRA rank `4`, alpha `8`, learning rate `5e-5`, 20-step warmup, cosine decay, and gradient clipping at norm `1.0`. Peak CUDA allocation was about `17820.6` to `17820.9` MB.
+- Failures or warnings: These are validation-set continuation pilots, not held-out test results. Phase A was numerically very close to the original selected checkpoint but did not beat it; Phase B degraded more clearly. The held-out test split was not used.
+- Next actions: Keep the selected model unchanged unless a future validation-only run beats `1.0609935`. If continuing LoRA exploration, try a lower continuation learning rate such as `1e-5` to `2e-5`, or a more conservative schedule, and select only by validation performance.
+- Claim status: verified
+
+## 2026-05-16 - AlphaGenome 128 bp Last-Block LoRA Adapter Feasibility Smoke on HY-GPU GPU 2
+
+- Run type: smoke test
+- Purpose: Verify that a parameter-efficient LoRA adaptation path can train the custom C. elegans 11-track RNA-seq adapter while keeping original AlphaGenome trunk weights frozen.
+- Git commit: `b592b0426b158e4a13e8afd8f2c96eae86692423`; working tree contained uncommitted DDP/scheduler updates from the previous 1 bp pilot plus the new LoRA smoke script and adapter gradient-control update.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; PyTorch CUDA `12.8`; driver CUDA `13.2`; `alphagenome_pytorch 0.3.1`; `CUDA_VISIBLE_DEVICES=2`
+- Command:
+
+```bash
+cd /home/zelinli6/Alphagenome
+
+RUN_DIR=runs/rna_seq11_adapter_128bp_lora_lastblock_smoke_20260516_1step_v2
+mkdir -p "$RUN_DIR"
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome \
+  python -u scripts/alphagenome_rna_seq11_lora_smoke.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --batch-size 1 \
+  --max-steps 1 \
+  --max-train-examples 1 \
+  --max-valid-examples 1 \
+  --max-valid-batches 1 \
+  --learning-rate 1e-4 \
+  --lora-rank 4 \
+  --lora-alpha 8 \
+  --device auto 2>&1 | tee "$RUN_DIR/train.log"
+```
+
+- Input data: First train example from `alphagenome_custom/datasets/rna_seq_npz_train`; first validation example from `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`. The held-out test split was not used.
+- Output path: `runs/rna_seq11_adapter_128bp_lora_lastblock_smoke_20260516_1step_v2/train.log`. This path is ignored by Git.
+- Result summary: Completed successfully. LoRA was applied only to the final transformer block sequence modules `tower.blocks.8.mha` and `tower.blocks.8.mlp`, while original non-LoRA AlphaGenome trunk parameters remained frozen.
+- Verification: Observed `lora_modules_applied=6`: `tower.blocks.8.mha.q_proj`, `tower.blocks.8.mha.k_proj`, `tower.blocks.8.mha.v_proj`, `tower.blocks.8.mha.linear_embedding`, `tower.blocks.8.mlp.fc1`, and `tower.blocks.8.mlp.fc2`. Observed `lora_trainable_parameters=72960`, `head_parameters=33803`, `base_non_lora_trainable_parameters=0`, and `total_trainable_parameters=106763`. One training step produced `prediction_shape=1x11x1048576`, train loss `2.83829`, `base_non_lora_has_grad=False`, `lora_has_grad=True`, `head_has_grad=True`, LoRA grad norm `0.0144359`, head grad norm `5.5984`, peak CUDA allocation `17767.9` MB, and one-example valid loss `1.91089`. Post-run check showed no active GPU compute process.
+- Failures or warnings: This is a feasibility smoke test on one train example and one validation example, not a model-performance result. It does not support model selection. The full held-out test split was not used.
+- Next actions: If continuing, run a validation-only 128 bp LoRA pilot, for example 100 to 500 steps with full validation, lower learning rate, warmup/cosine, and best-validation checkpointing. Continue keeping test untouched.
+- Claim status: verified
+
+## 2026-05-16 - AlphaGenome 128 bp Last-Block LoRA Adapter Smoke Failure on HY-GPU GPU 2
+
+- Run type: smoke test
+- Purpose: First attempt at the 128 bp last-block LoRA feasibility smoke.
+- Git commit: `b592b0426b158e4a13e8afd8f2c96eae86692423`; working tree contained uncommitted LoRA smoke edits.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; `CUDA_VISIBLE_DEVICES=2`
+- Command:
+
+```bash
+cd /home/zelinli6/Alphagenome
+
+RUN_DIR=runs/rna_seq11_adapter_128bp_lora_lastblock_smoke_20260516_1step
+mkdir -p "$RUN_DIR"
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome \
+  python -u scripts/alphagenome_rna_seq11_lora_smoke.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --batch-size 1 \
+  --max-steps 1 \
+  --max-train-examples 1 \
+  --max-valid-examples 1 \
+  --max-valid-batches 1 \
+  --learning-rate 1e-4 \
+  --lora-rank 4 \
+  --lora-alpha 8 \
+  --device auto 2>&1 | tee "$RUN_DIR/train.log"
+```
+
+- Input data: First train example and first validation example from the existing NPZ datasets; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`. The held-out test split was not used.
+- Output path: `runs/rna_seq11_adapter_128bp_lora_lastblock_smoke_20260516_1step/train.log`. This path is ignored by Git.
+- Result summary: Failed before completing the first forward pass.
+- Verification: Module targeting worked before the failure: the script reported `lora_modules_applied=6`, `lora_trainable_parameters=72960`, `head_parameters=33803`, `base_non_lora_trainable_parameters=0`, and `total_trainable_parameters=106763`.
+- Failures or warnings: Runtime error reported CPU/CUDA tensor mismatch because LoRA modules were inserted after the base model had already been moved to CUDA, leaving newly created LoRA layers on CPU. The script was fixed by moving the model to the selected device after applying LoRA, and the follow-up run succeeded.
+- Next actions: See the successful `2026-05-16 - AlphaGenome 128 bp Last-Block LoRA Adapter Feasibility Smoke on HY-GPU GPU 2` entry.
+- Claim status: verified
+
+## 2026-05-15 - Frozen AlphaGenome 1 bp Adapter 500-Step DDP Pilot on HY-GPU GPUs 2 and 3
+
+- Run type: training
+- Purpose: Test a more stable 1 bp embedding adapter schedule using frozen AlphaGenome trunk, two-GPU DDP, lower learning rate, warmup, cosine decay, gradient clipping, and gradient accumulation, while keeping the held-out test split untouched.
+- Git commit: `b592b0426b158e4a13e8afd8f2c96eae86692423`; working tree contained uncommitted training-script DDP/scheduler updates plus experiment-log updates.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; PyTorch CUDA `12.8`; driver CUDA `13.2`; `alphagenome_pytorch 0.3.1`; `CUDA_VISIBLE_DEVICES=2,3`; `torch.distributed.run --nproc_per_node=2`
+- Command:
+
+```bash
+cd /home/zelinli6/Alphagenome
+
+RUN_DIR=runs/rna_seq11_adapter_1bp_ddp_pilot_20260515_500steps_lr1e-4_warmup50_accum4_clip1
+mkdir -p "$RUN_DIR"
+
+CUDA_VISIBLE_DEVICES=2,3 conda run -n alphagenome \
+  python -m torch.distributed.run --standalone --nproc_per_node=2 \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir "$RUN_DIR" \
+  --batch-size 1 \
+  --max-steps 500 \
+  --eval-every 50 \
+  --learning-rate 1e-4 \
+  --embedding-resolution 1 \
+  --seed 20260515 \
+  --grad-accum-steps 4 \
+  --grad-clip-norm 1.0 \
+  --lr-schedule cosine \
+  --warmup-steps 50 \
+  --device auto 2>&1 | tee "$RUN_DIR/train.log"
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` (`116` examples); `alphagenome_custom/datasets/rna_seq_npz_valid` (`39` examples); base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`. The held-out test split was not used.
+- Output path: `runs/rna_seq11_adapter_1bp_ddp_pilot_20260515_500steps_lr1e-4_warmup50_accum4_clip1/` containing `config.json`, `metrics.tsv`, `train.log`, `adapter_head.pt`, and `adapter_head_best.pt`. This path is ignored by Git.
+- Result summary: Completed successfully with two DDP ranks. The run used frozen trunk plus the 1 bp adapter head (`16907` trainable parameters), per-process batch size `1`, gradient accumulation `4`, and global effective batch size `8`. Validation MSE improved throughout the run and the best checkpoint was the final step.
+- Verification: Observed `distributed=True`, `world_size=2`, `global_effective_batch_size=8`, repeated `prediction_shape=1x11x1048576`, `base_has_grad=False`, and peak torch CUDA allocation about `36039.0` MB on rank 0. Full-validation MSEs were `1.6729847` at step 50, `1.6765932` at step 100, `1.5817027` at step 150, `1.5381760` at step 200, `1.5135129` at step 250, `1.4926636` at step 300, `1.4850671` at step 350, `1.4796252` at step 400, `1.4776338` at step 450, and `1.4771859` at step 500. Best validation MSE was `1.4771859` at step 500, saved to `adapter_head_best.pt`. Post-run check showed no active GPU compute process.
+- Failures or warnings: This is a validation-set pilot, not held-out test performance. The run prints a PyTorch warning that `OMP_NUM_THREADS` is set to `1` by `torch.distributed.run`; no training failure resulted. The final cosine learning rate reached `0`, so continuing this exact run without changing the schedule would not further update weights.
+- Next actions: Evaluate the selected 1 bp checkpoint on the validation split with per-track MSE, MAE, Pearson, and sampled Spearman before deciding whether to run a longer 1 bp schedule or return to the stronger 128 bp adapter path. Do not use the held-out test split for this decision.
+- Claim status: verified
+
+## 2026-05-15 - Frozen AlphaGenome 1 bp Adapter DDP One-Step Smoke on HY-GPU GPUs 2 and 3
+
+- Run type: smoke test
+- Purpose: Verify the new two-process DDP training path before launching the longer 1 bp adapter pilot.
+- Git commit: `b592b0426b158e4a13e8afd8f2c96eae86692423`; working tree contained uncommitted DDP/scheduler updates to the training script.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; `CUDA_VISIBLE_DEVICES=2,3`; `torch.distributed.run --nproc_per_node=2`
+- Command:
+
+```bash
+cd /home/zelinli6/Alphagenome
+
+RUN_DIR=runs/rna_seq11_adapter_1bp_ddp_smoke_20260515_1step
+mkdir -p "$RUN_DIR"
+
+CUDA_VISIBLE_DEVICES=2,3 conda run -n alphagenome \
+  python -m torch.distributed.run --standalone --nproc_per_node=2 \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir "$RUN_DIR" \
+  --batch-size 1 \
+  --max-steps 1 \
+  --eval-every 1 \
+  --max-train-examples 2 \
+  --max-valid-examples 1 \
+  --learning-rate 1e-4 \
+  --embedding-resolution 1 \
+  --seed 20260515 \
+  --grad-accum-steps 4 \
+  --grad-clip-norm 1.0 \
+  --lr-schedule cosine \
+  --warmup-steps 50 \
+  --device auto \
+  --no-save-checkpoint 2>&1 | tee "$RUN_DIR/train.log"
+```
+
+- Input data: First two train examples and first validation example from the existing NPZ datasets; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`. The held-out test split was not used.
+- Output path: `runs/rna_seq11_adapter_1bp_ddp_smoke_20260515_1step/` containing `config.json`, `metrics.tsv`, and `train.log`. This path is ignored by Git.
+- Result summary: Completed successfully. The DDP path reported `distributed=True`, `world_size=2`, per-process batch size `1`, and global effective batch size `8`.
+- Verification: Observed `embedding_resolution=1`, `trainable_parameters=16907`, `prediction_shape=1x11x1048576`, `base_has_grad=False`, one-step train loss `2.55981`, one-example valid loss `1.89307`, and peak rank-0 CUDA allocation about `35934.9` MB.
+- Failures or warnings: This is an environment and DDP plumbing smoke test, not a model result. PyTorch emitted the expected `OMP_NUM_THREADS` notice for `torch.distributed.run`.
+- Next actions: Launch the planned 500-step validation-only DDP pilot with all train and validation NPZ examples.
+- Claim status: verified
+
+## 2026-05-15 - Frozen AlphaGenome 1 bp Embedding Adapter 100-Step Pilot on HY-GPU GPU 2
+
+- Run type: training
+- Purpose: Run a short validation-set pilot for the 1 bp embedding adapter path after the one-step feasibility smoke test, while keeping the held-out test split untouched for this new experiment round.
+- Git commit: `b592b0426b158e4a13e8afd8f2c96eae86692423`; working tree contained experiment-log updates for the 1 bp smoke and this pilot.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; PyTorch CUDA `12.8`; driver CUDA `13.2`; `alphagenome_pytorch 0.3.1`; `CUDA_VISIBLE_DEVICES=2`
+- Command:
+
+```bash
+cd /home/zelinli6/Alphagenome
+
+mkdir -p runs/rna_seq11_adapter_1bp_pilot_20260515_100steps_lr3e-4
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome \
+  python -u scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_adapter_1bp_pilot_20260515_100steps_lr3e-4 \
+  --batch-size 1 \
+  --max-steps 100 \
+  --eval-every 20 \
+  --learning-rate 3e-4 \
+  --embedding-resolution 1 \
+  --seed 20260515 \
+  --device auto \
+  > runs/rna_seq11_adapter_1bp_pilot_20260515_100steps_lr3e-4/train.log 2>&1
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` (`116` examples); `alphagenome_custom/datasets/rna_seq_npz_valid` (`39` examples); base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`. The held-out test split was not used.
+- Output path: `runs/rna_seq11_adapter_1bp_pilot_20260515_100steps_lr3e-4/` containing `config.json` (`936` bytes), `metrics.tsv` (`4.1K`), `train.log` (`22K`), `adapter_head.pt` (`69K`), and `adapter_head_best.pt` (`69K`). This path is ignored by Git.
+- Result summary: Completed successfully on a single allowed GPU (`CUDA_VISIBLE_DEVICES=2`). The 1 bp embedding adapter completed 100 training steps and full-validation passes every 20 steps.
+- Verification: Observed `embedding_resolution=1`, `trainable_parameters=16907`, `head_parameters=16907`, repeated `prediction_shape=1x11x1048576`, and `base_has_grad=False`. Full-validation MSEs were `1.6738151` at step 20, `1.7223911` at step 40, `1.6576294` at step 60, `1.5281759` at step 80, and final-step `1.5943006` at step 100. Best validation MSE was `1.5281759` at step 80, saved to `adapter_head_best.pt`. Peak CUDA memory allocation was about `36038.9` MB, while `nvidia-smi` process memory was about `60911` MiB during the run. Post-run check showed no active GPU compute process.
+- Failures or warnings: This is a short validation-set pilot, not held-out test performance. The 1 bp adapter path was computationally much slower than the 128 bp adapter path and did not outperform the prior 128 bp adapter pilots at comparable early steps. The held-out test split was not used.
+- Next actions: Treat the current 1 bp result as feasible but not yet better. If continuing, tune only on validation data, for example a lower learning rate or longer run, and do not reuse the held-out test for selection.
+- Claim status: verified
+
+## 2026-05-15 - Frozen AlphaGenome 1 bp Embedding Adapter Feasibility Smoke on HY-GPU GPU 2
+
+- Run type: smoke test
+- Purpose: Check whether the frozen AlphaGenome 1 bp embedding path can run a minimal C. elegans 11-track RNA-seq adapter forward/backward step and a one-example validation pass on HY-GPU before attempting any longer 1 bp-resolution adapter experiment.
+- Git commit: `b592b0426b158e4a13e8afd8f2c96eae86692423`; working tree contained this new experiment-log update after the pushed adapter workflow commit.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; PyTorch CUDA `12.8`; driver CUDA `13.2`; `alphagenome_pytorch 0.3.1`; `CUDA_VISIBLE_DEVICES=2`
+- Command:
+
+```bash
+cd /home/zelinli6/Alphagenome
+
+mkdir -p runs/rna_seq11_adapter_1bp_smoke_20260515_1step
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome \
+  python -u scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_adapter_1bp_smoke_20260515_1step \
+  --batch-size 1 \
+  --max-steps 1 \
+  --eval-every 1 \
+  --max-train-examples 1 \
+  --max-valid-examples 1 \
+  --learning-rate 3e-4 \
+  --embedding-resolution 1 \
+  --seed 20260515 \
+  --device auto \
+  > runs/rna_seq11_adapter_1bp_smoke_20260515_1step/train.log 2>&1
+```
+
+- Input data: First example from `alphagenome_custom/datasets/rna_seq_npz_train`; first example from `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`. The held-out test split was not used.
+- Output path: `runs/rna_seq11_adapter_1bp_smoke_20260515_1step/` containing `config.json` (`914` bytes), `metrics.tsv` (`152` bytes), `train.log` (`1.4K`), `adapter_head.pt` (`69K`), and `adapter_head_best.pt` (`69K`). This path is ignored by Git.
+- Result summary: Completed successfully on a single allowed GPU (`CUDA_VISIBLE_DEVICES=2`). The 1 bp embedding adapter produced full-length `1x11x1048576` predictions, completed one backward/optimizer step, and evaluated one validation example.
+- Verification: Observed `embedding_resolution=1`, `base_parameters=450452613`, `trainable_parameters=16907`, `head_parameters=16907`, `base_has_grad=False`, `dna_sequence_shape=1x4x1048576`, `rna_seq_shape=1x11x1048576`, `prediction_shape=1x11x1048576`, one-step train loss `2.734642`, one-example valid loss `1.8309213`, and peak CUDA memory allocation about `35994.9` MB. Post-run check showed no active GPU compute process.
+- Failures or warnings: This is only a feasibility smoke test on one train example and one validation example, not a model result. Exposing GPUs 2 and 3 would not automatically split the model with the current script; this run showed a single A100 80GB GPU is sufficient for the minimal 1 bp adapter path.
+- Next actions: If continuing toward a closer-to-original 1 bp-resolution adapter experiment, run a validation-only pilot schedule first, for example 20 to 100 steps with full validation, and keep the held-out test untouched for this new experiment round.
+- Claim status: verified
+
 ## 2026-05-15 - Frozen AlphaGenome Adapter Best Checkpoint Held-Out Test Evaluation on HY-GPU GPU 2
 
 - Run type: evaluation

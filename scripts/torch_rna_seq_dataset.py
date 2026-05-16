@@ -10,7 +10,7 @@ from typing import Literal
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Sampler
 
 
 TargetTransform = Literal["none", "log1p"]
@@ -94,9 +94,13 @@ def make_dataloader(
     batch_size: int = 1,
     shuffle: bool = False,
     num_workers: int = 0,
+    sampler: Sampler[int] | None = None,
     target_transform: TargetTransform = "log1p",
     max_examples: int | None = None,
 ) -> DataLoader:
+    if sampler is not None and shuffle:
+        raise ValueError("shuffle must be False when sampler is provided")
+
     dataset = AlphaGenomeRnaSeqNpzDataset(
         dataset_dir,
         target_transform=target_transform,
@@ -105,7 +109,8 @@ def make_dataloader(
     return DataLoader(
         dataset,
         batch_size=batch_size,
-        shuffle=shuffle,
+        shuffle=shuffle if sampler is None else False,
+        sampler=sampler,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
     )
