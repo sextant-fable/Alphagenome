@@ -1,10 +1,14 @@
 # C. elegans RNA-seq 11-Track AlphaGenome Adapter Summary
 
-Date: 2026-05-16
+Date: 2026-05-18
 
 This document summarizes the current frozen AlphaGenome adapter experiment for
 custom C. elegans 11-track RNA-seq prediction. Full command records and run
 details are in `docs/experiment_log.md`.
+
+For a collaborator-facing synthesis with experimental design rationale,
+interpretation, and next-step recommendations, see
+`docs/rna_seq11_collaborator_update_20260518.md`.
 
 ## Status
 
