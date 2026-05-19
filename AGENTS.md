@@ -56,9 +56,11 @@ The current repository evidence shows:
 
 - `HY-GPU` is a separate non-Slurm GPU server. `squeue`, `sbatch`, and `srun` are not expected to exist there.
 - Before running any GPU command on `HY-GPU`, check `hostname`, `nvidia-smi`, current GPU processes, current directory, Git commit, and active Python environment.
-- Use only GPU indices `2` and `3` on `HY-GPU` unless the user explicitly approves otherwise. Do not use GPU `0` or GPU `1`.
+- Default multi-GPU work on `HY-GPU` should use GPU indices `2` and `3`.
+- Use all four GPUs on `HY-GPU` only when the user explicitly requests four-GPU work; in that case use `CUDA_VISIBLE_DEVICES=0,1,2,3` after checking current GPU processes.
+- Do not use GPU `0` or GPU `1` unless the user explicitly requests four-GPU work.
 - For single-GPU smoke tests on `HY-GPU`, prefer `CUDA_VISIBLE_DEVICES=2`.
-- For multi-GPU experiments on `HY-GPU`, use only `CUDA_VISIBLE_DEVICES=2,3` unless the user explicitly changes this policy.
+- For multi-GPU experiments on `HY-GPU`, use `CUDA_VISIBLE_DEVICES=2,3` by default. Use `CUDA_VISIBLE_DEVICES=0,1,2,3` only for explicit four-GPU requests.
 - Short smoke tests may run directly on `HY-GPU` after user approval. Long runs must write logs to an ignored path such as `logs/` or `runs/`, record the command in `docs/experiment_log.md`, and avoid interrupting other users' processes.
 - Do not kill or modify unrelated processes on `HY-GPU`. If GPUs are busy, report the process list and ask the user before taking action.
 
