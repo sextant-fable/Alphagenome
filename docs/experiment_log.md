@@ -34,6 +34,54 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-19 - GenomeTracks RNA-seq 128 bp Head One-Step Sanity on HY-GPU GPU 2
+
+- Run type: smoke test
+- Purpose: Verify that the new AlphaGenome-style RNA-seq `GenomeTracksHead` path can run a 128 bp-only forward/backward pass on the existing C. elegans train/valid NPZ inputs using raw targets scaled into model space, while keeping the frozen trunk unchanged and keeping the held-out test split untouched.
+- Git commit: `fcc3ea7c290ffdcba4005cd12b133d094d8fb23b`; working tree contained uncommitted GenomeTracksHead implementation updates.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; PyTorch CUDA `12.8`; driver CUDA `13.2`; `alphagenome_pytorch 0.3.1`; `CUDA_VISIBLE_DEVICES=2`
+- Command:
+
+```bash
+cd /home/zelinli6/Alphagenome
+
+RUN_DIR=runs/rna_seq11_genometracks_128bp_head_sanity_20260519_1step
+mkdir -p "$RUN_DIR"
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome \
+  python -u scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir "$RUN_DIR" \
+  --batch-size 1 \
+  --max-steps 1 \
+  --eval-every 1 \
+  --max-train-examples 1 \
+  --max-valid-examples 1 \
+  --learning-rate 1e-4 \
+  --embedding-resolution 128 \
+  --head-type genome-tracks \
+  --head-resolutions 128 \
+  --target-transform none \
+  --track-means-source grouped-qc \
+  --seed 20260519 \
+  --device auto \
+  --no-save-checkpoint 2>&1 | tee "$RUN_DIR/train.log"
+```
+
+- Input data: First train example from `alphagenome_custom/datasets/rna_seq_npz_train`; first validation example from `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`; grouped track means from `alphagenome_custom/metadata/grouped_bigwig_qc.tsv`. The held-out test split was not used.
+- Output path: `runs/rna_seq11_genometracks_128bp_head_sanity_20260519_1step/`, containing `config.json`, `metrics.tsv`, and `train.log`. Checkpoint saving was disabled. This path is ignored by Git.
+- Result summary: Completed successfully. The 128 bp GenomeTracks-style RNA-seq head produced model-space predictions with shape `128:1x11x8192`, used raw targets with `--target-transform none`, and reported model-space train loss `2.0833006` and one-example validation loss `2.7360559`.
+- Verification: Reported `base_has_grad=False`, `head_weight_grad_norm=2.45218`, `head_parameters=33814`, `head_trainable_parameters=33814`, `base_non_lora_trainable_parameters=0`, and peak CUDA allocation `17585.7` MB. Post-run `nvidia-smi` showed no active GPU compute process.
+- Failures or warnings: This is a one-step engineering sanity check on one train example and one validation example, not a validation-set model result. The loss is in GenomeTracksHead model-scaled space and is not directly comparable to the earlier log1p MSE values. The held-out test split was not used.
+- Next actions: If this path is pursued, run a validation-only 128 bp pilot with full validation, then test the 1 bp + 128 bp multi-resolution head only after the 128 bp-only path is stable.
+- Claim status: verified
+
 ## 2026-05-16 - AlphaGenome 128 bp Last-Block LoRA Scheme C 100-Step Pilots on HY-GPU GPU 2
 
 - Run type: training

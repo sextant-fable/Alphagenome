@@ -3,15 +3,158 @@
 
 from __future__ import annotations
 
+import csv
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Sequence
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
 from alphagenome_pytorch import AlphaGenome
+from alphagenome_pytorch.heads import GenomeTracksHead
 from torch_rna_seq_dataset import masked_mse_loss
+
+
+HeadType = Literal["linear", "genome-tracks"]
+
+
+def parse_resolutions(
+    value: str | Sequence[int] | None,
+    *,
+    fallback_resolution: int,
+) -> tuple[int, ...]:
+    """Parse 1 bp / 128 bp head resolutions."""
+
+    if value is None:
+        resolutions = (fallback_resolution,)
+    elif isinstance(value, str):
+        resolutions = tuple(int(part.strip()) for part in value.split(",") if part.strip())
+    else:
+        resolutions = tuple(int(resolution) for resolution in value)
+
+    if not resolutions:
+        raise ValueError("At least one resolution is required")
+    invalid = sorted(set(resolutions) - {1, 128})
+    if invalid:
+        raise ValueError(f"Unsupported resolution(s): {invalid}; use 1 and/or 128")
+    return tuple(sorted(set(resolutions)))
+
+
+def embedding_channels_for_resolution(resolution: int) -> int:
+    if resolution == 1:
+        return 1536
+    if resolution == 128:
+        return 3072
+    raise ValueError(f"Unsupported resolution: {resolution}")
+
+
+def normalize_track_means(
+    track_means: torch.Tensor | Sequence[float] | None,
+    *,
+    n_tracks: int,
+    num_organisms: int,
+) -> torch.Tensor | None:
+    """Return track means as [num_organisms, n_tracks] or None."""
+
+    if track_means is None:
+        return None
+
+    tensor = torch.as_tensor(track_means, dtype=torch.float32)
+    if tensor.ndim == 1:
+        if int(tensor.shape[0]) != n_tracks:
+            raise ValueError(
+                f"track_means has {tensor.shape[0]} tracks; expected {n_tracks}"
+            )
+        tensor = tensor.unsqueeze(0)
+    elif tensor.ndim != 2:
+        raise ValueError("track_means must be a 1D or 2D tensor/sequence")
+
+    if int(tensor.shape[1]) != n_tracks:
+        raise ValueError(f"track_means has {tensor.shape[1]} tracks; expected {n_tracks}")
+    if int(tensor.shape[0]) == 1 and num_organisms > 1:
+        tensor = tensor.repeat(num_organisms, 1)
+    if int(tensor.shape[0]) < num_organisms:
+        raise ValueError(
+            f"track_means has {tensor.shape[0]} organisms; expected {num_organisms}"
+        )
+    return tensor[:num_organisms].contiguous()
+
+
+def load_track_means_from_grouped_qc(path: str | Path, *, n_tracks: int) -> torch.Tensor:
+    """Load per-track mean_signal values from grouped_bigwig_qc.tsv."""
+
+    rows: list[tuple[int, float]] = []
+    with Path(path).open() as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        for row in reader:
+            group_id = row.get("group_id", "")
+            if not group_id.startswith("RNA_SEQ_"):
+                continue
+            try:
+                track_index = int(group_id.rsplit("_", maxsplit=1)[1]) - 1
+                mean_signal = float(row["mean_signal"])
+            except (KeyError, ValueError) as error:
+                raise ValueError(f"Cannot parse track mean row in {path}: {row}") from error
+            rows.append((track_index, mean_signal))
+
+    rows.sort(key=lambda item: item[0])
+    if len(rows) != n_tracks:
+        raise ValueError(f"Loaded {len(rows)} track means from {path}; expected {n_tracks}")
+    expected_indices = list(range(n_tracks))
+    observed_indices = [index for index, _mean in rows]
+    if observed_indices != expected_indices:
+        raise ValueError(
+            f"Track mean indices in {path} are {observed_indices}; "
+            f"expected {expected_indices}"
+        )
+    return torch.tensor([mean for _index, mean in rows], dtype=torch.float32)
+
+
+def compute_nonzero_track_means_from_dataset(dataset) -> torch.Tensor:
+    """Compute AlphaGenome-style nonzero means from a raw-target NPZ dataset."""
+
+    n_tracks = int(dataset.metadata["n_tracks"])
+    sums = torch.zeros(n_tracks, dtype=torch.float64)
+    counts = torch.zeros(n_tracks, dtype=torch.float64)
+    for index in range(len(dataset)):
+        rna_seq = dataset[index]["rna_seq"].to(dtype=torch.float32)
+        if rna_seq.ndim != 2:
+            raise ValueError(f"Expected rna_seq [tracks, sequence], got {rna_seq.shape}")
+        rna_seq = rna_seq.clamp_min(0.0)
+        nonzero = rna_seq > 0
+        sums += (rna_seq * nonzero).sum(dim=1, dtype=torch.float64)
+        counts += nonzero.sum(dim=1).to(dtype=torch.float64)
+
+    means = torch.where(counts > 0, sums / counts.clamp_min(1.0), torch.ones_like(sums))
+    return means.to(dtype=torch.float32)
+
+
+def bin_rna_seq_target(target: torch.Tensor, resolution: int) -> torch.Tensor:
+    """Bin raw RNA-seq targets by summing bases into native head resolution."""
+
+    target = target.clamp_min(0.0)
+    if resolution == 1:
+        return target
+
+    usable_length = (target.shape[-1] // resolution) * resolution
+    if usable_length == 0:
+        raise ValueError(
+            f"Target length {target.shape[-1]} is too short for resolution {resolution}"
+        )
+    target = target[..., :usable_length]
+    return target.reshape(*target.shape[:-1], usable_length // resolution, resolution).sum(
+        dim=-1
+    )
+
+
+def format_prediction_shape(prediction: torch.Tensor | dict[int, torch.Tensor]) -> str:
+    if isinstance(prediction, dict):
+        return ",".join(
+            f"{resolution}:{'x'.join(map(str, tensor.shape))}"
+            for resolution, tensor in sorted(prediction.items())
+        )
+    return "x".join(map(str, prediction.shape))
 
 
 class RnaSeq11Adapter(torch.nn.Module):
@@ -25,30 +168,103 @@ class RnaSeq11Adapter(torch.nn.Module):
         embedding_resolution: int = 128,
         organism_index: int = 0,
         encode_requires_grad: bool = False,
+        head_type: HeadType = "linear",
+        head_resolutions: Sequence[int] | None = None,
+        track_means: torch.Tensor | Sequence[float] | None = None,
+        num_head_organisms: int | None = None,
     ) -> None:
         super().__init__()
         if embedding_resolution not in {1, 128}:
             raise ValueError("embedding_resolution must be 1 or 128")
+        if head_type not in {"linear", "genome-tracks"}:
+            raise ValueError("head_type must be 'linear' or 'genome-tracks'")
 
         self.base_model = base_model
         self.embedding_resolution = embedding_resolution
         self.organism_index = organism_index
         self.encode_requires_grad = encode_requires_grad
-        in_channels = 1536 if embedding_resolution == 1 else 3072
-        self.head = torch.nn.Conv1d(in_channels, n_tracks, kernel_size=1)
+        self.head_type = head_type
+        self.head_resolutions = parse_resolutions(
+            head_resolutions,
+            fallback_resolution=embedding_resolution,
+        )
+        self.n_tracks = n_tracks
+
+        if self.head_type == "linear":
+            if len(self.head_resolutions) != 1:
+                raise ValueError("linear head supports exactly one embedding resolution")
+            if self.head_resolutions[0] != embedding_resolution:
+                raise ValueError(
+                    "linear head_resolutions must match embedding_resolution"
+                )
+            in_channels = embedding_channels_for_resolution(embedding_resolution)
+            self.head = torch.nn.Conv1d(in_channels, n_tracks, kernel_size=1)
+        else:
+            num_organisms = (
+                max(organism_index + 1, 1)
+                if num_head_organisms is None
+                else num_head_organisms
+            )
+            normalized_means = normalize_track_means(
+                track_means,
+                n_tracks=n_tracks,
+                num_organisms=num_organisms,
+            )
+            self.head = GenomeTracksHead(
+                in_channels=None,
+                num_tracks=n_tracks,
+                resolutions=self.head_resolutions,
+                num_organisms=num_organisms,
+                apply_squashing=True,
+                track_means=normalized_means,
+            )
 
         for parameter in self.base_model.parameters():
             parameter.requires_grad = False
         self.base_model.eval()
 
-    def forward(self, dna_sequence: torch.Tensor, target_length: int) -> torch.Tensor:
-        """Return RNA-seq predictions in [B, C, S] format."""
+    @property
+    def uses_scaled_targets(self) -> bool:
+        return self.head_type == "genome-tracks"
 
-        organism_index = torch.full(
-            (dna_sequence.shape[0],),
+    def organism_index_tensor(self, batch_size: int, device: torch.device) -> torch.Tensor:
+        return torch.full(
+            (batch_size,),
             self.organism_index,
             dtype=torch.long,
-            device=dna_sequence.device,
+            device=device,
+        )
+
+    def scale_targets_for_loss(
+        self,
+        target: torch.Tensor,
+        *,
+        resolution: int,
+    ) -> torch.Tensor:
+        if self.head_type != "genome-tracks":
+            return target
+
+        organism_index = self.organism_index_tensor(target.shape[0], target.device)
+        target_at_resolution = bin_rna_seq_target(target, resolution)
+        return self.head.scale(
+            target_at_resolution,
+            organism_index,
+            resolution,
+            channels_last=False,
+        )
+
+    def forward(
+        self,
+        dna_sequence: torch.Tensor,
+        target_length: int | None = None,
+        *,
+        return_scaled: bool = False,
+    ) -> torch.Tensor | dict[int, torch.Tensor]:
+        """Return RNA-seq predictions in [B, C, S] format."""
+
+        organism_index = self.organism_index_tensor(
+            dna_sequence.shape[0],
+            dna_sequence.device,
         )
         dna_sequence_nlc = dna_sequence.transpose(1, 2).contiguous()
 
@@ -61,13 +277,26 @@ class RnaSeq11Adapter(torch.nn.Module):
             embeddings = self.base_model.encode(
                 dna_sequence_nlc,
                 organism_index,
-                resolutions=(self.embedding_resolution,),
+                resolutions=self.head_resolutions,
+                channels_last=False,
+            )
+
+        if self.head_type == "genome-tracks":
+            head_dtype = next(self.head.parameters()).dtype
+            embeddings_by_resolution = {
+                resolution: embeddings[f"embeddings_{resolution}bp"].to(dtype=head_dtype)
+                for resolution in self.head_resolutions
+            }
+            return self.head(
+                embeddings_by_resolution,
+                organism_index,
+                return_scaled=return_scaled,
                 channels_last=False,
             )
 
         key = f"embeddings_{self.embedding_resolution}bp"
         prediction = self.head(embeddings[key].to(dtype=self.head.weight.dtype))
-        if prediction.shape[-1] != target_length:
+        if target_length is not None and prediction.shape[-1] != target_length:
             prediction = F.interpolate(
                 prediction,
                 size=target_length,
@@ -75,6 +304,32 @@ class RnaSeq11Adapter(torch.nn.Module):
                 align_corners=False,
             )
         return prediction
+
+
+def masked_adapter_loss(
+    model: RnaSeq11Adapter,
+    prediction: torch.Tensor | dict[int, torch.Tensor],
+    target: torch.Tensor,
+    mask: torch.Tensor,
+) -> torch.Tensor:
+    """Compute legacy log1p loss or GenomeTracksHead model-space loss."""
+
+    if isinstance(prediction, dict):
+        losses = []
+        for resolution, resolution_prediction in sorted(prediction.items()):
+            scaled_target = model.scale_targets_for_loss(target, resolution=resolution)
+            losses.append(
+                masked_mse_loss(
+                    resolution_prediction,
+                    scaled_target.to(dtype=resolution_prediction.dtype),
+                    mask,
+                )
+            )
+        if not losses:
+            raise ValueError("No prediction resolutions were returned")
+        return torch.stack(losses).mean()
+
+    return masked_mse_loss(prediction, target, mask)
 
 
 def pick_device(requested: str) -> torch.device:
@@ -111,8 +366,12 @@ def evaluate_masked_mse(
             rna_seq = batch["rna_seq"].to(device=device, dtype=torch.float32)
             rna_seq_mask = batch["rna_seq_mask"].to(device=device)
 
-            prediction = model(dna_sequence, target_length=rna_seq.shape[-1])
-            loss = masked_mse_loss(prediction, rna_seq, rna_seq_mask)
+            prediction = model(
+                dna_sequence,
+                target_length=rna_seq.shape[-1],
+                return_scaled=model.uses_scaled_targets,
+            )
+            loss = masked_adapter_loss(model, prediction, rna_seq, rna_seq_mask)
             batch_size = int(dna_sequence.shape[0])
             weighted_loss_sum += float(loss.detach().cpu()) * batch_size
             n_batches += 1
@@ -144,15 +403,52 @@ def evaluate_masked_mse_by_track(
             rna_seq = batch["rna_seq"].to(device=device, dtype=torch.float32)
             rna_seq_mask = batch["rna_seq_mask"].to(device=device)
 
-            prediction = model(dna_sequence, target_length=rna_seq.shape[-1])
+            prediction = model(
+                dna_sequence,
+                target_length=rna_seq.shape[-1],
+                return_scaled=model.uses_scaled_targets,
+            )
+            if isinstance(prediction, dict):
+                prediction_items = sorted(prediction.items())
+            else:
+                prediction_items = [(model.embedding_resolution, prediction)]
             mask = rna_seq_mask
-            while mask.ndim < prediction.ndim:
+            while mask.ndim < 3:
                 mask = mask.unsqueeze(-1)
-            mask = mask.to(dtype=prediction.dtype, device=prediction.device)
 
-            squared_error = (prediction - rna_seq).square() * mask
-            batch_sse = squared_error.sum(dim=(0, 2)).detach().cpu()
-            batch_denominator = mask.expand_as(prediction).sum(dim=(0, 2)).detach().cpu()
+            batch_sse = None
+            batch_denominator = None
+            for resolution, resolution_prediction in prediction_items:
+                if isinstance(prediction, dict):
+                    target_for_loss = model.scale_targets_for_loss(
+                        rna_seq,
+                        resolution=resolution,
+                    )
+                else:
+                    target_for_loss = rna_seq
+                resolution_mask = mask.to(
+                    dtype=resolution_prediction.dtype,
+                    device=resolution_prediction.device,
+                )
+                squared_error = (
+                    resolution_prediction - target_for_loss
+                ).square() * resolution_mask
+                resolution_sse = squared_error.sum(dim=(0, 2)).detach().cpu()
+                resolution_denominator = (
+                    resolution_mask.expand_as(resolution_prediction)
+                    .sum(dim=(0, 2))
+                    .detach()
+                    .cpu()
+                )
+                if batch_sse is None:
+                    batch_sse = resolution_sse
+                    batch_denominator = resolution_denominator
+                else:
+                    batch_sse += resolution_sse
+                    batch_denominator += resolution_denominator
+
+            assert batch_sse is not None
+            assert batch_denominator is not None
 
             if per_track_sse is None:
                 per_track_sse = batch_sse
@@ -245,6 +541,13 @@ def evaluate_pointwise_metrics(
     spearman_sample_size: int = 0,
     spearman_seed: int = 0,
 ) -> dict[str, object]:
+    if model.head_type != "linear":
+        raise NotImplementedError(
+            "Pointwise metrics are currently implemented for the legacy linear "
+            "head only. Use evaluate_masked_mse for GenomeTracksHead model-space "
+            "sanity checks."
+        )
+
     model.eval()
     n_tracks: int | None = None
     sse: torch.Tensor | None = None

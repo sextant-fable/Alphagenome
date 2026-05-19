@@ -26,12 +26,17 @@ from alphagenome_pytorch.extensions.finetuning.adapters import (
 )
 from alphagenome_rna_seq11_adapter import (
     RnaSeq11Adapter,
+    compute_nonzero_track_means_from_dataset,
     count_parameters,
     evaluate_masked_mse,
+    format_prediction_shape,
+    load_track_means_from_grouped_qc,
     load_adapter_checkpoint,
+    masked_adapter_loss,
+    parse_resolutions,
     pick_device,
 )
-from torch_rna_seq_dataset import make_dataloader, masked_mse_loss
+from torch_rna_seq_dataset import AlphaGenomeRnaSeqNpzDataset, make_dataloader
 
 
 def parse_args() -> argparse.Namespace:
@@ -113,6 +118,44 @@ def parse_args() -> argparse.Namespace:
         choices=[1, 128],
         default=128,
         help="Frozen AlphaGenome embedding resolution used by the adapter head.",
+    )
+    parser.add_argument(
+        "--head-type",
+        choices=["linear", "genome-tracks"],
+        default="linear",
+        help=(
+            "linear keeps the legacy 1x1 Conv1d head; genome-tracks uses an "
+            "AlphaGenome-style RNA-seq GenomeTracksHead."
+        ),
+    )
+    parser.add_argument(
+        "--head-resolutions",
+        default=None,
+        help=(
+            "Comma-separated GenomeTracksHead resolutions, e.g. 128 or 1,128. "
+            "Defaults to --embedding-resolution."
+        ),
+    )
+    parser.add_argument(
+        "--track-means-source",
+        choices=["ones", "grouped-qc", "train-nonzero"],
+        default="grouped-qc",
+        help=(
+            "Track means for genome-tracks scaling. grouped-qc uses "
+            "alphagenome_custom/metadata/grouped_bigwig_qc.tsv; train-nonzero "
+            "streams raw train NPZ targets and computes nonzero means."
+        ),
+    )
+    parser.add_argument(
+        "--track-means-tsv",
+        default="alphagenome_custom/metadata/grouped_bigwig_qc.tsv",
+        help="TSV used when --track-means-source grouped-qc.",
+    )
+    parser.add_argument(
+        "--track-means-max-examples",
+        type=int,
+        default=None,
+        help="Optional train NPZ example limit for --track-means-source train-nonzero.",
     )
     parser.add_argument(
         "--target-transform",
@@ -319,13 +362,22 @@ def save_training_checkpoint(
     lora_alpha: int,
     freeze_head: bool,
     init_adapter_checkpoint: str | None,
+    head_type: str,
+    head_resolutions: tuple[int, ...],
+    loss_space: str,
+    track_means_source: str,
+    track_means_tsv: str,
+    track_means_max_examples: int | None,
 ) -> None:
     checkpoint = {
         "adapter_head_state_dict": model.head.state_dict(),
         "n_tracks": n_tracks,
         "embedding_resolution": embedding_resolution,
+        "head_type": head_type,
+        "head_resolutions": list(head_resolutions),
         "organism_index": organism_index,
         "target_transform": target_transform,
+        "loss_space": loss_space,
         "base_weights": str(weights),
         "best_valid_loss": best_valid_loss,
         "best_valid_step": best_valid_step,
@@ -338,6 +390,9 @@ def save_training_checkpoint(
         ),
         "freeze_head": freeze_head,
         "init_adapter_checkpoint": init_adapter_checkpoint,
+        "track_means_source": track_means_source,
+        "track_means_tsv": track_means_tsv,
+        "track_means_max_examples": track_means_max_examples,
     }
     torch.save(checkpoint, path)
 
@@ -352,6 +407,17 @@ def main() -> None:
         raise ValueError("--warmup-steps must be >= 0")
     if args.freeze_head and not args.enable_last_block_lora:
         raise ValueError("--freeze-head requires --enable-last-block-lora")
+    head_resolutions = parse_resolutions(
+        args.head_resolutions,
+        fallback_resolution=args.embedding_resolution,
+    )
+    if args.head_type == "linear" and head_resolutions != (args.embedding_resolution,):
+        raise ValueError("linear head requires --head-resolutions to match --embedding-resolution")
+    if args.head_type == "genome-tracks" and args.target_transform != "none":
+        raise ValueError(
+            "--head-type genome-tracks requires --target-transform none so raw "
+            "RNA-seq targets can be scaled into model space."
+        )
 
     train_dataset_dir = Path(args.train_dataset_dir)
     valid_dataset_dir = Path(args.valid_dataset_dir)
@@ -407,6 +473,25 @@ def main() -> None:
     )
     n_tracks = int(train_loader.dataset.metadata["n_tracks"])
 
+    track_means = None
+    if args.head_type == "genome-tracks":
+        if args.track_means_source == "ones":
+            track_means = torch.ones(n_tracks, dtype=torch.float32)
+        elif args.track_means_source == "grouped-qc":
+            track_means = load_track_means_from_grouped_qc(
+                args.track_means_tsv,
+                n_tracks=n_tracks,
+            )
+        elif args.track_means_source == "train-nonzero":
+            track_mean_dataset = AlphaGenomeRnaSeqNpzDataset(
+                train_dataset_dir,
+                target_transform="none",
+                max_examples=args.track_means_max_examples,
+            )
+            track_means = compute_nonzero_track_means_from_dataset(track_mean_dataset)
+        else:
+            raise ValueError(f"Unknown track means source: {args.track_means_source}")
+
     if is_main_process(rank):
         write_config(
             config_path,
@@ -436,6 +521,20 @@ def main() -> None:
     print_main(rank, f"n_valid_examples\t{len(valid_loader.dataset)}")
     print_main(rank, f"n_tracks\t{n_tracks}")
     print_main(rank, f"target_transform\t{args.target_transform}")
+    print_main(rank, f"head_type\t{args.head_type}")
+    print_main(rank, f"head_resolutions\t{','.join(map(str, head_resolutions))}")
+    print_main(
+        rank,
+        "loss_space\t"
+        f"{'genome_tracks_model_scaled' if args.head_type == 'genome-tracks' else 'target_transform'}",
+    )
+    print_main(rank, f"track_means_source\t{args.track_means_source}")
+    if track_means is not None:
+        print_main(
+            rank,
+            "track_means\t"
+            + ",".join(f"{float(value):.8g}" for value in track_means),
+        )
     print_main(rank, f"embedding_resolution\t{args.embedding_resolution}")
     print_main(rank, f"organism_index\t{args.organism_index}")
     print_main(rank, f"learning_rate\t{args.learning_rate}")
@@ -470,17 +569,38 @@ def main() -> None:
         embedding_resolution=args.embedding_resolution,
         organism_index=args.organism_index,
         encode_requires_grad=args.enable_last_block_lora,
+        head_type=args.head_type,
+        head_resolutions=head_resolutions,
+        track_means=track_means,
     ).to(device)
 
     if args.init_adapter_checkpoint is not None:
         init_checkpoint = load_adapter_checkpoint(args.init_adapter_checkpoint)
         checkpoint_n_tracks = int(init_checkpoint["n_tracks"])
         checkpoint_resolution = int(init_checkpoint["embedding_resolution"])
+        checkpoint_head_type = str(init_checkpoint.get("head_type", "linear"))
+        checkpoint_head_resolutions = tuple(
+            int(resolution)
+            for resolution in init_checkpoint.get(
+                "head_resolutions",
+                [checkpoint_resolution],
+            )
+        )
         if checkpoint_n_tracks != n_tracks:
             raise ValueError(
                 f"Init checkpoint n_tracks={checkpoint_n_tracks}, dataset n_tracks={n_tracks}"
             )
-        if checkpoint_resolution != args.embedding_resolution:
+        if checkpoint_head_type != args.head_type:
+            raise ValueError(
+                f"Init checkpoint head_type={checkpoint_head_type}, "
+                f"requested={args.head_type}"
+            )
+        if checkpoint_head_resolutions != head_resolutions:
+            raise ValueError(
+                "Init checkpoint head_resolutions="
+                f"{checkpoint_head_resolutions}, requested={head_resolutions}"
+            )
+        if args.head_type == "linear" and checkpoint_resolution != args.embedding_resolution:
             raise ValueError(
                 "Init checkpoint embedding_resolution="
                 f"{checkpoint_resolution}, requested={args.embedding_resolution}"
@@ -591,7 +711,7 @@ def main() -> None:
         accumulated_examples = 0
         last_dna_shape: tuple[int, ...] | None = None
         last_rna_seq_shape: tuple[int, ...] | None = None
-        last_prediction_shape: tuple[int, ...] | None = None
+        last_prediction_shape: str | None = None
 
         for _ in range(args.grad_accum_steps):
             batch = next(train_batches)
@@ -599,15 +719,19 @@ def main() -> None:
             rna_seq = batch["rna_seq"].to(device=device, dtype=torch.float32)
             rna_seq_mask = batch["rna_seq_mask"].to(device=device)
 
-            prediction = train_model(dna_sequence, target_length=rna_seq.shape[-1])
-            loss = masked_mse_loss(prediction, rna_seq, rna_seq_mask)
+            prediction = train_model(
+                dna_sequence,
+                target_length=rna_seq.shape[-1],
+                return_scaled=model.uses_scaled_targets,
+            )
+            loss = masked_adapter_loss(model, prediction, rna_seq, rna_seq_mask)
             (loss / args.grad_accum_steps).backward()
 
             accumulated_train_loss += float(loss.detach().cpu())
             accumulated_examples += int(dna_sequence.shape[0])
             last_dna_shape = tuple(dna_sequence.shape)
             last_rna_seq_shape = tuple(rna_seq.shape)
-            last_prediction_shape = tuple(prediction.shape)
+            last_prediction_shape = format_prediction_shape(prediction)
 
         if args.grad_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(trainable_parameters, args.grad_clip_norm)
@@ -655,7 +779,7 @@ def main() -> None:
             if last_rna_seq_shape is not None:
                 print(f"rna_seq_shape\t{'x'.join(map(str, last_rna_seq_shape))}")
             if last_prediction_shape is not None:
-                print(f"prediction_shape\t{'x'.join(map(str, last_prediction_shape))}")
+                print(f"prediction_shape\t{last_prediction_shape}")
             print(f"base_has_grad\t{base_has_grad}")
             if args.enable_last_block_lora:
                 print(f"base_non_lora_has_grad\t{base_has_grad}")
@@ -712,6 +836,16 @@ def main() -> None:
                         lora_alpha=args.lora_alpha,
                         freeze_head=args.freeze_head,
                         init_adapter_checkpoint=args.init_adapter_checkpoint,
+                        head_type=args.head_type,
+                        head_resolutions=head_resolutions,
+                        loss_space=(
+                            "genome_tracks_model_scaled"
+                            if args.head_type == "genome-tracks"
+                            else "target_transform"
+                        ),
+                        track_means_source=args.track_means_source,
+                        track_means_tsv=args.track_means_tsv,
+                        track_means_max_examples=args.track_means_max_examples,
                     )
                     print(f"saved_best_checkpoint\t{best_checkpoint_path}")
                     print(f"best_valid_step\t{best_valid_step}")
@@ -736,6 +870,16 @@ def main() -> None:
             lora_alpha=args.lora_alpha,
             freeze_head=args.freeze_head,
             init_adapter_checkpoint=args.init_adapter_checkpoint,
+            head_type=args.head_type,
+            head_resolutions=head_resolutions,
+            loss_space=(
+                "genome_tracks_model_scaled"
+                if args.head_type == "genome-tracks"
+                else "target_transform"
+            ),
+            track_means_source=args.track_means_source,
+            track_means_tsv=args.track_means_tsv,
+            track_means_max_examples=args.track_means_max_examples,
         )
         print(f"saved_checkpoint\t{checkpoint_path}")
     cleanup_distributed(is_distributed)

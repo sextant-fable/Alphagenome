@@ -14,9 +14,13 @@ from alphagenome_rna_seq11_adapter import (
     RnaSeq11Adapter,
     count_parameters,
     evaluate_masked_mse,
+    format_prediction_shape,
+    load_track_means_from_grouped_qc,
+    masked_adapter_loss,
+    parse_resolutions,
     pick_device,
 )
-from torch_rna_seq_dataset import make_dataloader, masked_mse_loss
+from torch_rna_seq_dataset import make_dataloader
 
 
 def parse_args() -> argparse.Namespace:
@@ -52,6 +56,28 @@ def parse_args() -> argparse.Namespace:
         help="Frozen AlphaGenome embedding resolution used by the adapter head.",
     )
     parser.add_argument(
+        "--head-type",
+        choices=["linear", "genome-tracks"],
+        default="linear",
+        help="Head implementation to smoke-train.",
+    )
+    parser.add_argument(
+        "--head-resolutions",
+        default=None,
+        help="Comma-separated head resolutions, e.g. 128 or 1,128.",
+    )
+    parser.add_argument(
+        "--track-means-source",
+        choices=["ones", "grouped-qc"],
+        default="grouped-qc",
+        help="Track means for genome-tracks scaling.",
+    )
+    parser.add_argument(
+        "--track-means-tsv",
+        default="alphagenome_custom/metadata/grouped_bigwig_qc.tsv",
+        help="TSV used when --track-means-source grouped-qc.",
+    )
+    parser.add_argument(
         "--target-transform",
         choices=["log1p", "none"],
         default="log1p",
@@ -65,8 +91,29 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def grad_norm(module: torch.nn.Module) -> float:
+    norms = [
+        parameter.grad.detach().float().norm()
+        for parameter in module.parameters()
+        if parameter.grad is not None
+    ]
+    if not norms:
+        return 0.0
+    return float(torch.linalg.vector_norm(torch.stack(norms)).cpu())
+
+
 def main() -> None:
     args = parse_args()
+    head_resolutions = parse_resolutions(
+        args.head_resolutions,
+        fallback_resolution=args.embedding_resolution,
+    )
+    if args.head_type == "linear" and head_resolutions != (args.embedding_resolution,):
+        raise ValueError("linear head requires --head-resolutions to match --embedding-resolution")
+    if args.head_type == "genome-tracks" and args.target_transform != "none":
+        raise ValueError(
+            "--head-type genome-tracks requires --target-transform none for raw target scaling"
+        )
     dataset_dir = Path(args.dataset_dir)
     valid_dataset_dir = (
         Path(args.valid_dataset_dir) if args.valid_dataset_dir is not None else None
@@ -93,6 +140,15 @@ def main() -> None:
             max_examples=args.max_valid_examples,
         )
     n_tracks = int(dataloader.dataset.metadata["n_tracks"])
+    track_means = None
+    if args.head_type == "genome-tracks":
+        if args.track_means_source == "ones":
+            track_means = torch.ones(n_tracks, dtype=torch.float32)
+        else:
+            track_means = load_track_means_from_grouped_qc(
+                args.track_means_tsv,
+                n_tracks=n_tracks,
+            )
 
     print(f"dataset_dir\t{dataset_dir}")
     if valid_dataset_dir is not None:
@@ -103,6 +159,12 @@ def main() -> None:
         print(f"n_valid_examples\t{len(valid_dataloader.dataset)}")
     print(f"n_tracks\t{n_tracks}")
     print(f"target_transform\t{args.target_transform}")
+    print(f"head_type\t{args.head_type}")
+    print(f"head_resolutions\t{','.join(map(str, head_resolutions))}")
+    print(
+        "loss_space\t"
+        f"{'genome_tracks_model_scaled' if args.head_type == 'genome-tracks' else 'target_transform'}"
+    )
     print(f"embedding_resolution\t{args.embedding_resolution}")
     print(f"organism_index\t{args.organism_index}")
     print(f"device\t{device}")
@@ -115,6 +177,9 @@ def main() -> None:
         n_tracks=n_tracks,
         embedding_resolution=args.embedding_resolution,
         organism_index=args.organism_index,
+        head_type=args.head_type,
+        head_resolutions=head_resolutions,
+        track_means=track_means,
     ).to(device)
     optimizer = torch.optim.AdamW(model.head.parameters(), lr=args.learning_rate)
 
@@ -130,8 +195,12 @@ def main() -> None:
         rna_seq = batch["rna_seq"].to(device=device, dtype=torch.float32)
         rna_seq_mask = batch["rna_seq_mask"].to(device=device)
 
-        prediction = model(dna_sequence, target_length=rna_seq.shape[-1])
-        loss = masked_mse_loss(prediction, rna_seq, rna_seq_mask)
+        prediction = model(
+            dna_sequence,
+            target_length=rna_seq.shape[-1],
+            return_scaled=model.uses_scaled_targets,
+        )
+        loss = masked_adapter_loss(model, prediction, rna_seq, rna_seq_mask)
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -143,10 +212,10 @@ def main() -> None:
         print(f"step\t{step}")
         print(f"dna_sequence_shape\t{'x'.join(map(str, dna_sequence.shape))}")
         print(f"rna_seq_shape\t{'x'.join(map(str, rna_seq.shape))}")
-        print(f"prediction_shape\t{'x'.join(map(str, prediction.shape))}")
+        print(f"prediction_shape\t{format_prediction_shape(prediction)}")
         print(f"loss\t{float(loss.detach().cpu()):.6g}")
         print(f"base_has_grad\t{base_has_grad}")
-        print(f"head_weight_grad_norm\t{float(model.head.weight.grad.norm().detach().cpu()):.6g}")
+        print(f"head_weight_grad_norm\t{grad_norm(model.head):.6g}")
         if device.type == "cuda":
             print(f"cuda_max_memory_allocated_mb\t{torch.cuda.max_memory_allocated() / 1024**2:.1f}")
 

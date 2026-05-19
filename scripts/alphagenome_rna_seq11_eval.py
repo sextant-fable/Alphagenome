@@ -17,6 +17,7 @@ from alphagenome_rna_seq11_adapter import (
     evaluate_masked_mse_by_track,
     evaluate_pointwise_metrics,
     load_adapter_checkpoint,
+    parse_resolutions,
     pick_device,
 )
 from torch_rna_seq_dataset import make_dataloader
@@ -78,6 +79,17 @@ def parse_args() -> argparse.Namespace:
         choices=[1, 128],
         default=None,
         help="Override checkpoint embedding resolution.",
+    )
+    parser.add_argument(
+        "--head-type",
+        choices=["linear", "genome-tracks"],
+        default=None,
+        help="Override checkpoint head type.",
+    )
+    parser.add_argument(
+        "--head-resolutions",
+        default=None,
+        help="Override checkpoint head resolutions, e.g. 128 or 1,128.",
     )
     parser.add_argument(
         "--organism-index",
@@ -254,6 +266,23 @@ def main() -> None:
         if args.embedding_resolution is not None
         else int(checkpoint["embedding_resolution"])
     )
+    checkpoint_head_resolutions = tuple(
+        int(resolution)
+        for resolution in checkpoint.get("head_resolutions", [embedding_resolution])
+    )
+    head_type = (
+        args.head_type
+        if args.head_type is not None
+        else str(checkpoint.get("head_type", "linear"))
+    )
+    head_resolutions = (
+        parse_resolutions(
+            args.head_resolutions,
+            fallback_resolution=embedding_resolution,
+        )
+        if args.head_resolutions is not None
+        else checkpoint_head_resolutions
+    )
     organism_index = (
         args.organism_index
         if args.organism_index is not None
@@ -264,6 +293,11 @@ def main() -> None:
         if args.target_transform is not None
         else str(checkpoint.get("target_transform", "log1p"))
     )
+    if head_type == "genome-tracks" and target_transform != "none":
+        raise ValueError(
+            "GenomeTracksHead checkpoints must be evaluated with raw targets: "
+            "--target-transform none"
+        )
 
     dataloader = make_dataloader(
         dataset_dir,
@@ -286,6 +320,9 @@ def main() -> None:
     print(f"n_examples\t{len(dataloader.dataset)}")
     print(f"n_tracks\t{n_tracks}")
     print(f"target_transform\t{target_transform}")
+    print(f"head_type\t{head_type}")
+    print(f"head_resolutions\t{','.join(map(str, head_resolutions))}")
+    print(f"loss_space\t{checkpoint.get('loss_space', 'target_transform')}")
     print(f"embedding_resolution\t{embedding_resolution}")
     print(f"organism_index\t{organism_index}")
     print(f"device\t{device}")
@@ -293,13 +330,18 @@ def main() -> None:
         print(f"cuda_device\t{torch.cuda.get_device_name(device)}")
 
     base_model = AlphaGenome.from_pretrained(weights, device=device)
+    checkpoint_head_state = checkpoint["adapter_head_state_dict"]
+    track_means = checkpoint_head_state.get("track_means")
     model = RnaSeq11Adapter(
         base_model,
         n_tracks=n_tracks,
         embedding_resolution=embedding_resolution,
         organism_index=organism_index,
+        head_type=head_type,
+        head_resolutions=head_resolutions,
+        track_means=track_means,
     ).to(device)
-    model.head.load_state_dict(checkpoint["adapter_head_state_dict"])
+    model.head.load_state_dict(checkpoint_head_state)
 
     print(f"base_parameters\t{count_parameters(model.base_model)}")
     print(f"total_parameters\t{count_parameters(model)}")
