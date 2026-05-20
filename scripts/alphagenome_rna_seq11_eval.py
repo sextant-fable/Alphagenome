@@ -13,6 +13,7 @@ from alphagenome_pytorch import AlphaGenome
 from alphagenome_rna_seq11_adapter import (
     RnaSeq11Adapter,
     count_parameters,
+    evaluate_128bp_binned_pointwise_metrics,
     evaluate_masked_mse,
     evaluate_masked_mse_by_track,
     evaluate_pointwise_metrics,
@@ -62,6 +63,17 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--common-128bp-metrics",
+        choices=["raw-sum", "log1p-mean"],
+        default=None,
+        help=(
+            "Compute common 128 bp binned metrics for any head. raw-sum compares "
+            "128 bp summed raw signal; log1p-mean compares log1p of 128 bp mean "
+            "raw signal. Uses raw NPZ targets regardless of checkpoint target "
+            "transform."
+        ),
+    )
+    parser.add_argument(
         "--spearman-sample-size",
         type=int,
         default=0,
@@ -103,6 +115,15 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override checkpoint target transform.",
     )
+    parser.add_argument(
+        "--loss-type",
+        choices=["mse", "poisson-multinomial"],
+        default=None,
+        help="Override checkpoint loss type for scalar valid_loss evaluation.",
+    )
+    parser.add_argument("--multinomial-num-segments", type=int, default=None)
+    parser.add_argument("--positional-weight", type=float, default=None)
+    parser.add_argument("--count-weight", type=float, default=None)
     parser.add_argument(
         "--device",
         default="auto",
@@ -293,18 +314,45 @@ def main() -> None:
         if args.target_transform is not None
         else str(checkpoint.get("target_transform", "log1p"))
     )
+    checkpoint_target_transform = str(checkpoint.get("target_transform", "log1p"))
+    loss_type = (
+        args.loss_type
+        if args.loss_type is not None
+        else str(checkpoint.get("loss_type", "mse"))
+    )
+    multinomial_num_segments = (
+        args.multinomial_num_segments
+        if args.multinomial_num_segments is not None
+        else int(checkpoint.get("multinomial_num_segments", 8))
+    )
+    positional_weight = (
+        args.positional_weight
+        if args.positional_weight is not None
+        else float(checkpoint.get("positional_weight", 5.0))
+    )
+    count_weight = (
+        args.count_weight
+        if args.count_weight is not None
+        else float(checkpoint.get("count_weight", 1.0))
+    )
     if head_type == "genome-tracks" and target_transform != "none":
         raise ValueError(
             "GenomeTracksHead checkpoints must be evaluated with raw targets: "
             "--target-transform none"
         )
+    if loss_type == "poisson-multinomial" and head_type != "genome-tracks":
+        raise ValueError("poisson-multinomial evaluation requires genome-tracks")
+
+    dataset_target_transform = (
+        "none" if args.common_128bp_metrics is not None else target_transform
+    )
 
     dataloader = make_dataloader(
         dataset_dir,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        target_transform=target_transform,
+        target_transform=dataset_target_transform,
         max_examples=args.max_examples,
     )
     n_tracks = int(dataloader.dataset.metadata["n_tracks"])
@@ -320,9 +368,16 @@ def main() -> None:
     print(f"n_examples\t{len(dataloader.dataset)}")
     print(f"n_tracks\t{n_tracks}")
     print(f"target_transform\t{target_transform}")
+    print(f"dataset_target_transform\t{dataset_target_transform}")
     print(f"head_type\t{head_type}")
     print(f"head_resolutions\t{','.join(map(str, head_resolutions))}")
     print(f"loss_space\t{checkpoint.get('loss_space', 'target_transform')}")
+    print(f"loss_type\t{loss_type}")
+    print(f"multinomial_num_segments\t{multinomial_num_segments}")
+    print(f"positional_weight\t{positional_weight}")
+    print(f"count_weight\t{count_weight}")
+    if args.common_128bp_metrics is not None:
+        print(f"common_128bp_metrics\t{args.common_128bp_metrics}")
     print(f"embedding_resolution\t{embedding_resolution}")
     print(f"organism_index\t{organism_index}")
     print(f"device\t{device}")
@@ -351,7 +406,18 @@ def main() -> None:
     per_track_losses = None
     point_metrics = None
     track_labels = load_track_names(dataloader.dataset.metadata, n_tracks)
-    if args.point_metrics:
+    if args.common_128bp_metrics is not None:
+        point_metrics = evaluate_128bp_binned_pointwise_metrics(
+            model,
+            dataloader,
+            device=device,
+            linear_prediction_transform=checkpoint_target_transform,
+            metric_transform=args.common_128bp_metrics,
+        )
+        loss = float(point_metrics["overall_mse"])
+        batches = int(point_metrics["batches"])
+        examples = int(point_metrics["examples"])
+    elif args.point_metrics:
         point_metrics = evaluate_pointwise_metrics(
             model,
             dataloader,
@@ -373,6 +439,10 @@ def main() -> None:
             model,
             dataloader,
             device=device,
+            loss_type=loss_type,
+            multinomial_num_segments=multinomial_num_segments,
+            positional_weight=positional_weight,
+            count_weight=count_weight,
         )
     print(f"valid_batches\t{batches}")
     print(f"valid_examples\t{examples}")

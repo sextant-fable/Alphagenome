@@ -13,10 +13,12 @@ import torch.nn.functional as F
 
 from alphagenome_pytorch import AlphaGenome
 from alphagenome_pytorch.heads import GenomeTracksHead
+from alphagenome_pytorch.losses import multinomial_loss as alphagenome_multinomial_loss
 from torch_rna_seq_dataset import masked_mse_loss
 
 
 HeadType = Literal["linear", "genome-tracks"]
+LossType = Literal["mse", "poisson-multinomial"]
 
 
 def parse_resolutions(
@@ -306,13 +308,71 @@ class RnaSeq11Adapter(torch.nn.Module):
         return prediction
 
 
+def prediction_return_scaled_for_loss(model: RnaSeq11Adapter, loss_type: LossType) -> bool:
+    """Return whether the head should emit model-space predictions for loss."""
+
+    return model.head_type == "genome-tracks" and loss_type == "mse"
+
+
+def _mask_for_prediction(mask: torch.Tensor, prediction: torch.Tensor) -> torch.Tensor:
+    while mask.ndim < prediction.ndim:
+        mask = mask.unsqueeze(-1)
+    return mask.to(device=prediction.device, dtype=torch.bool)
+
+
 def masked_adapter_loss(
     model: RnaSeq11Adapter,
     prediction: torch.Tensor | dict[int, torch.Tensor],
     target: torch.Tensor,
     mask: torch.Tensor,
+    *,
+    loss_type: LossType = "mse",
+    multinomial_num_segments: int = 8,
+    positional_weight: float = 5.0,
+    count_weight: float = 1.0,
 ) -> torch.Tensor:
-    """Compute legacy log1p loss or GenomeTracksHead model-space loss."""
+    """Compute legacy MSE or AlphaGenome-style RNA-seq count/position loss."""
+
+    if loss_type == "poisson-multinomial":
+        if model.head_type != "genome-tracks" or not isinstance(prediction, dict):
+            raise ValueError(
+                "poisson-multinomial loss requires a GenomeTracksHead prediction dict"
+            )
+        if multinomial_num_segments < 1:
+            raise ValueError("multinomial_num_segments must be >= 1")
+
+        losses = []
+        for resolution, resolution_prediction in sorted(prediction.items()):
+            target_at_resolution = bin_rna_seq_target(target, resolution)
+            if target_at_resolution.shape != resolution_prediction.shape:
+                raise ValueError(
+                    "Prediction/target shape mismatch for "
+                    f"{resolution} bp: {resolution_prediction.shape} vs "
+                    f"{target_at_resolution.shape}"
+                )
+            sequence_length = int(resolution_prediction.shape[-1])
+            if sequence_length % multinomial_num_segments != 0:
+                raise ValueError(
+                    f"{sequence_length=} is not divisible by "
+                    f"{multinomial_num_segments=}"
+                )
+            segment_length = sequence_length // multinomial_num_segments
+            loss_dict = alphagenome_multinomial_loss(
+                y_true=target_at_resolution.to(dtype=resolution_prediction.dtype),
+                y_pred=resolution_prediction.clamp_min(1e-7),
+                mask=_mask_for_prediction(mask, resolution_prediction),
+                multinomial_resolution=segment_length,
+                positional_weight=positional_weight,
+                count_weight=count_weight,
+                channels_last=False,
+            )
+            losses.append(loss_dict["loss"])
+        if not losses:
+            raise ValueError("No prediction resolutions were returned")
+        return torch.stack(losses).mean()
+
+    if loss_type != "mse":
+        raise ValueError(f"Unsupported loss_type: {loss_type}")
 
     if isinstance(prediction, dict):
         losses = []
@@ -355,6 +415,10 @@ def evaluate_masked_mse(
     *,
     device: torch.device,
     max_batches: int | None = None,
+    loss_type: LossType = "mse",
+    multinomial_num_segments: int = 8,
+    positional_weight: float = 5.0,
+    count_weight: float = 1.0,
 ) -> tuple[float, int, int]:
     model.eval()
     weighted_loss_sum = 0.0
@@ -369,9 +433,18 @@ def evaluate_masked_mse(
             prediction = model(
                 dna_sequence,
                 target_length=rna_seq.shape[-1],
-                return_scaled=model.uses_scaled_targets,
+                return_scaled=prediction_return_scaled_for_loss(model, loss_type),
             )
-            loss = masked_adapter_loss(model, prediction, rna_seq, rna_seq_mask)
+            loss = masked_adapter_loss(
+                model,
+                prediction,
+                rna_seq,
+                rna_seq_mask,
+                loss_type=loss_type,
+                multinomial_num_segments=multinomial_num_segments,
+                positional_weight=positional_weight,
+                count_weight=count_weight,
+            )
             batch_size = int(dna_sequence.shape[0])
             weighted_loss_sum += float(loss.detach().cpu()) * batch_size
             n_batches += 1
@@ -719,6 +792,154 @@ def evaluate_pointwise_metrics(
         "per_track_pearson": per_track_pearson,
         "per_track_spearman_sampled": per_track_spearman,
         "per_track_spearman_sampled_n": per_track_spearman_n,
+        "batches": n_batches,
+        "examples": n_examples,
+    }
+
+
+def evaluate_128bp_binned_pointwise_metrics(
+    model: RnaSeq11Adapter,
+    dataloader: torch.utils.data.DataLoader,
+    *,
+    device: torch.device,
+    linear_prediction_transform: str,
+    metric_transform: Literal["raw-sum", "log1p-mean"] = "log1p-mean",
+    max_batches: int | None = None,
+) -> dict[str, object]:
+    """Evaluate any RNA-seq head on common 128 bp binned raw-target metrics."""
+
+    if metric_transform not in {"raw-sum", "log1p-mean"}:
+        raise ValueError(f"Unsupported metric_transform: {metric_transform}")
+
+    model.eval()
+    n_tracks: int | None = None
+    sse: torch.Tensor | None = None
+    sae: torch.Tensor | None = None
+    sum_x: torch.Tensor | None = None
+    sum_y: torch.Tensor | None = None
+    sum_x2: torch.Tensor | None = None
+    sum_y2: torch.Tensor | None = None
+    sum_xy: torch.Tensor | None = None
+    denominator: torch.Tensor | None = None
+    n_batches = 0
+    n_examples = 0
+
+    with torch.no_grad():
+        for batch in dataloader:
+            dna_sequence = batch["dna_sequence"].to(device=device, dtype=torch.float32)
+            rna_seq = batch["rna_seq"].to(device=device, dtype=torch.float32)
+            rna_seq_mask = batch["rna_seq_mask"].to(device=device)
+
+            prediction = model(
+                dna_sequence,
+                target_length=rna_seq.shape[-1],
+                return_scaled=False,
+            )
+            if isinstance(prediction, dict):
+                if 128 in prediction:
+                    prediction_128 = prediction[128].clamp_min(0.0)
+                elif 1 in prediction:
+                    prediction_128 = bin_rna_seq_target(prediction[1], 128)
+                else:
+                    raise ValueError("GenomeTracksHead returned neither 1 bp nor 128 bp")
+            else:
+                prediction_raw = prediction
+                if linear_prediction_transform == "log1p":
+                    prediction_raw = torch.expm1(prediction_raw).clamp_min(0.0)
+                elif linear_prediction_transform == "none":
+                    prediction_raw = prediction_raw.clamp_min(0.0)
+                else:
+                    raise ValueError(
+                        "linear_prediction_transform must be 'log1p' or 'none'"
+                    )
+                prediction_128 = bin_rna_seq_target(prediction_raw, 128)
+
+            target_128 = bin_rna_seq_target(rna_seq, 128)
+            if metric_transform == "log1p-mean":
+                prediction_metric = torch.log1p(prediction_128 / 128.0)
+                target_metric = torch.log1p(target_128 / 128.0)
+            else:
+                prediction_metric = prediction_128
+                target_metric = target_128
+
+            if n_tracks is None:
+                n_tracks = int(prediction_metric.shape[1])
+                sse = torch.zeros(n_tracks, dtype=torch.float64)
+                sae = torch.zeros(n_tracks, dtype=torch.float64)
+                sum_x = torch.zeros(n_tracks, dtype=torch.float64)
+                sum_y = torch.zeros(n_tracks, dtype=torch.float64)
+                sum_x2 = torch.zeros(n_tracks, dtype=torch.float64)
+                sum_y2 = torch.zeros(n_tracks, dtype=torch.float64)
+                sum_xy = torch.zeros(n_tracks, dtype=torch.float64)
+                denominator = torch.zeros(n_tracks, dtype=torch.float64)
+
+            mask = _mask_for_prediction(rna_seq_mask, prediction_metric)
+            mask64 = mask.to(dtype=torch.float64)
+            prediction64 = prediction_metric.to(dtype=torch.float64)
+            target64 = target_metric.to(dtype=torch.float64)
+            error64 = prediction64 - target64
+
+            assert sse is not None
+            assert sae is not None
+            assert sum_x is not None
+            assert sum_y is not None
+            assert sum_x2 is not None
+            assert sum_y2 is not None
+            assert sum_xy is not None
+            assert denominator is not None
+            sse += (error64.square() * mask64).sum(dim=(0, 2)).detach().cpu()
+            sae += (error64.abs() * mask64).sum(dim=(0, 2)).detach().cpu()
+            sum_x += (prediction64 * mask64).sum(dim=(0, 2)).detach().cpu()
+            sum_y += (target64 * mask64).sum(dim=(0, 2)).detach().cpu()
+            sum_x2 += (prediction64.square() * mask64).sum(dim=(0, 2)).detach().cpu()
+            sum_y2 += (target64.square() * mask64).sum(dim=(0, 2)).detach().cpu()
+            sum_xy += (prediction64 * target64 * mask64).sum(dim=(0, 2)).detach().cpu()
+            denominator += mask64.expand_as(prediction64).sum(dim=(0, 2)).detach().cpu()
+
+            n_batches += 1
+            n_examples += int(dna_sequence.shape[0])
+            if max_batches is not None and n_batches >= max_batches:
+                break
+
+    if denominator is None:
+        raise ValueError("Cannot evaluate an empty dataloader")
+
+    per_track_mse = sse / denominator.clamp_min(1.0)
+    per_track_mae = sae / denominator.clamp_min(1.0)
+    per_track_pearson = [
+        pearson_from_sums(
+            float(sum_x[index]),
+            float(sum_y[index]),
+            float(sum_x2[index]),
+            float(sum_y2[index]),
+            float(sum_xy[index]),
+            float(denominator[index]),
+        )
+        for index in range(len(denominator))
+    ]
+    overall_n = float(denominator.sum())
+    overall_mse = float(sse.sum() / denominator.sum().clamp_min(1.0))
+    overall_mae = float(sae.sum() / denominator.sum().clamp_min(1.0))
+    overall_pearson = pearson_from_sums(
+        float(sum_x.sum()),
+        float(sum_y.sum()),
+        float(sum_x2.sum()),
+        float(sum_y2.sum()),
+        float(sum_xy.sum()),
+        overall_n,
+    )
+
+    model.train()
+    model.base_model.eval()
+    return {
+        "overall_mse": overall_mse,
+        "overall_mae": overall_mae,
+        "overall_pearson": overall_pearson,
+        "per_track_mse": [float(value) for value in per_track_mse],
+        "per_track_mae": [float(value) for value in per_track_mae],
+        "per_track_pearson": per_track_pearson,
+        "per_track_spearman_sampled": None,
+        "per_track_spearman_sampled_n": None,
         "batches": n_batches,
         "examples": n_examples,
     }
