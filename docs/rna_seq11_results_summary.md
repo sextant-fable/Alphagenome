@@ -1,6 +1,6 @@
 # C. elegans RNA-seq 11-Track AlphaGenome Adapter Summary
 
-Date: 2026-05-18
+Date: 2026-05-21
 
 This document summarizes the current frozen AlphaGenome adapter experiment for
 custom C. elegans 11-track RNA-seq prediction. Full command records and run
@@ -21,6 +21,10 @@ interpretation, and next-step recommendations, see
 - Do not use the test split for additional model selection or tuning.
 - A follow-up 128 bp last-block LoRA scheme C feasibility round did not improve
   validation MSE, so the selected model remains unchanged.
+- Follow-up 128 bp GenomeTracksHead experiments with model-space MSE and with
+  AlphaGenome-style Poisson + multinomial count loss did not beat the selected
+  legacy 128 bp linear adapter under the common 128 bp binned `log1p(mean raw)`
+  audit metric, so the selected model remains unchanged.
 
 ## Data
 
@@ -307,6 +311,29 @@ Held-out test result for the selected checkpoint:
 |---|---:|---|---:|---:|---:|
 | frozen AlphaGenome adapter | test | best valid checkpoint, step 4250 | `1.1711332` | `0.76486897` | `0.55539986` |
 
+GenomeTracksHead follow-up audit metrics:
+
+These use a common 128 bp binned `log1p(mean raw signal)` metric so the
+GenomeTracks checkpoints and legacy linear checkpoint can be compared on the
+same transformed target space. These audit metrics are separate from each
+run's training loss.
+
+| model | split | checkpoint/objective | MSE | MAE | Pearson |
+|---|---:|---|---:|---:|---:|
+| legacy 128 bp linear adapter | valid | best step 4250, log1p MSE objective | `1.0298867` | `0.68138634` | `0.62135428` |
+| legacy 128 bp linear adapter | test | best step 4250, log1p MSE objective | `1.1380058` | `0.73726858` | `0.59136682` |
+| 128 bp GenomeTracksHead | valid | best step 3000, model-space MSE objective | `2.133715` | `1.1418334` | `0.53935375` |
+| 128 bp GenomeTracksHead | test | best step 3000, model-space MSE objective | `1.8786616` | `1.0444137` | `0.53915857` |
+| 128 bp GenomeTracksHead | valid | best step 500, Poisson + multinomial objective | `3.0527705` | `1.4647581` | `0.49153418` |
+| 128 bp GenomeTracksHead | test | best step 500, Poisson + multinomial objective | `2.5278237` | `1.2957843` | `0.5309488` |
+
+GenomeTracksHead objective-specific validation losses:
+
+| run | objective-space validation curve |
+|---|---|
+| 128 bp GenomeTracksHead, model-space MSE | step 250 `1.808731`, 500 `1.7033822`, 1000 `1.6219809`, 1500 `1.5778429`, 2000 `1.5444947`, 2500 `1.5202813`, 3000 `1.5025958` |
+| 128 bp GenomeTracksHead, Poisson + multinomial | step 100 `91680.721`, 200 `86910.675`, 300 `85539.633`, 400 `85080.233`, 500 `85025.399` |
+
 Relative validation MSE comparison:
 
 - adapter best vs train-track mean baseline:
@@ -407,6 +434,8 @@ Limits:
 
 ## Recommended Next Step
 
-For this experiment round, freeze the result above as the current benchmark and
-commit the scripts plus documentation. Future modeling changes should be treated
-as a new experiment round with validation-only model selection.
+For this experiment round, keep the legacy 128 bp linear adapter as the current
+benchmark. Do not start 1 bp + 128 bp GenomeTracksHead training from the current
+Poisson + multinomial setup yet; first investigate loss weighting/scaling,
+warm-starting GenomeTracksHead from the 128 bp MSE checkpoint, or a hybrid
+objective using validation-only model selection.

@@ -34,6 +34,129 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-21 - GenomeTracks 128 bp MSE Run Stopped at Step 3000 and Common-Metric Audit
+
+- Run type: training and evaluation
+- Purpose: Stop the 4-GPU 128 bp-only GenomeTracksHead MSE run at the user's requested 3000-step cutoff, then compare its best checkpoint with the legacy 128 bp linear adapter best checkpoint using a common 128 bp binned `log1p(mean raw signal)` metric.
+- Git commit: Training was launched from `65ae17776f7ffccfdfd744840104d9038352f279`; common-metric evaluation used `8c094c57c1c59122a356348d7f64be1d4f541d86`.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; PyTorch `2.11.0+cu128`; A100 80GB GPUs; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`
+- Command:
+
+```bash
+RUN_ID=rna_seq11_genometracks_128bp_trainnonzero_20260520_5000steps_lr3e-4_4gpu_gacc4
+
+# Training command was launched on 2026-05-20 and stopped after valid step 3000.
+CUDA_VISIBLE_DEVICES=0,1,2,3 conda run -n alphagenome torchrun --standalone --nproc_per_node=4 \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/${RUN_ID} \
+  --embedding-resolution 128 \
+  --head-type genome-tracks \
+  --head-resolutions 128 \
+  --target-transform none \
+  --track-means-source train-nonzero \
+  --batch-size 1 \
+  --grad-accum-steps 4 \
+  --max-steps 5000 \
+  --eval-every 250 \
+  --learning-rate 3e-4 \
+  --warmup-steps 500 \
+  --lr-schedule cosine \
+  --grad-clip-norm 1.0 \
+  --num-workers 2
+
+CUDA_VISIBLE_DEVICES=0 conda run -n alphagenome python scripts/alphagenome_rna_seq11_eval.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --checkpoint runs/${RUN_ID}/adapter_head_best.pt \
+  --common-128bp-metrics log1p-mean \
+  --metrics-output runs/${RUN_ID}/valid_best_common128_log1pmean_metrics.tsv \
+  --device cuda
+
+CUDA_VISIBLE_DEVICES=1 conda run -n alphagenome python scripts/alphagenome_rna_seq11_eval.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_test \
+  --checkpoint runs/${RUN_ID}/adapter_head_best.pt \
+  --common-128bp-metrics log1p-mean \
+  --metrics-output runs/${RUN_ID}/test_best_common128_log1pmean_metrics.tsv \
+  --device cuda
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train`, `alphagenome_custom/datasets/rna_seq_npz_valid`, and audit-only `alphagenome_custom/datasets/rna_seq_npz_test`
+- Output path: `runs/rna_seq11_genometracks_128bp_trainnonzero_20260520_5000steps_lr3e-4_4gpu_gacc4`
+- Result summary: Training was stopped after the step-3000 validation. GenomeTracks model-space valid MSE improved monotonically from `1.808731` at step 250 to `1.5025958` at step 3000. On the common 128 bp binned `log1p(mean raw)` metric, however, this checkpoint was worse than the legacy 128 bp linear best checkpoint.
+- Verification: GenomeTracks MSE common metrics were valid MSE `2.133715`, MAE `1.1418334`, Pearson `0.53935375`; test MSE `1.8786616`, MAE `1.0444137`, Pearson `0.53915857`. Legacy 128 bp linear best common metrics were valid MSE `1.0298867`, MAE `0.68138634`, Pearson `0.62135428`; test MSE `1.1380058`, MAE `0.73726858`, Pearson `0.59136682`.
+- Failures or warnings: The held-out test split was used only for this audit comparison, not for model selection. GenomeTracks model-space MSE is not directly comparable to legacy log1p MSE; the common 128 bp metric was added for cross-head comparison.
+- Next actions: Do not promote the MSE-trained 128 bp GenomeTracks checkpoint to 1 bp + 128 bp. First test the AlphaGenome-style count/position loss on 128 bp only.
+- Claim status: verified
+
+## 2026-05-21 - GenomeTracks 128 bp Poisson-Multinomial Loss 500-Step Sanity
+
+- Run type: smoke test, training, and evaluation
+- Purpose: Evaluate whether an AlphaGenome-style RNA-seq loss, implemented as Poisson total-count plus positional multinomial count loss over 8 sequence segments, is a better 128 bp-only GenomeTracksHead objective before attempting 1 bp + 128 bp multi-resolution training.
+- Git commit: `8c094c57c1c59122a356348d7f64be1d4f541d86`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; PyTorch `2.11.0+cu128`; A100 80GB GPUs; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`
+- Command:
+
+```bash
+RUN_ID=rna_seq11_genometracks_128bp_poissonmulti_20260521_500steps_lr3e-4_4gpu_gacc4_run2
+
+CUDA_VISIBLE_DEVICES=0,1,2,3 conda run -n alphagenome torchrun --standalone --nproc_per_node=4 \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/${RUN_ID} \
+  --embedding-resolution 128 \
+  --head-type genome-tracks \
+  --head-resolutions 128 \
+  --target-transform none \
+  --track-means-source train-nonzero \
+  --loss-type poisson-multinomial \
+  --multinomial-num-segments 8 \
+  --positional-weight 5.0 \
+  --count-weight 1.0 \
+  --batch-size 1 \
+  --grad-accum-steps 4 \
+  --max-steps 500 \
+  --eval-every 100 \
+  --learning-rate 3e-4 \
+  --warmup-steps 50 \
+  --lr-schedule cosine \
+  --grad-clip-norm 1.0 \
+  --num-workers 2
+
+CUDA_VISIBLE_DEVICES=0 conda run -n alphagenome python scripts/alphagenome_rna_seq11_eval.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --checkpoint runs/${RUN_ID}/adapter_head_best.pt \
+  --common-128bp-metrics log1p-mean \
+  --metrics-output runs/${RUN_ID}/valid_best_common128_log1pmean_metrics.tsv \
+  --device cuda
+
+CUDA_VISIBLE_DEVICES=1 conda run -n alphagenome python scripts/alphagenome_rna_seq11_eval.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_test \
+  --checkpoint runs/${RUN_ID}/adapter_head_best.pt \
+  --common-128bp-metrics log1p-mean \
+  --metrics-output runs/${RUN_ID}/test_best_common128_log1pmean_metrics.tsv \
+  --device cuda
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train`, `alphagenome_custom/datasets/rna_seq_npz_valid`, and audit-only `alphagenome_custom/datasets/rna_seq_npz_test`
+- Output path: `runs/rna_seq11_genometracks_128bp_poissonmulti_20260521_500steps_lr3e-4_4gpu_gacc4_run2`
+- Result summary: The count/position objective ran successfully and valid loss decreased from `91680.721` at step 100 to `85025.399` at step 500, but the common 128 bp `log1p(mean raw)` metrics were substantially worse than both the legacy 128 bp linear best checkpoint and the MSE-trained GenomeTracks checkpoint.
+- Verification: Poisson-multinomial valid losses were step 100 `91680.721`, step 200 `86910.675`, step 300 `85539.633`, step 400 `85080.233`, and step 500 `85025.399`. Audit test Poisson-multinomial loss was `54648.254`. Common 128 bp `log1p(mean raw)` metrics were valid MSE `3.0527705`, MAE `1.4647581`, Pearson `0.49153418`; test MSE `2.5278237`, MAE `1.2957843`, Pearson `0.5309488`.
+- Failures or warnings: A first background `nohup conda run` launch at `runs/rna_seq11_genometracks_128bp_poissonmulti_20260521_500steps_lr3e-4_4gpu_gacc4` exited after writing only `config.json`; the log was empty and no metrics were written. A 1-step smoke test and a 2-step full-data debug run completed successfully before the foreground 500-step run. Test metrics are audit-only and should not guide model selection.
+- Next actions: Do not start 1 bp + 128 bp multi-resolution training from this objective yet. Investigate loss weighting/scaling, warm-starting from the MSE-trained GenomeTracks checkpoint, or a hybrid objective before spending 1 bp GPU time.
+- Claim status: verified
+
 ## 2026-05-19 - GenomeTracks RNA-seq 128 bp Head One-Step Sanity on HY-GPU GPU 2
 
 - Run type: smoke test
