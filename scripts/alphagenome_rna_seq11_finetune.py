@@ -166,12 +166,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--loss-type",
-        choices=["mse", "poisson-multinomial"],
+        choices=["mse", "poisson-multinomial", "hybrid-mse-poisson"],
         default="mse",
         help=(
             "mse keeps the current masked MSE objective; poisson-multinomial "
             "uses AlphaGenome-style total-count plus positional count loss for "
-            "GenomeTracksHead."
+            "GenomeTracksHead; hybrid-mse-poisson combines both with explicit "
+            "weights."
         ),
     )
     parser.add_argument(
@@ -191,6 +192,18 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=1.0,
         help="Poisson total-count loss weight.",
+    )
+    parser.add_argument(
+        "--mse-weight",
+        type=float,
+        default=1.0,
+        help="Model-space MSE weight for hybrid-mse-poisson loss.",
+    )
+    parser.add_argument(
+        "--poisson-weight",
+        type=float,
+        default=1.0,
+        help="Poisson-multinomial component weight for hybrid-mse-poisson loss.",
     )
     parser.add_argument(
         "--device",
@@ -280,6 +293,16 @@ def learning_rate_for_step(
         return base_lr * cosine
 
     return base_lr
+
+
+def loss_space_for_config(head_type: str, loss_type: str) -> str:
+    if head_type == "genome-tracks" and loss_type == "mse":
+        return "genome_tracks_model_scaled"
+    if loss_type == "poisson-multinomial":
+        return "experimental_counts"
+    if loss_type == "hybrid-mse-poisson":
+        return "hybrid_genome_tracks_mse_plus_counts"
+    return "target_transform"
 
 
 def infinite_batches(
@@ -398,6 +421,8 @@ def save_training_checkpoint(
     multinomial_num_segments: int,
     positional_weight: float,
     count_weight: float,
+    mse_weight: float,
+    poisson_weight: float,
     track_means_source: str,
     track_means_tsv: str,
     track_means_max_examples: int | None,
@@ -415,6 +440,8 @@ def save_training_checkpoint(
         "multinomial_num_segments": multinomial_num_segments,
         "positional_weight": positional_weight,
         "count_weight": count_weight,
+        "mse_weight": mse_weight,
+        "poisson_weight": poisson_weight,
         "base_weights": str(weights),
         "best_valid_loss": best_valid_loss,
         "best_valid_step": best_valid_step,
@@ -455,13 +482,18 @@ def main() -> None:
             "--head-type genome-tracks requires --target-transform none so raw "
             "RNA-seq targets can be scaled into model space."
         )
-    if args.loss_type == "poisson-multinomial":
+    if args.loss_type in {"poisson-multinomial", "hybrid-mse-poisson"}:
         if args.head_type != "genome-tracks":
-            raise ValueError("--loss-type poisson-multinomial requires genome-tracks")
+            raise ValueError(f"--loss-type {args.loss_type} requires genome-tracks")
         if args.target_transform != "none":
-            raise ValueError("--loss-type poisson-multinomial requires raw targets")
+            raise ValueError(f"--loss-type {args.loss_type} requires raw targets")
         if args.multinomial_num_segments < 1:
             raise ValueError("--multinomial-num-segments must be >= 1")
+    if args.loss_type == "hybrid-mse-poisson":
+        if args.mse_weight < 0.0 or args.poisson_weight < 0.0:
+            raise ValueError("Hybrid loss weights must be non-negative")
+        if args.mse_weight == 0.0 and args.poisson_weight == 0.0:
+            raise ValueError("At least one hybrid loss weight must be positive")
 
     train_dataset_dir = Path(args.train_dataset_dir)
     valid_dataset_dir = Path(args.valid_dataset_dir)
@@ -569,13 +601,14 @@ def main() -> None:
     print_main(rank, f"head_resolutions\t{','.join(map(str, head_resolutions))}")
     print_main(
         rank,
-        "loss_space\t"
-        f"{'genome_tracks_model_scaled' if args.head_type == 'genome-tracks' and args.loss_type == 'mse' else 'experimental_counts' if args.loss_type == 'poisson-multinomial' else 'target_transform'}",
+        f"loss_space\t{loss_space_for_config(args.head_type, args.loss_type)}",
     )
     print_main(rank, f"loss_type\t{args.loss_type}")
     print_main(rank, f"multinomial_num_segments\t{args.multinomial_num_segments}")
     print_main(rank, f"positional_weight\t{args.positional_weight}")
     print_main(rank, f"count_weight\t{args.count_weight}")
+    print_main(rank, f"mse_weight\t{args.mse_weight}")
+    print_main(rank, f"poisson_weight\t{args.poisson_weight}")
     print_main(rank, f"track_means_source\t{args.track_means_source}")
     if track_means is not None:
         print_main(
@@ -781,6 +814,8 @@ def main() -> None:
                 multinomial_num_segments=args.multinomial_num_segments,
                 positional_weight=args.positional_weight,
                 count_weight=args.count_weight,
+                mse_weight=args.mse_weight,
+                poisson_weight=args.poisson_weight,
             )
             (loss / args.grad_accum_steps).backward()
 
@@ -856,6 +891,8 @@ def main() -> None:
                     multinomial_num_segments=args.multinomial_num_segments,
                     positional_weight=args.positional_weight,
                     count_weight=args.count_weight,
+                    mse_weight=args.mse_weight,
+                    poisson_weight=args.poisson_weight,
                 )
                 cuda_memory = (
                     torch.cuda.max_memory_allocated() / 1024**2
@@ -899,17 +936,13 @@ def main() -> None:
                         init_adapter_checkpoint=args.init_adapter_checkpoint,
                         head_type=args.head_type,
                         head_resolutions=head_resolutions,
-                        loss_space=(
-                            "genome_tracks_model_scaled"
-                            if args.head_type == "genome-tracks" and args.loss_type == "mse"
-                            else "experimental_counts"
-                            if args.loss_type == "poisson-multinomial"
-                            else "target_transform"
-                        ),
+                        loss_space=loss_space_for_config(args.head_type, args.loss_type),
                         loss_type=args.loss_type,
                         multinomial_num_segments=args.multinomial_num_segments,
                         positional_weight=args.positional_weight,
                         count_weight=args.count_weight,
+                        mse_weight=args.mse_weight,
+                        poisson_weight=args.poisson_weight,
                         track_means_source=args.track_means_source,
                         track_means_tsv=args.track_means_tsv,
                         track_means_max_examples=args.track_means_max_examples,
@@ -939,17 +972,13 @@ def main() -> None:
             init_adapter_checkpoint=args.init_adapter_checkpoint,
             head_type=args.head_type,
             head_resolutions=head_resolutions,
-            loss_space=(
-                "genome_tracks_model_scaled"
-                if args.head_type == "genome-tracks" and args.loss_type == "mse"
-                else "experimental_counts"
-                if args.loss_type == "poisson-multinomial"
-                else "target_transform"
-            ),
+            loss_space=loss_space_for_config(args.head_type, args.loss_type),
             loss_type=args.loss_type,
             multinomial_num_segments=args.multinomial_num_segments,
             positional_weight=args.positional_weight,
             count_weight=args.count_weight,
+            mse_weight=args.mse_weight,
+            poisson_weight=args.poisson_weight,
             track_means_source=args.track_means_source,
             track_means_tsv=args.track_means_tsv,
             track_means_max_examples=args.track_means_max_examples,

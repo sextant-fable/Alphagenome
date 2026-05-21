@@ -18,7 +18,7 @@ from torch_rna_seq_dataset import masked_mse_loss
 
 
 HeadType = Literal["linear", "genome-tracks"]
-LossType = Literal["mse", "poisson-multinomial"]
+LossType = Literal["mse", "poisson-multinomial", "hybrid-mse-poisson"]
 
 
 def parse_resolutions(
@@ -311,13 +311,91 @@ class RnaSeq11Adapter(torch.nn.Module):
 def prediction_return_scaled_for_loss(model: RnaSeq11Adapter, loss_type: LossType) -> bool:
     """Return whether the head should emit model-space predictions for loss."""
 
-    return model.head_type == "genome-tracks" and loss_type == "mse"
+    return model.head_type == "genome-tracks" and loss_type in {
+        "mse",
+        "hybrid-mse-poisson",
+    }
 
 
 def _mask_for_prediction(mask: torch.Tensor, prediction: torch.Tensor) -> torch.Tensor:
     while mask.ndim < prediction.ndim:
         mask = mask.unsqueeze(-1)
     return mask.to(device=prediction.device, dtype=torch.bool)
+
+
+def _genome_tracks_mse_component(
+    model: RnaSeq11Adapter,
+    prediction: dict[int, torch.Tensor],
+    target: torch.Tensor,
+    mask: torch.Tensor,
+) -> torch.Tensor:
+    losses = []
+    for resolution, resolution_prediction in sorted(prediction.items()):
+        scaled_target = model.scale_targets_for_loss(target, resolution=resolution)
+        losses.append(
+            masked_mse_loss(
+                resolution_prediction,
+                scaled_target.to(dtype=resolution_prediction.dtype),
+                mask,
+            )
+        )
+    if not losses:
+        raise ValueError("No prediction resolutions were returned")
+    return torch.stack(losses).mean()
+
+
+def _poisson_multinomial_component(
+    model: RnaSeq11Adapter,
+    prediction: dict[int, torch.Tensor],
+    target: torch.Tensor,
+    mask: torch.Tensor,
+    *,
+    prediction_is_scaled: bool,
+    multinomial_num_segments: int,
+    positional_weight: float,
+    count_weight: float,
+) -> torch.Tensor:
+    if multinomial_num_segments < 1:
+        raise ValueError("multinomial_num_segments must be >= 1")
+
+    organism_index = model.organism_index_tensor(target.shape[0], target.device)
+    losses = []
+    for resolution, resolution_prediction in sorted(prediction.items()):
+        target_at_resolution = bin_rna_seq_target(target, resolution)
+        raw_prediction = resolution_prediction
+        if prediction_is_scaled:
+            raw_prediction = model.head.unscale(
+                resolution_prediction,
+                organism_index,
+                resolution,
+                channels_last=False,
+            )
+        if target_at_resolution.shape != raw_prediction.shape:
+            raise ValueError(
+                "Prediction/target shape mismatch for "
+                f"{resolution} bp: {raw_prediction.shape} vs "
+                f"{target_at_resolution.shape}"
+            )
+        sequence_length = int(raw_prediction.shape[-1])
+        if sequence_length % multinomial_num_segments != 0:
+            raise ValueError(
+                f"{sequence_length=} is not divisible by "
+                f"{multinomial_num_segments=}"
+            )
+        segment_length = sequence_length // multinomial_num_segments
+        loss_dict = alphagenome_multinomial_loss(
+            y_true=target_at_resolution.to(dtype=raw_prediction.dtype),
+            y_pred=raw_prediction.clamp_min(1e-7),
+            mask=_mask_for_prediction(mask, raw_prediction),
+            multinomial_resolution=segment_length,
+            positional_weight=positional_weight,
+            count_weight=count_weight,
+            channels_last=False,
+        )
+        losses.append(loss_dict["loss"])
+    if not losses:
+        raise ValueError("No prediction resolutions were returned")
+    return torch.stack(losses).mean()
 
 
 def masked_adapter_loss(
@@ -330,6 +408,8 @@ def masked_adapter_loss(
     multinomial_num_segments: int = 8,
     positional_weight: float = 5.0,
     count_weight: float = 1.0,
+    mse_weight: float = 1.0,
+    poisson_weight: float = 1.0,
 ) -> torch.Tensor:
     """Compute legacy MSE or AlphaGenome-style RNA-seq count/position loss."""
 
@@ -338,56 +418,40 @@ def masked_adapter_loss(
             raise ValueError(
                 "poisson-multinomial loss requires a GenomeTracksHead prediction dict"
             )
-        if multinomial_num_segments < 1:
-            raise ValueError("multinomial_num_segments must be >= 1")
+        return _poisson_multinomial_component(
+            model,
+            prediction,
+            target,
+            mask,
+            prediction_is_scaled=False,
+            multinomial_num_segments=multinomial_num_segments,
+            positional_weight=positional_weight,
+            count_weight=count_weight,
+        )
 
-        losses = []
-        for resolution, resolution_prediction in sorted(prediction.items()):
-            target_at_resolution = bin_rna_seq_target(target, resolution)
-            if target_at_resolution.shape != resolution_prediction.shape:
-                raise ValueError(
-                    "Prediction/target shape mismatch for "
-                    f"{resolution} bp: {resolution_prediction.shape} vs "
-                    f"{target_at_resolution.shape}"
-                )
-            sequence_length = int(resolution_prediction.shape[-1])
-            if sequence_length % multinomial_num_segments != 0:
-                raise ValueError(
-                    f"{sequence_length=} is not divisible by "
-                    f"{multinomial_num_segments=}"
-                )
-            segment_length = sequence_length // multinomial_num_segments
-            loss_dict = alphagenome_multinomial_loss(
-                y_true=target_at_resolution.to(dtype=resolution_prediction.dtype),
-                y_pred=resolution_prediction.clamp_min(1e-7),
-                mask=_mask_for_prediction(mask, resolution_prediction),
-                multinomial_resolution=segment_length,
-                positional_weight=positional_weight,
-                count_weight=count_weight,
-                channels_last=False,
+    if loss_type == "hybrid-mse-poisson":
+        if model.head_type != "genome-tracks" or not isinstance(prediction, dict):
+            raise ValueError(
+                "hybrid-mse-poisson loss requires a GenomeTracksHead prediction dict"
             )
-            losses.append(loss_dict["loss"])
-        if not losses:
-            raise ValueError("No prediction resolutions were returned")
-        return torch.stack(losses).mean()
+        mse_loss = _genome_tracks_mse_component(model, prediction, target, mask)
+        poisson_loss = _poisson_multinomial_component(
+            model,
+            prediction,
+            target,
+            mask,
+            prediction_is_scaled=True,
+            multinomial_num_segments=multinomial_num_segments,
+            positional_weight=positional_weight,
+            count_weight=count_weight,
+        )
+        return mse_weight * mse_loss + poisson_weight * poisson_loss
 
     if loss_type != "mse":
         raise ValueError(f"Unsupported loss_type: {loss_type}")
 
     if isinstance(prediction, dict):
-        losses = []
-        for resolution, resolution_prediction in sorted(prediction.items()):
-            scaled_target = model.scale_targets_for_loss(target, resolution=resolution)
-            losses.append(
-                masked_mse_loss(
-                    resolution_prediction,
-                    scaled_target.to(dtype=resolution_prediction.dtype),
-                    mask,
-                )
-            )
-        if not losses:
-            raise ValueError("No prediction resolutions were returned")
-        return torch.stack(losses).mean()
+        return _genome_tracks_mse_component(model, prediction, target, mask)
 
     return masked_mse_loss(prediction, target, mask)
 
@@ -419,6 +483,8 @@ def evaluate_masked_mse(
     multinomial_num_segments: int = 8,
     positional_weight: float = 5.0,
     count_weight: float = 1.0,
+    mse_weight: float = 1.0,
+    poisson_weight: float = 1.0,
 ) -> tuple[float, int, int]:
     model.eval()
     weighted_loss_sum = 0.0
@@ -444,6 +510,8 @@ def evaluate_masked_mse(
                 multinomial_num_segments=multinomial_num_segments,
                 positional_weight=positional_weight,
                 count_weight=count_weight,
+                mse_weight=mse_weight,
+                poisson_weight=poisson_weight,
             )
             batch_size = int(dna_sequence.shape[0])
             weighted_loss_sum += float(loss.detach().cpu()) * batch_size

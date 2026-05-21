@@ -117,13 +117,15 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--loss-type",
-        choices=["mse", "poisson-multinomial"],
+        choices=["mse", "poisson-multinomial", "hybrid-mse-poisson"],
         default=None,
         help="Override checkpoint loss type for scalar valid_loss evaluation.",
     )
     parser.add_argument("--multinomial-num-segments", type=int, default=None)
     parser.add_argument("--positional-weight", type=float, default=None)
     parser.add_argument("--count-weight", type=float, default=None)
+    parser.add_argument("--mse-weight", type=float, default=None)
+    parser.add_argument("--poisson-weight", type=float, default=None)
     parser.add_argument(
         "--device",
         default="auto",
@@ -335,13 +337,23 @@ def main() -> None:
         if args.count_weight is not None
         else float(checkpoint.get("count_weight", 1.0))
     )
+    mse_weight = (
+        args.mse_weight
+        if args.mse_weight is not None
+        else float(checkpoint.get("mse_weight", 1.0))
+    )
+    poisson_weight = (
+        args.poisson_weight
+        if args.poisson_weight is not None
+        else float(checkpoint.get("poisson_weight", 1.0))
+    )
     if head_type == "genome-tracks" and target_transform != "none":
         raise ValueError(
             "GenomeTracksHead checkpoints must be evaluated with raw targets: "
             "--target-transform none"
         )
-    if loss_type == "poisson-multinomial" and head_type != "genome-tracks":
-        raise ValueError("poisson-multinomial evaluation requires genome-tracks")
+    if loss_type in {"poisson-multinomial", "hybrid-mse-poisson"} and head_type != "genome-tracks":
+        raise ValueError(f"{loss_type} evaluation requires genome-tracks")
 
     dataset_target_transform = (
         "none" if args.common_128bp_metrics is not None else target_transform
@@ -376,6 +388,8 @@ def main() -> None:
     print(f"multinomial_num_segments\t{multinomial_num_segments}")
     print(f"positional_weight\t{positional_weight}")
     print(f"count_weight\t{count_weight}")
+    print(f"mse_weight\t{mse_weight}")
+    print(f"poisson_weight\t{poisson_weight}")
     if args.common_128bp_metrics is not None:
         print(f"common_128bp_metrics\t{args.common_128bp_metrics}")
     print(f"embedding_resolution\t{embedding_resolution}")
@@ -443,6 +457,8 @@ def main() -> None:
             multinomial_num_segments=multinomial_num_segments,
             positional_weight=positional_weight,
             count_weight=count_weight,
+            mse_weight=mse_weight,
+            poisson_weight=poisson_weight,
         )
     print(f"valid_batches\t{batches}")
     print(f"valid_examples\t{examples}")
