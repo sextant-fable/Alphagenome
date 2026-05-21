@@ -34,6 +34,105 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-21 - GenomeTracks 128 bp Warm-Start Count and Hybrid Loss Sweep
+
+- Run type: analysis, training, and evaluation
+- Purpose: Use validation-only diagnostics to decide whether the 128 bp GenomeTracksHead should be extended or promoted to 1 bp + 128 bp multi-resolution training after the from-scratch Poisson-multinomial objective underperformed.
+- Git commit: `784789849e75cffb59af5f769ec1c92a311e5803`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; PyTorch `2.11.0+cu128`; A100 80GB GPUs; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`
+- Command:
+
+```bash
+# Scale/common-metric diagnostics for existing checkpoints.
+CUDA_VISIBLE_DEVICES=0 conda run -n alphagenome python scripts/alphagenome_rna_seq11_scale_diagnostic.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --checkpoint <checkpoint> \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --metrics-output <run_dir>/valid_scale_diagnostic.tsv \
+  --batch-size 1 \
+  --num-workers 2 \
+  --device cuda
+
+# Warm-start Poisson-multinomial run.
+RUN_ID=rna_seq11_genometracks_128bp_pm_warmstart_pos1_20260521_500steps_lr3e-5_4gpu_gacc4
+CUDA_VISIBLE_DEVICES=0,1,2,3 conda run -n alphagenome torchrun --standalone --nproc_per_node=4 \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/${RUN_ID} \
+  --init-adapter-checkpoint runs/rna_seq11_genometracks_128bp_trainnonzero_20260520_5000steps_lr3e-4_4gpu_gacc4/adapter_head_best.pt \
+  --embedding-resolution 128 \
+  --head-type genome-tracks \
+  --head-resolutions 128 \
+  --target-transform none \
+  --track-means-source train-nonzero \
+  --loss-type poisson-multinomial \
+  --multinomial-num-segments 8 \
+  --positional-weight 1.0 \
+  --count-weight 1.0 \
+  --batch-size 1 \
+  --grad-accum-steps 4 \
+  --max-steps 500 \
+  --eval-every 100 \
+  --learning-rate 3e-5 \
+  --warmup-steps 50 \
+  --lr-schedule cosine \
+  --grad-clip-norm 1.0 \
+  --num-workers 2
+
+# Warm-start hybrid sweep; repeated with poisson-weight 1e-5, 3e-5, and 1e-4.
+RUN_ID=rna_seq11_genometracks_128bp_hybrid_pw<WEIGHT>_20260521_500steps_lr3e-5_4gpu_gacc4
+CUDA_VISIBLE_DEVICES=0,1,2,3 conda run -n alphagenome torchrun --standalone --nproc_per_node=4 \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/${RUN_ID} \
+  --init-adapter-checkpoint runs/rna_seq11_genometracks_128bp_trainnonzero_20260520_5000steps_lr3e-4_4gpu_gacc4/adapter_head_best.pt \
+  --embedding-resolution 128 \
+  --head-type genome-tracks \
+  --head-resolutions 128 \
+  --target-transform none \
+  --track-means-source train-nonzero \
+  --loss-type hybrid-mse-poisson \
+  --multinomial-num-segments 8 \
+  --positional-weight 1.0 \
+  --count-weight 1.0 \
+  --mse-weight 1.0 \
+  --poisson-weight <WEIGHT> \
+  --batch-size 1 \
+  --grad-accum-steps 4 \
+  --max-steps 500 \
+  --eval-every 100 \
+  --learning-rate 3e-5 \
+  --warmup-steps 50 \
+  --lr-schedule cosine \
+  --grad-clip-norm 1.0 \
+  --num-workers 2
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`
+- Output paths:
+  - `runs/rna_seq11_genometracks_128bp_pm_warmstart_pos1_20260521_500steps_lr3e-5_4gpu_gacc4`
+  - `runs/rna_seq11_genometracks_128bp_hybrid_pw1e-5_20260521_500steps_lr3e-5_4gpu_gacc4`
+  - `runs/rna_seq11_genometracks_128bp_hybrid_pw3e-5_20260521_500steps_lr3e-5_4gpu_gacc4`
+  - `runs/rna_seq11_genometracks_128bp_hybrid_pw1e-4_20260521_500steps_lr3e-5_4gpu_gacc4`
+- Result summary: The diagnostics showed that improving raw signal mean scale did not improve the common 128 bp `log1p(mean raw)` metric. The legacy 128 bp linear adapter still had the best valid common metric. The 128 bp GenomeTracks MSE checkpoint remained the best GenomeTracks-family checkpoint in this round, and every warm-start count or hybrid loss candidate was worse than it.
+- Verification:
+  - Scale diagnostics before warm-starting: legacy 128 bp linear valid prediction/target mean ratio `0.10651676`, common128 MSE `1.0298867`, Pearson `0.62135428`; 128 bp GenomeTracks MSE ratio `0.53258544`, common128 MSE `2.133715`, Pearson `0.53935375`; from-scratch Poisson-multinomial ratio `0.65168605`, common128 MSE `3.0527705`, Pearson `0.49153418`.
+  - Warm-start Poisson-multinomial valid losses were step 100 `18511.789`, 200 `18495.892`, 300 `18489.356`, 400 `18485.56`, and 500 `18485.124`. Its scale ratio was `0.78547391`, common128 MSE `2.9095493`, MAE `1.3788249`, Pearson `0.52790218`.
+  - Hybrid `poisson_weight=1e-5` valid losses were step 100 `1.688949`, 200 `1.6883764`, 300 `1.6878839`, 400 `1.6877085`, and 500 `1.6876779`. Its scale ratio was `0.55806949`, common128 MSE `2.2140787`, MAE `1.1680553`, Pearson `0.53737598`.
+  - Hybrid `poisson_weight=3e-5` valid losses were step 100 `2.0615844`, 200 `2.0610508`, 300 `2.0605806`, 400 `2.0604339`, and 500 `2.0604059`. Its scale ratio was `0.5863238`, common128 MSE `2.3104292`, MAE `1.2004244`, Pearson `0.5351673`.
+  - Hybrid `poisson_weight=1e-4` valid losses were step 100 `3.3626393`, 200 `3.3621139`, 300 `3.3615108`, 400 `3.3613712`, and 500 `3.3613398`. Its scale ratio was `0.64649976`, common128 MSE `2.504247`, MAE `1.2616879`, Pearson `0.53141917`.
+- Failures or warnings: The held-out test split was not used in this sweep. Objective-space losses are not directly comparable across different `poisson_weight` settings, so model selection used only the common valid metric and diagnostics. All warm-started count/hybrid candidates missed the pre-specified promotion target of improving on the 128 bp GenomeTracks MSE common metric.
+- Next actions: Do not extend these count/hybrid 128 bp candidates and do not start 1 bp + 128 bp multi-resolution training from them. Keep the legacy 128 bp linear adapter as the selected model; revisit target scaling/loss design only after the expanded data are available or after a separate validation-only normalization study.
+- Claim status: verified
+
 ## 2026-05-21 - GenomeTracks 128 bp MSE Run Stopped at Step 3000 and Common-Metric Audit
 
 - Run type: training and evaluation

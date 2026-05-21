@@ -25,6 +25,9 @@ interpretation, and next-step recommendations, see
   AlphaGenome-style Poisson + multinomial count loss did not beat the selected
   legacy 128 bp linear adapter under the common 128 bp binned `log1p(mean raw)`
   audit metric, so the selected model remains unchanged.
+- Validation-only warm-start count and hybrid loss sweeps also did not improve
+  the best 128 bp GenomeTracksHead checkpoint, so 1 bp + 128 bp multi-resolution
+  GenomeTracksHead training is not recommended from these objectives yet.
 
 ## Data
 
@@ -326,6 +329,10 @@ run's training loss.
 | 128 bp GenomeTracksHead | test | best step 3000, model-space MSE objective | `1.8786616` | `1.0444137` | `0.53915857` |
 | 128 bp GenomeTracksHead | valid | best step 500, Poisson + multinomial objective | `3.0527705` | `1.4647581` | `0.49153418` |
 | 128 bp GenomeTracksHead | test | best step 500, Poisson + multinomial objective | `2.5278237` | `1.2957843` | `0.5309488` |
+| 128 bp GenomeTracksHead | valid | warm-start from MSE, Poisson + multinomial, positional weight 1.0 | `2.9095493` | `1.3788249` | `0.52790218` |
+| 128 bp GenomeTracksHead | valid | warm-start from MSE, hybrid MSE + `1e-5` Poisson-multinomial | `2.2140787` | `1.1680553` | `0.53737598` |
+| 128 bp GenomeTracksHead | valid | warm-start from MSE, hybrid MSE + `3e-5` Poisson-multinomial | `2.3104292` | `1.2004244` | `0.5351673` |
+| 128 bp GenomeTracksHead | valid | warm-start from MSE, hybrid MSE + `1e-4` Poisson-multinomial | `2.504247` | `1.2616879` | `0.53141917` |
 
 GenomeTracksHead objective-specific validation losses:
 
@@ -333,6 +340,10 @@ GenomeTracksHead objective-specific validation losses:
 |---|---|
 | 128 bp GenomeTracksHead, model-space MSE | step 250 `1.808731`, 500 `1.7033822`, 1000 `1.6219809`, 1500 `1.5778429`, 2000 `1.5444947`, 2500 `1.5202813`, 3000 `1.5025958` |
 | 128 bp GenomeTracksHead, Poisson + multinomial | step 100 `91680.721`, 200 `86910.675`, 300 `85539.633`, 400 `85080.233`, 500 `85025.399` |
+| 128 bp GenomeTracksHead, warm-start Poisson + multinomial, positional weight 1.0 | step 100 `18511.789`, 200 `18495.892`, 300 `18489.356`, 400 `18485.56`, 500 `18485.124` |
+| 128 bp GenomeTracksHead, warm-start hybrid, Poisson weight `1e-5` | step 100 `1.688949`, 200 `1.6883764`, 300 `1.6878839`, 400 `1.6877085`, 500 `1.6876779` |
+| 128 bp GenomeTracksHead, warm-start hybrid, Poisson weight `3e-5` | step 100 `2.0615844`, 200 `2.0610508`, 300 `2.0605806`, 400 `2.0604339`, 500 `2.0604059` |
+| 128 bp GenomeTracksHead, warm-start hybrid, Poisson weight `1e-4` | step 100 `3.3626393`, 200 `3.3621139`, 300 `3.3615108`, 400 `3.3613712`, 500 `3.3613398` |
 
 Relative validation MSE comparison:
 
@@ -436,6 +447,7 @@ Limits:
 
 For this experiment round, keep the legacy 128 bp linear adapter as the current
 benchmark. Do not start 1 bp + 128 bp GenomeTracksHead training from the current
-Poisson + multinomial setup yet; first investigate loss weighting/scaling,
-warm-starting GenomeTracksHead from the 128 bp MSE checkpoint, or a hybrid
-objective using validation-only model selection.
+Poisson + multinomial or hybrid objectives. The validation-only sweep indicates
+that better raw-scale matching alone is not enough; revisit target scaling/loss
+normalization after the expanded dataset is available, or run a separate
+validation-only normalization study before spending 1 bp GPU time.
