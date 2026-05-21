@@ -149,7 +149,9 @@ For Spearman runs reported here:
 HY-GPU non-Slurm server:
 
 - host: `HY-GPU`
-- allowed GPU used: `CUDA_VISIBLE_DEVICES=2`
+- primary selected-model GPU: `CUDA_VISIBLE_DEVICES=2`
+- later 128 bp GenomeTracks follow-up runs used `CUDA_VISIBLE_DEVICES=0,1,2,3`
+  after explicit user approval
 - GPU: NVIDIA A100 80GB PCIe
 - conda environment: `alphagenome`
 - Python: `3.12.13`
