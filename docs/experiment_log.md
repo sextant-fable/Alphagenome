@@ -34,6 +34,33 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-22 - 128 bp Log1p-MSE Staged Sweep Launch
+
+- Run type: training and evaluation
+- Purpose: Launch the agreed validation-only sweep around the strongest baseline, `128bp embedding + simple linear head + log1p MSE`, using independent single-GPU jobs on four GPUs rather than DDP. The launcher runs hyperparameter screening, baseline seed stability, head screening, binned-target screening, promotion runs, optional 10000-step extensions, final seed confirmation, and a final valid diagnostic. The held-out test split is not used.
+- Git commit: Recorded by the launcher at runtime in `logs/rna_seq11_128bp_log1p_sweep_20260522/driver.log` as `git_commit`.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`
+- Command:
+
+```bash
+nohup conda run -n alphagenome python -u scripts/rna_seq11_run_128bp_log1p_sweep.py \
+  --date-tag 20260522 \
+  --gpus 0,1,2,3 \
+  > logs/rna_seq11_128bp_log1p_sweep_20260522/driver.log 2>&1 &
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`
+- Output path: ignored run directories under `runs/rna_seq11_sweep_*`; summary TSV `runs/rna_seq11_128bp_log1p_sweep_20260522/sweep_results.tsv`; logs under `logs/rna_seq11_128bp_log1p_sweep_20260522/`
+- Result summary: Launched; results are pending.
+- Verification: Pre-launch checks confirmed host `HY-GPU`, repository path `/home/zelinli6/Alphagenome`, commit `b211afd2c114b11fb21b8d9c7e9c1ae8938921b3`, conda environment `alphagenome`, PyTorch CUDA availability, and idle GPUs 0-3.
+- Failures or warnings: The branch could not be pushed before launch because HTTPS credentials are unavailable in this environment. Generated logs, checkpoints, and run outputs remain ignored and must not be committed.
+- Next actions: Monitor `logs/rna_seq11_128bp_log1p_sweep_20260522/driver.log` and summarize valid-only results after the launcher completes the staged sweep.
+- Claim status: verified
+
 ## 2026-05-22 - 128 bp Log1p-MSE Sweep Tooling and Smoke Validation
 
 - Run type: engineering smoke test and validation
