@@ -1,6 +1,6 @@
 # C. elegans RNA-seq 11-Track AlphaGenome Adapter Summary
 
-Date: 2026-05-21
+Date: 2026-05-22
 
 This document summarizes the current frozen AlphaGenome adapter experiment for
 custom C. elegans 11-track RNA-seq prediction. Full command records and run
@@ -28,6 +28,9 @@ interpretation, and next-step recommendations, see
 - Validation-only warm-start count and hybrid loss sweeps also did not improve
   the best 128 bp GenomeTracksHead checkpoint, so 1 bp + 128 bp multi-resolution
   GenomeTracksHead training is not recommended from these objectives yet.
+- The next 128 bp log1p-MSE sweep tooling is implemented and smoke-validated,
+  but the long validation-only sweep has not yet been launched. This keeps the
+  selected model unchanged.
 
 ## Data
 
@@ -125,6 +128,18 @@ LoRA scheme C continuation pilots:
   100 total steps with full validation every 20 steps.
 - Neither pilot outperformed the selected frozen-trunk 128 bp adapter checkpoint.
 
+128 bp log1p-MSE sweep tooling:
+
+- The legacy `conv1x1` head remains the default and preserves backward
+  compatibility with the selected checkpoint.
+- Additional validation-only sweep heads are now available:
+  `mlp1x1`, `conv3`, `conv5`, `residual-conv1x1`, and `residual-conv3`.
+- Linear-head training now supports masked MSE or SmoothL1, full-resolution
+  `log1p` targets, and 128 bp binned `log1p(mean raw)` targets.
+- Checkpoints record the linear head architecture, hidden channels, loss type,
+  target space, and SmoothL1 beta so evaluation can reconstruct the correct
+  head automatically.
+
 ## Loss And Metrics
 
 Training loss:
@@ -143,6 +158,14 @@ For Spearman runs reported here:
 
 - `spearman_sample_size=200000`
 - `spearman_seed=20260515`
+
+New validation diagnostics for the 128 bp log1p-MSE sweep:
+
+- per-track MSE, MAE, Pearson, and sampled Spearman
+- per-window MSE, MAE, and Pearson
+- stratum metrics for `zero`, `0<log1p<=1`, `1<log1p<=3`, and `log1p>3`
+- common 128 bp metrics plus upsampled full-resolution metrics for binned-target
+  checkpoints
 
 ## Environment
 
@@ -310,6 +333,14 @@ Validation-set development results:
 | 128 bp last-block LoRA, initialized from selected adapter, head frozen | valid | best step 20 | `1.0613562` | not computed | not computed |
 | 128 bp last-block LoRA, initialized from selected adapter, LoRA+head | valid | best step 40 | `1.067338` | not computed | not computed |
 
+Tooling validation result:
+
+| check | split | result |
+|---|---:|---|
+| selected checkpoint reload after sweep-tooling changes | valid | reproduced MSE `1.0609935`, MAE `0.71866247`, Pearson `0.58809888` |
+| diagnostic TSV for selected checkpoint | valid | wrote `11` track rows, `39` window rows, and `4` stratum rows |
+| new head/loss/target smoke tests | train/valid mini-subsets | 1-step train, 1-example valid, checkpoint save, and reload passed |
+
 Held-out test result for the selected checkpoint:
 
 | model | split | checkpoint | MSE | MAE | Pearson |
@@ -449,7 +480,7 @@ Limits:
 
 For this experiment round, keep the legacy 128 bp linear adapter as the current
 benchmark. Do not start 1 bp + 128 bp GenomeTracksHead training from the current
-Poisson + multinomial or hybrid objectives. The validation-only sweep indicates
-that better raw-scale matching alone is not enough; revisit target scaling/loss
-normalization after the expanded dataset is available, or run a separate
-validation-only normalization study before spending 1 bp GPU time.
+Poisson + multinomial or hybrid objectives. Launch the staged 128 bp
+log1p-MSE sweep next: seed stability, short hyperparameter screening, head
+screening, binned-target screening, and promotion runs chosen only by validation
+metrics. Keep the held-out test split frozen.

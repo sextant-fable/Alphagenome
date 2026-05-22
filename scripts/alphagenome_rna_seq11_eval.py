@@ -19,6 +19,7 @@ from alphagenome_rna_seq11_adapter import (
     evaluate_pointwise_metrics,
     load_adapter_checkpoint,
     parse_resolutions,
+    pearson_from_sums,
     pick_device,
 )
 from torch_rna_seq_dataset import make_dataloader
@@ -53,6 +54,11 @@ def parse_args() -> argparse.Namespace:
         "--metrics-output",
         default=None,
         help="Optional TSV path for overall and per-track metrics.",
+    )
+    parser.add_argument(
+        "--diagnostic-output",
+        default=None,
+        help="Optional combined TSV with overall, track, window, and stratum metrics.",
     )
     parser.add_argument(
         "--point-metrics",
@@ -103,6 +109,38 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override checkpoint head resolutions, e.g. 128 or 1,128.",
     )
+    parser.add_argument(
+        "--linear-head-architecture",
+        choices=[
+            "conv1x1",
+            "mlp1x1",
+            "conv3",
+            "conv5",
+            "residual-conv1x1",
+            "residual-conv3",
+        ],
+        default=None,
+        help="Override checkpoint linear head architecture.",
+    )
+    parser.add_argument(
+        "--linear-hidden-channels",
+        type=int,
+        default=None,
+        help="Override checkpoint linear hidden channels.",
+    )
+    parser.add_argument(
+        "--linear-target-space",
+        choices=["full-log1p", "binned128-log1p-mean"],
+        default=None,
+        help="Override checkpoint linear target space.",
+    )
+    parser.add_argument(
+        "--linear-loss-type",
+        choices=["mse", "smooth-l1"],
+        default=None,
+        help="Override checkpoint linear loss type for scalar valid_loss.",
+    )
+    parser.add_argument("--smooth-l1-beta", type=float, default=None)
     parser.add_argument(
         "--organism-index",
         type=int,
@@ -276,6 +314,248 @@ def write_point_metrics_tsv(
             )
 
 
+def metrics_from_sums(
+    *,
+    sse: float,
+    sae: float,
+    sum_x: float,
+    sum_y: float,
+    sum_x2: float,
+    sum_y2: float,
+    sum_xy: float,
+    n: float,
+) -> dict[str, float]:
+    denominator = max(n, 1.0)
+    return {
+        "mse": sse / denominator,
+        "mae": sae / denominator,
+        "pearson": pearson_from_sums(sum_x, sum_y, sum_x2, sum_y2, sum_xy, n),
+        "n_values": n,
+    }
+
+
+def evaluate_window_and_strata_metrics(
+    model: RnaSeq11Adapter,
+    dataloader: torch.utils.data.DataLoader,
+    *,
+    device: torch.device,
+) -> tuple[list[dict[str, object]], dict[str, dict[str, float]]]:
+    if model.head_type != "linear":
+        raise NotImplementedError("Window/stratified diagnostics currently support linear heads")
+
+    strata = {
+        "zero": {
+            "predicate": lambda target: target == 0,
+            "sse": 0.0,
+            "sae": 0.0,
+            "sum_x": 0.0,
+            "sum_y": 0.0,
+            "sum_x2": 0.0,
+            "sum_y2": 0.0,
+            "sum_xy": 0.0,
+            "n": 0.0,
+        },
+        "0<log1p<=1": {
+            "predicate": lambda target: (target > 0) & (target <= 1),
+            "sse": 0.0,
+            "sae": 0.0,
+            "sum_x": 0.0,
+            "sum_y": 0.0,
+            "sum_x2": 0.0,
+            "sum_y2": 0.0,
+            "sum_xy": 0.0,
+            "n": 0.0,
+        },
+        "1<log1p<=3": {
+            "predicate": lambda target: (target > 1) & (target <= 3),
+            "sse": 0.0,
+            "sae": 0.0,
+            "sum_x": 0.0,
+            "sum_y": 0.0,
+            "sum_x2": 0.0,
+            "sum_y2": 0.0,
+            "sum_xy": 0.0,
+            "n": 0.0,
+        },
+        "log1p>3": {
+            "predicate": lambda target: target > 3,
+            "sse": 0.0,
+            "sae": 0.0,
+            "sum_x": 0.0,
+            "sum_y": 0.0,
+            "sum_x2": 0.0,
+            "sum_y2": 0.0,
+            "sum_xy": 0.0,
+            "n": 0.0,
+        },
+    }
+    window_rows: list[dict[str, object]] = []
+    model.eval()
+    with torch.no_grad():
+        for batch in dataloader:
+            dna_sequence = batch["dna_sequence"].to(device=device, dtype=torch.float32)
+            rna_seq = batch["rna_seq"].to(device=device, dtype=torch.float32)
+            rna_seq_mask = batch["rna_seq_mask"].to(device=device)
+            prediction = model(dna_sequence, target_length=rna_seq.shape[-1])
+            if isinstance(prediction, dict):
+                raise NotImplementedError(
+                    "Window/stratified diagnostics currently support linear heads"
+                )
+
+            mask = rna_seq_mask
+            while mask.ndim < prediction.ndim:
+                mask = mask.unsqueeze(-1)
+            mask = mask.to(dtype=torch.bool, device=prediction.device).expand_as(prediction)
+            prediction64 = prediction.to(dtype=torch.float64)
+            target64 = rna_seq.to(dtype=torch.float64)
+            error64 = prediction64 - target64
+
+            for batch_index in range(int(prediction.shape[0])):
+                sample_mask = mask[batch_index]
+                n = float(sample_mask.sum().detach().cpu())
+                pred_values = prediction64[batch_index][sample_mask]
+                target_values = target64[batch_index][sample_mask]
+                error_values = pred_values - target_values
+                stats = metrics_from_sums(
+                    sse=float(error_values.square().sum().detach().cpu()),
+                    sae=float(error_values.abs().sum().detach().cpu()),
+                    sum_x=float(pred_values.sum().detach().cpu()),
+                    sum_y=float(target_values.sum().detach().cpu()),
+                    sum_x2=float(pred_values.square().sum().detach().cpu()),
+                    sum_y2=float(target_values.square().sum().detach().cpu()),
+                    sum_xy=float((pred_values * target_values).sum().detach().cpu()),
+                    n=n,
+                )
+                window_rows.append(
+                    {
+                        "interval_chromosome": batch["interval_chromosome"][batch_index],
+                        "interval_start": int(batch["interval_start"][batch_index]),
+                        "interval_end": int(batch["interval_end"][batch_index]),
+                        **stats,
+                    }
+                )
+
+            for stratum_name, stratum in strata.items():
+                stratum_mask = stratum["predicate"](target64) & mask
+                if not bool(stratum_mask.any()):
+                    continue
+                pred_values = prediction64[stratum_mask]
+                target_values = target64[stratum_mask]
+                error_values = pred_values - target_values
+                stratum["sse"] += float(error_values.square().sum().detach().cpu())
+                stratum["sae"] += float(error_values.abs().sum().detach().cpu())
+                stratum["sum_x"] += float(pred_values.sum().detach().cpu())
+                stratum["sum_y"] += float(target_values.sum().detach().cpu())
+                stratum["sum_x2"] += float(pred_values.square().sum().detach().cpu())
+                stratum["sum_y2"] += float(target_values.square().sum().detach().cpu())
+                stratum["sum_xy"] += float((pred_values * target_values).sum().detach().cpu())
+                stratum["n"] += float(stratum_mask.sum().detach().cpu())
+
+    model.train()
+    model.base_model.eval()
+    stratum_metrics = {
+        name: metrics_from_sums(
+            sse=float(stats["sse"]),
+            sae=float(stats["sae"]),
+            sum_x=float(stats["sum_x"]),
+            sum_y=float(stats["sum_y"]),
+            sum_x2=float(stats["sum_x2"]),
+            sum_y2=float(stats["sum_y2"]),
+            sum_xy=float(stats["sum_xy"]),
+            n=float(stats["n"]),
+        )
+        for name, stats in strata.items()
+    }
+    return window_rows, stratum_metrics
+
+
+def write_diagnostic_tsv(
+    path: Path,
+    *,
+    point_metrics: dict[str, object],
+    window_rows: list[dict[str, object]],
+    stratum_metrics: dict[str, dict[str, float]],
+    track_labels: list[str],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    spearman_values = point_metrics["per_track_spearman_sampled"]
+    spearman_ns = point_metrics["per_track_spearman_sampled_n"]
+    fieldnames = [
+        "metric_scope",
+        "track_index",
+        "track_id",
+        "track_name",
+        "window_index",
+        "interval_chromosome",
+        "interval_start",
+        "interval_end",
+        "stratum",
+        "mse",
+        "mae",
+        "pearson",
+        "spearman_sampled",
+        "spearman_sampled_n",
+        "n_values",
+    ]
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t")
+        writer.writeheader()
+        writer.writerow(
+            {
+                "metric_scope": "overall",
+                "mse": f"{float(point_metrics['overall_mse']):.8g}",
+                "mae": f"{float(point_metrics['overall_mae']):.8g}",
+                "pearson": f"{float(point_metrics['overall_pearson']):.8g}",
+                "n_values": "",
+            }
+        )
+        for index, track_label in enumerate(track_labels):
+            track_id, track_name = track_label.split("\t", maxsplit=1)
+            writer.writerow(
+                {
+                    "metric_scope": "track",
+                    "track_index": index,
+                    "track_id": track_id,
+                    "track_name": track_name,
+                    "mse": f"{point_metrics['per_track_mse'][index]:.8g}",
+                    "mae": f"{point_metrics['per_track_mae'][index]:.8g}",
+                    "pearson": f"{point_metrics['per_track_pearson'][index]:.8g}",
+                    "spearman_sampled": (
+                        "" if spearman_values is None
+                        else f"{spearman_values[index]:.8g}"
+                    ),
+                    "spearman_sampled_n": (
+                        "" if spearman_ns is None else spearman_ns[index]
+                    ),
+                }
+            )
+        for index, row in enumerate(window_rows):
+            writer.writerow(
+                {
+                    "metric_scope": "window",
+                    "window_index": index,
+                    "interval_chromosome": row["interval_chromosome"],
+                    "interval_start": row["interval_start"],
+                    "interval_end": row["interval_end"],
+                    "mse": f"{float(row['mse']):.8g}",
+                    "mae": f"{float(row['mae']):.8g}",
+                    "pearson": f"{float(row['pearson']):.8g}",
+                    "n_values": f"{float(row['n_values']):.0f}",
+                }
+            )
+        for stratum_name, stats in stratum_metrics.items():
+            writer.writerow(
+                {
+                    "metric_scope": "stratum",
+                    "stratum": stratum_name,
+                    "mse": f"{float(stats['mse']):.8g}",
+                    "mae": f"{float(stats['mae']):.8g}",
+                    "pearson": f"{float(stats['pearson']):.8g}",
+                    "n_values": f"{float(stats['n_values']):.0f}",
+                }
+            )
+
+
 def main() -> None:
     args = parse_args()
     dataset_dir = Path(args.dataset_dir)
@@ -305,6 +585,31 @@ def main() -> None:
         )
         if args.head_resolutions is not None
         else checkpoint_head_resolutions
+    )
+    linear_head_architecture = (
+        args.linear_head_architecture
+        if args.linear_head_architecture is not None
+        else str(checkpoint.get("linear_head_architecture", "conv1x1"))
+    )
+    linear_hidden_channels = (
+        args.linear_hidden_channels
+        if args.linear_hidden_channels is not None
+        else int(checkpoint.get("linear_hidden_channels", 256))
+    )
+    linear_target_space = (
+        args.linear_target_space
+        if args.linear_target_space is not None
+        else str(checkpoint.get("linear_target_space", "full-log1p"))
+    )
+    linear_loss_type = (
+        args.linear_loss_type
+        if args.linear_loss_type is not None
+        else str(checkpoint.get("linear_loss_type", "mse"))
+    )
+    smooth_l1_beta = (
+        args.smooth_l1_beta
+        if args.smooth_l1_beta is not None
+        else float(checkpoint.get("smooth_l1_beta", 1.0))
     )
     organism_index = (
         args.organism_index
@@ -354,10 +659,17 @@ def main() -> None:
         )
     if loss_type in {"poisson-multinomial", "hybrid-mse-poisson"} and head_type != "genome-tracks":
         raise ValueError(f"{loss_type} evaluation requires genome-tracks")
+    if args.diagnostic_output is not None and args.common_128bp_metrics is not None:
+        raise ValueError("--diagnostic-output cannot be combined with --common-128bp-metrics")
 
-    dataset_target_transform = (
-        "none" if args.common_128bp_metrics is not None else target_transform
-    )
+    if args.common_128bp_metrics is not None:
+        dataset_target_transform = "none"
+    elif head_type == "linear" and linear_target_space == "binned128-log1p-mean" and not (
+        args.point_metrics or args.diagnostic_output is not None
+    ):
+        dataset_target_transform = "none"
+    else:
+        dataset_target_transform = target_transform
 
     dataloader = make_dataloader(
         dataset_dir,
@@ -383,6 +695,11 @@ def main() -> None:
     print(f"dataset_target_transform\t{dataset_target_transform}")
     print(f"head_type\t{head_type}")
     print(f"head_resolutions\t{','.join(map(str, head_resolutions))}")
+    print(f"linear_head_architecture\t{linear_head_architecture}")
+    print(f"linear_hidden_channels\t{linear_hidden_channels}")
+    print(f"linear_target_space\t{linear_target_space}")
+    print(f"linear_loss_type\t{linear_loss_type}")
+    print(f"smooth_l1_beta\t{smooth_l1_beta}")
     print(f"loss_space\t{checkpoint.get('loss_space', 'target_transform')}")
     print(f"loss_type\t{loss_type}")
     print(f"multinomial_num_segments\t{multinomial_num_segments}")
@@ -408,6 +725,9 @@ def main() -> None:
         organism_index=organism_index,
         head_type=head_type,
         head_resolutions=head_resolutions,
+        linear_head_architecture=linear_head_architecture,
+        linear_hidden_channels=linear_hidden_channels,
+        linear_track_means=checkpoint_head_state.get("track_means"),
         track_means=track_means,
     ).to(device)
     model.head.load_state_dict(checkpoint_head_state)
@@ -426,12 +746,13 @@ def main() -> None:
             dataloader,
             device=device,
             linear_prediction_transform=checkpoint_target_transform,
+            linear_target_space=linear_target_space,
             metric_transform=args.common_128bp_metrics,
         )
         loss = float(point_metrics["overall_mse"])
         batches = int(point_metrics["batches"])
         examples = int(point_metrics["examples"])
-    elif args.point_metrics:
+    elif args.point_metrics or args.diagnostic_output is not None:
         point_metrics = evaluate_pointwise_metrics(
             model,
             dataloader,
@@ -459,6 +780,9 @@ def main() -> None:
             count_weight=count_weight,
             mse_weight=mse_weight,
             poisson_weight=poisson_weight,
+            linear_loss_type=linear_loss_type,
+            linear_target_space=linear_target_space,
+            smooth_l1_beta=smooth_l1_beta,
         )
     print(f"valid_batches\t{batches}")
     print(f"valid_examples\t{examples}")
@@ -512,6 +836,25 @@ def main() -> None:
                 examples=examples,
             )
         print(f"metrics_output\t{args.metrics_output}")
+    if args.diagnostic_output is not None:
+        if point_metrics is None:
+            raise RuntimeError("diagnostic output requires point metrics")
+        window_rows, stratum_metrics = evaluate_window_and_strata_metrics(
+            model,
+            dataloader,
+            device=device,
+        )
+        write_diagnostic_tsv(
+            Path(args.diagnostic_output),
+            point_metrics=point_metrics,
+            window_rows=window_rows,
+            stratum_metrics=stratum_metrics,
+            track_labels=track_labels,
+        )
+        print(f"diagnostic_output\t{args.diagnostic_output}")
+        print(f"diagnostic_track_rows\t{len(track_labels)}")
+        print(f"diagnostic_window_rows\t{len(window_rows)}")
+        print(f"diagnostic_stratum_rows\t{len(stratum_metrics)}")
     if device.type == "cuda":
         print(f"cuda_max_memory_allocated_mb\t{torch.cuda.max_memory_allocated() / 1024**2:.1f}")
 

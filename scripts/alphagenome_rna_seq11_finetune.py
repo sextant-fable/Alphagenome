@@ -26,15 +26,18 @@ from alphagenome_pytorch.extensions.finetuning.adapters import (
 )
 from alphagenome_rna_seq11_adapter import (
     RnaSeq11Adapter,
+    compute_linear_track_means_from_dataset,
     compute_nonzero_track_means_from_dataset,
     count_parameters,
     evaluate_masked_mse,
     format_prediction_shape,
+    is_residual_linear_architecture,
     load_track_means_from_grouped_qc,
     load_adapter_checkpoint,
     masked_adapter_loss,
     parse_resolutions,
     pick_device,
+    prepare_linear_target,
     prediction_return_scaled_for_loss,
 )
 from torch_rna_seq_dataset import AlphaGenomeRnaSeqNpzDataset, make_dataloader
@@ -138,6 +141,46 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--linear-head-architecture",
+        choices=[
+            "conv1x1",
+            "mlp1x1",
+            "conv3",
+            "conv5",
+            "residual-conv1x1",
+            "residual-conv3",
+        ],
+        default="conv1x1",
+        help="Trainable simple-head architecture used when --head-type linear.",
+    )
+    parser.add_argument(
+        "--linear-hidden-channels",
+        type=int,
+        default=256,
+        help="Hidden channels for non-legacy linear head variants.",
+    )
+    parser.add_argument(
+        "--linear-loss-type",
+        choices=["mse", "smooth-l1"],
+        default="mse",
+        help="Loss for linear heads; GenomeTracks loss selection uses --loss-type.",
+    )
+    parser.add_argument(
+        "--smooth-l1-beta",
+        type=float,
+        default=1.0,
+        help="Beta parameter for --linear-loss-type smooth-l1.",
+    )
+    parser.add_argument(
+        "--linear-target-space",
+        choices=["full-log1p", "binned128-log1p-mean"],
+        default="full-log1p",
+        help=(
+            "full-log1p keeps legacy full-resolution log1p targets; "
+            "binned128-log1p-mean trains against 128 bp log1p(mean raw) bins."
+        ),
+    )
+    parser.add_argument(
         "--track-means-source",
         choices=["ones", "grouped-qc", "train-nonzero"],
         default="grouped-qc",
@@ -214,6 +257,18 @@ def parse_args() -> argparse.Namespace:
         "--no-save-checkpoint",
         action="store_true",
         help="Write config and metrics only; skip adapter checkpoint.",
+    )
+    parser.add_argument(
+        "--early-stopping-patience",
+        type=int,
+        default=None,
+        help="Stop after this many validations without improvement.",
+    )
+    parser.add_argument(
+        "--early-stopping-min-steps",
+        type=int,
+        default=0,
+        help="Do not early-stop before this optimizer step.",
     )
     return parser.parse_args()
 
@@ -295,13 +350,20 @@ def learning_rate_for_step(
     return base_lr
 
 
-def loss_space_for_config(head_type: str, loss_type: str) -> str:
+def loss_space_for_config(
+    head_type: str,
+    loss_type: str,
+    linear_target_space: str = "full-log1p",
+    linear_loss_type: str = "mse",
+) -> str:
     if head_type == "genome-tracks" and loss_type == "mse":
         return "genome_tracks_model_scaled"
     if loss_type == "poisson-multinomial":
         return "experimental_counts"
     if loss_type == "hybrid-mse-poisson":
         return "hybrid_genome_tracks_mse_plus_counts"
+    if head_type == "linear":
+        return f"{linear_target_space}_{linear_loss_type}"
     return "target_transform"
 
 
@@ -416,6 +478,11 @@ def save_training_checkpoint(
     init_adapter_checkpoint: str | None,
     head_type: str,
     head_resolutions: tuple[int, ...],
+    linear_head_architecture: str,
+    linear_hidden_channels: int,
+    linear_loss_type: str,
+    linear_target_space: str,
+    smooth_l1_beta: float,
     loss_space: str,
     loss_type: str,
     multinomial_num_segments: int,
@@ -433,6 +500,11 @@ def save_training_checkpoint(
         "embedding_resolution": embedding_resolution,
         "head_type": head_type,
         "head_resolutions": list(head_resolutions),
+        "linear_head_architecture": linear_head_architecture,
+        "linear_hidden_channels": linear_hidden_channels,
+        "linear_loss_type": linear_loss_type,
+        "linear_target_space": linear_target_space,
+        "smooth_l1_beta": smooth_l1_beta,
         "organism_index": organism_index,
         "target_transform": target_transform,
         "loss_space": loss_space,
@@ -471,17 +543,30 @@ def main() -> None:
         raise ValueError("--warmup-steps must be >= 0")
     if args.freeze_head and not args.enable_last_block_lora:
         raise ValueError("--freeze-head requires --enable-last-block-lora")
+    if args.linear_hidden_channels < 1:
+        raise ValueError("--linear-hidden-channels must be >= 1")
+    if args.smooth_l1_beta <= 0.0:
+        raise ValueError("--smooth-l1-beta must be > 0")
+    if args.early_stopping_patience is not None and args.early_stopping_patience < 1:
+        raise ValueError("--early-stopping-patience must be >= 1")
+    if args.early_stopping_min_steps < 0:
+        raise ValueError("--early-stopping-min-steps must be >= 0")
     head_resolutions = parse_resolutions(
         args.head_resolutions,
         fallback_resolution=args.embedding_resolution,
     )
     if args.head_type == "linear" and head_resolutions != (args.embedding_resolution,):
         raise ValueError("linear head requires --head-resolutions to match --embedding-resolution")
+    if args.head_type == "linear" and args.linear_target_space == "binned128-log1p-mean":
+        if args.embedding_resolution != 128:
+            raise ValueError("binned128-log1p-mean requires --embedding-resolution 128")
     if args.head_type == "genome-tracks" and args.target_transform != "none":
         raise ValueError(
             "--head-type genome-tracks requires --target-transform none so raw "
             "RNA-seq targets can be scaled into model space."
         )
+    if args.head_type == "genome-tracks" and args.linear_target_space != "full-log1p":
+        raise ValueError("--linear-target-space is only supported for linear heads")
     if args.loss_type in {"poisson-multinomial", "hybrid-mse-poisson"}:
         if args.head_type != "genome-tracks":
             raise ValueError(f"--loss-type {args.loss_type} requires genome-tracks")
@@ -494,6 +579,12 @@ def main() -> None:
             raise ValueError("Hybrid loss weights must be non-negative")
         if args.mse_weight == 0.0 and args.poisson_weight == 0.0:
             raise ValueError("At least one hybrid loss weight must be positive")
+    dataset_target_transform = (
+        "none"
+        if args.head_type == "linear"
+        and args.linear_target_space == "binned128-log1p-mean"
+        else args.target_transform
+    )
 
     train_dataset_dir = Path(args.train_dataset_dir)
     valid_dataset_dir = Path(args.valid_dataset_dir)
@@ -512,7 +603,7 @@ def main() -> None:
             batch_size=args.batch_size,
             shuffle=False,
             num_workers=0,
-            target_transform=args.target_transform,
+            target_transform=dataset_target_transform,
             max_examples=args.max_train_examples,
         ).dataset
         train_sampler = DistributedSampler(
@@ -536,7 +627,7 @@ def main() -> None:
             batch_size=args.batch_size,
             shuffle=True,
             num_workers=args.num_workers,
-            target_transform=args.target_transform,
+            target_transform=dataset_target_transform,
             max_examples=args.max_train_examples,
         )
     valid_loader = make_dataloader(
@@ -544,7 +635,7 @@ def main() -> None:
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        target_transform=args.target_transform,
+        target_transform=dataset_target_transform,
         max_examples=args.max_valid_examples,
     )
     n_tracks = int(train_loader.dataset.metadata["n_tracks"])
@@ -567,6 +658,21 @@ def main() -> None:
             track_means = compute_nonzero_track_means_from_dataset(track_mean_dataset)
         else:
             raise ValueError(f"Unknown track means source: {args.track_means_source}")
+
+    linear_track_means = None
+    if (
+        args.head_type == "linear"
+        and is_residual_linear_architecture(args.linear_head_architecture)
+    ):
+        linear_mean_dataset = AlphaGenomeRnaSeqNpzDataset(
+            train_dataset_dir,
+            target_transform=dataset_target_transform,
+            max_examples=args.max_train_examples,
+        )
+        linear_track_means = compute_linear_track_means_from_dataset(
+            linear_mean_dataset,
+            target_space=args.linear_target_space,
+        )
 
     if is_main_process(rank):
         write_config(
@@ -597,11 +703,24 @@ def main() -> None:
     print_main(rank, f"n_valid_examples\t{len(valid_loader.dataset)}")
     print_main(rank, f"n_tracks\t{n_tracks}")
     print_main(rank, f"target_transform\t{args.target_transform}")
+    print_main(rank, f"dataset_target_transform\t{dataset_target_transform}")
     print_main(rank, f"head_type\t{args.head_type}")
     print_main(rank, f"head_resolutions\t{','.join(map(str, head_resolutions))}")
+    print_main(rank, f"linear_head_architecture\t{args.linear_head_architecture}")
+    print_main(rank, f"linear_hidden_channels\t{args.linear_hidden_channels}")
+    print_main(rank, f"linear_loss_type\t{args.linear_loss_type}")
+    print_main(rank, f"smooth_l1_beta\t{args.smooth_l1_beta}")
+    print_main(rank, f"linear_target_space\t{args.linear_target_space}")
+    if linear_track_means is not None:
+        print_main(
+            rank,
+            "linear_track_means\t"
+            + ",".join(f"{float(value):.8g}" for value in linear_track_means),
+        )
     print_main(
         rank,
-        f"loss_space\t{loss_space_for_config(args.head_type, args.loss_type)}",
+        "loss_space\t"
+        f"{loss_space_for_config(args.head_type, args.loss_type, args.linear_target_space, args.linear_loss_type)}",
     )
     print_main(rank, f"loss_type\t{args.loss_type}")
     print_main(rank, f"multinomial_num_segments\t{args.multinomial_num_segments}")
@@ -652,6 +771,9 @@ def main() -> None:
         encode_requires_grad=args.enable_last_block_lora,
         head_type=args.head_type,
         head_resolutions=head_resolutions,
+        linear_head_architecture=args.linear_head_architecture,
+        linear_hidden_channels=args.linear_hidden_channels,
+        linear_track_means=linear_track_means,
         track_means=track_means,
     ).to(device)
 
@@ -666,6 +788,15 @@ def main() -> None:
                 "head_resolutions",
                 [checkpoint_resolution],
             )
+        )
+        checkpoint_linear_head_architecture = str(
+            init_checkpoint.get("linear_head_architecture", "conv1x1")
+        )
+        checkpoint_linear_hidden_channels = int(
+            init_checkpoint.get("linear_hidden_channels", args.linear_hidden_channels)
+        )
+        checkpoint_linear_target_space = str(
+            init_checkpoint.get("linear_target_space", "full-log1p")
         )
         if checkpoint_n_tracks != n_tracks:
             raise ValueError(
@@ -686,6 +817,26 @@ def main() -> None:
                 "Init checkpoint embedding_resolution="
                 f"{checkpoint_resolution}, requested={args.embedding_resolution}"
             )
+        if args.head_type == "linear":
+            if checkpoint_linear_head_architecture != args.linear_head_architecture:
+                raise ValueError(
+                    "Init checkpoint linear_head_architecture="
+                    f"{checkpoint_linear_head_architecture}, "
+                    f"requested={args.linear_head_architecture}"
+                )
+            if checkpoint_linear_head_architecture != "conv1x1" and (
+                checkpoint_linear_hidden_channels != args.linear_hidden_channels
+            ):
+                raise ValueError(
+                    "Init checkpoint linear_hidden_channels="
+                    f"{checkpoint_linear_hidden_channels}, "
+                    f"requested={args.linear_hidden_channels}"
+                )
+            if checkpoint_linear_target_space != args.linear_target_space:
+                raise ValueError(
+                    "Init checkpoint linear_target_space="
+                    f"{checkpoint_linear_target_space}, requested={args.linear_target_space}"
+                )
         model.head.load_state_dict(init_checkpoint["adapter_head_state_dict"])
 
     lora_target_modules: list[str] = []
@@ -776,6 +927,7 @@ def main() -> None:
     model.base_model.eval()
     best_valid_loss: float | None = None
     best_valid_step: int | None = None
+    validations_without_improvement = 0
     train_batches = infinite_batches(train_loader, train_sampler)
     for step in range(1, args.max_steps + 1):
         lr = learning_rate_for_step(
@@ -799,16 +951,20 @@ def main() -> None:
             dna_sequence = batch["dna_sequence"].to(device=device, dtype=torch.float32)
             rna_seq = batch["rna_seq"].to(device=device, dtype=torch.float32)
             rna_seq_mask = batch["rna_seq_mask"].to(device=device)
+            loss_target = (
+                prepare_linear_target(rna_seq, target_space=args.linear_target_space)
+                if args.head_type == "linear" else rna_seq
+            )
 
             prediction = train_model(
                 dna_sequence,
-                target_length=rna_seq.shape[-1],
+                target_length=loss_target.shape[-1],
                 return_scaled=prediction_return_scaled_for_loss(model, args.loss_type),
             )
             loss = masked_adapter_loss(
                 model,
                 prediction,
-                rna_seq,
+                loss_target if args.head_type == "linear" else rna_seq,
                 rna_seq_mask,
                 loss_type=args.loss_type,
                 multinomial_num_segments=args.multinomial_num_segments,
@@ -816,6 +972,8 @@ def main() -> None:
                 count_weight=args.count_weight,
                 mse_weight=args.mse_weight,
                 poisson_weight=args.poisson_weight,
+                linear_loss_type=args.linear_loss_type,
+                smooth_l1_beta=args.smooth_l1_beta,
             )
             (loss / args.grad_accum_steps).backward()
 
@@ -882,6 +1040,7 @@ def main() -> None:
                 print(f"cuda_max_memory_allocated_mb\t{cuda_memory:.1f}")
 
         if step % args.eval_every == 0 or step == args.max_steps:
+            stop_training = False
             if is_main_process(rank):
                 valid_loss, valid_batches, valid_examples = evaluate_masked_mse(
                     model,
@@ -893,6 +1052,9 @@ def main() -> None:
                     count_weight=args.count_weight,
                     mse_weight=args.mse_weight,
                     poisson_weight=args.poisson_weight,
+                    linear_loss_type=args.linear_loss_type,
+                    linear_target_space=args.linear_target_space,
+                    smooth_l1_beta=args.smooth_l1_beta,
                 )
                 cuda_memory = (
                     torch.cuda.max_memory_allocated() / 1024**2
@@ -912,12 +1074,14 @@ def main() -> None:
                 print(f"valid_batches\t{valid_batches}")
                 print(f"valid_examples\t{valid_examples}")
                 print(f"valid_loss\t{valid_loss:.6g}")
-                if (
-                    not args.no_save_checkpoint
-                    and (best_valid_loss is None or valid_loss < best_valid_loss)
-                ):
+                improved = best_valid_loss is None or valid_loss < best_valid_loss
+                if improved:
                     best_valid_loss = valid_loss
                     best_valid_step = step
+                    validations_without_improvement = 0
+                else:
+                    validations_without_improvement += 1
+                if not args.no_save_checkpoint and improved:
                     save_training_checkpoint(
                         best_checkpoint_path,
                         model=model,
@@ -936,7 +1100,17 @@ def main() -> None:
                         init_adapter_checkpoint=args.init_adapter_checkpoint,
                         head_type=args.head_type,
                         head_resolutions=head_resolutions,
-                        loss_space=loss_space_for_config(args.head_type, args.loss_type),
+                        linear_head_architecture=args.linear_head_architecture,
+                        linear_hidden_channels=args.linear_hidden_channels,
+                        linear_loss_type=args.linear_loss_type,
+                        linear_target_space=args.linear_target_space,
+                        smooth_l1_beta=args.smooth_l1_beta,
+                        loss_space=loss_space_for_config(
+                            args.head_type,
+                            args.loss_type,
+                            args.linear_target_space,
+                            args.linear_loss_type,
+                        ),
                         loss_type=args.loss_type,
                         multinomial_num_segments=args.multinomial_num_segments,
                         positional_weight=args.positional_weight,
@@ -950,8 +1124,29 @@ def main() -> None:
                     print(f"saved_best_checkpoint\t{best_checkpoint_path}")
                     print(f"best_valid_step\t{best_valid_step}")
                     print(f"best_valid_loss\t{best_valid_loss:.6g}")
+                if (
+                    args.early_stopping_patience is not None
+                    and step >= args.early_stopping_min_steps
+                    and validations_without_improvement >= args.early_stopping_patience
+                ):
+                    stop_training = True
+                    print(f"early_stopping_step\t{step}")
+                    print(
+                        "early_stopping_validations_without_improvement\t"
+                        f"{validations_without_improvement}"
+                    )
+            if is_distributed:
+                stop_tensor = torch.tensor(
+                    int(stop_training),
+                    dtype=torch.int64,
+                    device=device,
+                )
+                dist.broadcast(stop_tensor, src=0)
+                stop_training = bool(int(stop_tensor.item()))
             if is_distributed:
                 dist.barrier()
+            if stop_training:
+                break
 
     if is_main_process(rank) and not args.no_save_checkpoint:
         save_training_checkpoint(
@@ -972,7 +1167,17 @@ def main() -> None:
             init_adapter_checkpoint=args.init_adapter_checkpoint,
             head_type=args.head_type,
             head_resolutions=head_resolutions,
-            loss_space=loss_space_for_config(args.head_type, args.loss_type),
+            linear_head_architecture=args.linear_head_architecture,
+            linear_hidden_channels=args.linear_hidden_channels,
+            linear_loss_type=args.linear_loss_type,
+            linear_target_space=args.linear_target_space,
+            smooth_l1_beta=args.smooth_l1_beta,
+            loss_space=loss_space_for_config(
+                args.head_type,
+                args.loss_type,
+                args.linear_target_space,
+                args.linear_loss_type,
+            ),
             loss_type=args.loss_type,
             multinomial_num_segments=args.multinomial_num_segments,
             positional_weight=args.positional_weight,

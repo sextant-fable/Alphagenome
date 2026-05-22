@@ -34,6 +34,57 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-22 - 128 bp Log1p-MSE Sweep Tooling and Smoke Validation
+
+- Run type: engineering smoke test and validation
+- Purpose: Implement the next 128 bp frozen-trunk log1p-MSE sweep tooling before launching hour-scale screening runs. This adds richer linear head variants, SmoothL1 support, 128 bp binned target training, early stopping, checkpoint metadata, and validation diagnostics while keeping test split untouched.
+- Git commit: `a7ec8cbf8d9b954d567ea50aafe0c83ff66768c3`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; A100 80GB GPUs; user explicitly allowed four-GPU work with `CUDA_VISIBLE_DEVICES=0,1,2,3`
+- Command:
+
+```bash
+conda run -n alphagenome python -m py_compile \
+  scripts/alphagenome_rna_seq11_adapter.py \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  scripts/alphagenome_rna_seq11_eval.py \
+  scripts/alphagenome_rna_seq11_scale_diagnostic.py
+
+# Each smoke used one train example, one valid example, max_steps=1, and one GPU.
+# Architectures checked:
+# conv1x1, mlp1x1, conv3, conv5, residual-conv1x1, residual-conv3.
+# Additional checks:
+# linear-loss-type smooth-l1 and linear-target-space binned128-log1p-mean.
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome python -u \
+  scripts/alphagenome_rna_seq11_eval.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --checkpoint runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt \
+  --point-metrics \
+  --spearman-sample-size 200000 \
+  --spearman-seed 20260515 \
+  --metrics-output runs/rna_seq11_sweep_legacy_valid_repro_20260522/legacy_valid_point_metrics.tsv \
+  --diagnostic-output runs/rna_seq11_sweep_legacy_valid_repro_20260522/legacy_valid_diagnostic.tsv \
+  --device auto
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`; legacy selected checkpoint `runs/rna_seq11_adapter_formal_20260515_5000steps_lr3e-4_128bp/adapter_head_best.pt`
+- Output paths: ignored smoke directories under `runs/rna_seq11_sweep_smoke_*_20260522_1step`; ignored logs under `logs/`; legacy validation reproduction at `runs/rna_seq11_sweep_legacy_valid_repro_20260522`
+- Result summary: Code compilation passed. All new linear head architectures completed 1-step train, 1-example valid, checkpoint save, and checkpoint reload. SmoothL1 and binned128 target-space smoke checks completed. The binned checkpoint common128 and scale-diagnostic paths were fixed and verified after catching an initial shape mismatch during smoke. Combined diagnostic output wrote the expected scopes.
+- Verification:
+  - 1-step prediction shapes were `1x11x1048576` for full-log1p heads and `1x11x8192` for the binned128 target-space smoke.
+  - Trainable/head parameters were `33803` for `conv1x1`, `789515` for `mlp1x1`, `986379` for `conv3`, `1117451` for `conv5`, `33814` for `residual-conv1x1`, and `986390` for `residual-conv3`.
+  - Legacy selected checkpoint full valid reproduction matched the recorded benchmark: MSE `1.0609935`, MAE `0.71866247`, Pearson `0.58809888`.
+  - Full valid diagnostic output contained `11` track rows, `39` window rows, and `4` stratum rows.
+  - Binned128 smoke common128 reload reported MSE `1.9483177` and Pearson `0.070606199` on one validation example; this is an environment/checkpoint reload check, not a model result.
+- Failures or warnings: The first binned128 common128/scale diagnostic attempt exposed a shape mismatch caused by upsampling binned predictions before common128 evaluation; the code was corrected and the binned smoke was rerun successfully. These smoke-test metrics are environment/tooling validation only and should not be used for model selection. The held-out test split was not used. `git push` failed with `fatal: could not read Username for 'https://github.com': No such device or address`.
+- Next actions: Launch the staged validation-only sweep from this tooling: seed-stability runs, 18-run short hyperparameter screen, head screen, binned target screen, then promotion runs only for valid-selected candidates.
+- Claim status: verified
+
 ## 2026-05-21 - GenomeTracks 128 bp Warm-Start Count and Hybrid Loss Sweep
 
 - Run type: analysis, training, and evaluation

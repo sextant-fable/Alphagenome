@@ -19,6 +19,16 @@ from torch_rna_seq_dataset import masked_mse_loss
 
 HeadType = Literal["linear", "genome-tracks"]
 LossType = Literal["mse", "poisson-multinomial", "hybrid-mse-poisson"]
+LinearHeadArchitecture = Literal[
+    "conv1x1",
+    "mlp1x1",
+    "conv3",
+    "conv5",
+    "residual-conv1x1",
+    "residual-conv3",
+]
+LinearLossType = Literal["mse", "smooth-l1"]
+LinearTargetSpace = Literal["full-log1p", "binned128-log1p-mean"]
 
 
 def parse_resolutions(
@@ -49,6 +59,111 @@ def embedding_channels_for_resolution(resolution: int) -> int:
     if resolution == 128:
         return 3072
     raise ValueError(f"Unsupported resolution: {resolution}")
+
+
+def linear_architecture_base(architecture: str) -> str:
+    if architecture.startswith("residual-"):
+        return architecture.removeprefix("residual-")
+    return architecture
+
+
+def is_residual_linear_architecture(architecture: str) -> bool:
+    return architecture.startswith("residual-")
+
+
+def normalize_linear_track_means(
+    track_means: torch.Tensor | Sequence[float] | None,
+    *,
+    n_tracks: int,
+) -> torch.Tensor:
+    if track_means is None:
+        return torch.zeros(1, n_tracks, 1, dtype=torch.float32)
+    tensor = torch.as_tensor(track_means, dtype=torch.float32)
+    if tensor.ndim == 1:
+        tensor = tensor.view(1, -1, 1)
+    elif tensor.ndim == 2:
+        tensor = tensor.view(1, tensor.shape[0], tensor.shape[1])
+    if tensor.shape != (1, n_tracks, 1):
+        raise ValueError(
+            f"linear track means must have shape [1,{n_tracks},1] or [{n_tracks}], "
+            f"got {tuple(tensor.shape)}"
+        )
+    return tensor.contiguous()
+
+
+class ResidualTrackMeanHead(torch.nn.Module):
+    """Predict a residual around per-track train-set means."""
+
+    def __init__(
+        self,
+        base_head: torch.nn.Module,
+        *,
+        n_tracks: int,
+        track_means: torch.Tensor | Sequence[float] | None,
+    ) -> None:
+        super().__init__()
+        self.base_head = base_head
+        self.register_buffer(
+            "track_means",
+            normalize_linear_track_means(track_means, n_tracks=n_tracks),
+        )
+        self.residual_scale = torch.nn.Parameter(torch.ones(1, n_tracks, 1))
+
+    def forward(self, embeddings: torch.Tensor) -> torch.Tensor:
+        residual = self.base_head(embeddings)
+        return self.track_means.to(dtype=residual.dtype) + (
+            self.residual_scale.to(dtype=residual.dtype) * residual
+        )
+
+
+def build_linear_head(
+    *,
+    in_channels: int,
+    n_tracks: int,
+    architecture: LinearHeadArchitecture,
+    hidden_channels: int,
+    track_means: torch.Tensor | Sequence[float] | None = None,
+) -> torch.nn.Module:
+    if hidden_channels < 1:
+        raise ValueError("linear hidden channels must be >= 1")
+
+    base_architecture = linear_architecture_base(architecture)
+    if base_architecture == "conv1x1":
+        base_head: torch.nn.Module = torch.nn.Conv1d(
+            in_channels,
+            n_tracks,
+            kernel_size=1,
+        )
+    elif base_architecture == "mlp1x1":
+        base_head = torch.nn.Sequential(
+            torch.nn.Conv1d(in_channels, hidden_channels, kernel_size=1),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(hidden_channels, n_tracks, kernel_size=1),
+        )
+    elif base_architecture in {"conv3", "conv5"}:
+        kernel_size = int(base_architecture.removeprefix("conv"))
+        base_head = torch.nn.Sequential(
+            torch.nn.Conv1d(in_channels, hidden_channels, kernel_size=1),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(
+                hidden_channels,
+                hidden_channels,
+                kernel_size=kernel_size,
+                padding=kernel_size // 2,
+            ),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(hidden_channels, n_tracks, kernel_size=1),
+        )
+    else:
+        raise ValueError(f"Unsupported linear head architecture: {architecture}")
+
+    if is_residual_linear_architecture(architecture):
+        return ResidualTrackMeanHead(
+            base_head,
+            n_tracks=n_tracks,
+            track_means=track_means,
+        )
+    return base_head
 
 
 def normalize_track_means(
@@ -150,6 +265,93 @@ def bin_rna_seq_target(target: torch.Tensor, resolution: int) -> torch.Tensor:
     )
 
 
+def binned_log1p_mean_target(
+    target: torch.Tensor,
+    *,
+    resolution: int = 128,
+) -> torch.Tensor:
+    """Convert raw targets to log1p(mean raw signal) bins."""
+
+    return torch.log1p(bin_rna_seq_target(target, resolution) / float(resolution))
+
+
+def prepare_linear_target(
+    target: torch.Tensor,
+    *,
+    target_space: LinearTargetSpace,
+) -> torch.Tensor:
+    if target_space == "full-log1p":
+        return target
+    if target_space == "binned128-log1p-mean":
+        return binned_log1p_mean_target(target, resolution=128)
+    raise ValueError(f"Unsupported linear target space: {target_space}")
+
+
+def masked_smooth_l1_loss(
+    prediction: torch.Tensor,
+    target: torch.Tensor,
+    mask: torch.Tensor,
+    *,
+    beta: float,
+) -> torch.Tensor:
+    if beta <= 0.0:
+        raise ValueError("smooth-l1 beta must be > 0")
+    while mask.ndim < prediction.ndim:
+        mask = mask.unsqueeze(-1)
+    mask = mask.to(device=prediction.device, dtype=prediction.dtype)
+    loss = F.smooth_l1_loss(
+        prediction,
+        target.to(dtype=prediction.dtype),
+        reduction="none",
+        beta=beta,
+    )
+    return (loss * mask).sum() / mask.expand_as(loss).sum().clamp_min(1.0)
+
+
+def masked_linear_loss(
+    prediction: torch.Tensor,
+    target: torch.Tensor,
+    mask: torch.Tensor,
+    *,
+    linear_loss_type: LinearLossType = "mse",
+    smooth_l1_beta: float = 1.0,
+) -> torch.Tensor:
+    if linear_loss_type == "mse":
+        return masked_mse_loss(prediction, target, mask)
+    if linear_loss_type == "smooth-l1":
+        return masked_smooth_l1_loss(
+            prediction,
+            target,
+            mask,
+            beta=smooth_l1_beta,
+        )
+    raise ValueError(f"Unsupported linear loss type: {linear_loss_type}")
+
+
+def compute_linear_track_means_from_dataset(
+    dataset,
+    *,
+    target_space: LinearTargetSpace,
+) -> torch.Tensor:
+    """Compute per-track means in the linear head's training target space."""
+
+    n_tracks = int(dataset.metadata["n_tracks"])
+    sums = torch.zeros(n_tracks, dtype=torch.float64)
+    counts = torch.zeros(n_tracks, dtype=torch.float64)
+    for index in range(len(dataset)):
+        example = dataset[index]
+        rna_seq = example["rna_seq"].to(dtype=torch.float32)
+        rna_seq_mask = example["rna_seq_mask"].to(dtype=torch.bool)
+        target = prepare_linear_target(rna_seq.unsqueeze(0), target_space=target_space)[0]
+        while rna_seq_mask.ndim < target.ndim:
+            rna_seq_mask = rna_seq_mask.unsqueeze(-1)
+        mask = rna_seq_mask.to(dtype=torch.float64).expand_as(target)
+        sums += (target.to(dtype=torch.float64) * mask).sum(dim=1)
+        counts += mask.sum(dim=1)
+    means = torch.where(counts > 0, sums / counts.clamp_min(1.0), torch.zeros_like(sums))
+    return means.to(dtype=torch.float32)
+
+
 def format_prediction_shape(prediction: torch.Tensor | dict[int, torch.Tensor]) -> str:
     if isinstance(prediction, dict):
         return ",".join(
@@ -172,6 +374,9 @@ class RnaSeq11Adapter(torch.nn.Module):
         encode_requires_grad: bool = False,
         head_type: HeadType = "linear",
         head_resolutions: Sequence[int] | None = None,
+        linear_head_architecture: LinearHeadArchitecture = "conv1x1",
+        linear_hidden_channels: int = 256,
+        linear_track_means: torch.Tensor | Sequence[float] | None = None,
         track_means: torch.Tensor | Sequence[float] | None = None,
         num_head_organisms: int | None = None,
     ) -> None:
@@ -191,6 +396,8 @@ class RnaSeq11Adapter(torch.nn.Module):
             fallback_resolution=embedding_resolution,
         )
         self.n_tracks = n_tracks
+        self.linear_head_architecture = linear_head_architecture
+        self.linear_hidden_channels = linear_hidden_channels
 
         if self.head_type == "linear":
             if len(self.head_resolutions) != 1:
@@ -200,7 +407,13 @@ class RnaSeq11Adapter(torch.nn.Module):
                     "linear head_resolutions must match embedding_resolution"
                 )
             in_channels = embedding_channels_for_resolution(embedding_resolution)
-            self.head = torch.nn.Conv1d(in_channels, n_tracks, kernel_size=1)
+            self.head = build_linear_head(
+                in_channels=in_channels,
+                n_tracks=n_tracks,
+                architecture=linear_head_architecture,
+                hidden_channels=linear_hidden_channels,
+                track_means=linear_track_means,
+            )
         else:
             num_organisms = (
                 max(organism_index + 1, 1)
@@ -224,6 +437,9 @@ class RnaSeq11Adapter(torch.nn.Module):
         for parameter in self.base_model.parameters():
             parameter.requires_grad = False
         self.base_model.eval()
+
+    def head_dtype(self) -> torch.dtype:
+        return next(self.head.parameters()).dtype
 
     @property
     def uses_scaled_targets(self) -> bool:
@@ -297,7 +513,7 @@ class RnaSeq11Adapter(torch.nn.Module):
             )
 
         key = f"embeddings_{self.embedding_resolution}bp"
-        prediction = self.head(embeddings[key].to(dtype=self.head.weight.dtype))
+        prediction = self.head(embeddings[key].to(dtype=self.head_dtype()))
         if target_length is not None and prediction.shape[-1] != target_length:
             prediction = F.interpolate(
                 prediction,
@@ -410,6 +626,8 @@ def masked_adapter_loss(
     count_weight: float = 1.0,
     mse_weight: float = 1.0,
     poisson_weight: float = 1.0,
+    linear_loss_type: LinearLossType = "mse",
+    smooth_l1_beta: float = 1.0,
 ) -> torch.Tensor:
     """Compute legacy MSE or AlphaGenome-style RNA-seq count/position loss."""
 
@@ -453,7 +671,13 @@ def masked_adapter_loss(
     if isinstance(prediction, dict):
         return _genome_tracks_mse_component(model, prediction, target, mask)
 
-    return masked_mse_loss(prediction, target, mask)
+    return masked_linear_loss(
+        prediction,
+        target,
+        mask,
+        linear_loss_type=linear_loss_type,
+        smooth_l1_beta=smooth_l1_beta,
+    )
 
 
 def pick_device(requested: str) -> torch.device:
@@ -485,6 +709,9 @@ def evaluate_masked_mse(
     count_weight: float = 1.0,
     mse_weight: float = 1.0,
     poisson_weight: float = 1.0,
+    linear_loss_type: LinearLossType = "mse",
+    linear_target_space: LinearTargetSpace = "full-log1p",
+    smooth_l1_beta: float = 1.0,
 ) -> tuple[float, int, int]:
     model.eval()
     weighted_loss_sum = 0.0
@@ -495,16 +722,20 @@ def evaluate_masked_mse(
             dna_sequence = batch["dna_sequence"].to(device=device, dtype=torch.float32)
             rna_seq = batch["rna_seq"].to(device=device, dtype=torch.float32)
             rna_seq_mask = batch["rna_seq_mask"].to(device=device)
+            loss_target = (
+                prepare_linear_target(rna_seq, target_space=linear_target_space)
+                if model.head_type == "linear" else rna_seq
+            )
 
             prediction = model(
                 dna_sequence,
-                target_length=rna_seq.shape[-1],
+                target_length=loss_target.shape[-1],
                 return_scaled=prediction_return_scaled_for_loss(model, loss_type),
             )
             loss = masked_adapter_loss(
                 model,
                 prediction,
-                rna_seq,
+                loss_target if model.head_type == "linear" else rna_seq,
                 rna_seq_mask,
                 loss_type=loss_type,
                 multinomial_num_segments=multinomial_num_segments,
@@ -512,6 +743,8 @@ def evaluate_masked_mse(
                 count_weight=count_weight,
                 mse_weight=mse_weight,
                 poisson_weight=poisson_weight,
+                linear_loss_type=linear_loss_type,
+                smooth_l1_beta=smooth_l1_beta,
             )
             batch_size = int(dna_sequence.shape[0])
             weighted_loss_sum += float(loss.detach().cpu()) * batch_size
@@ -871,6 +1104,7 @@ def evaluate_128bp_binned_pointwise_metrics(
     *,
     device: torch.device,
     linear_prediction_transform: str,
+    linear_target_space: LinearTargetSpace = "full-log1p",
     metric_transform: Literal["raw-sum", "log1p-mean"] = "log1p-mean",
     max_batches: int | None = None,
 ) -> dict[str, object]:
@@ -898,9 +1132,15 @@ def evaluate_128bp_binned_pointwise_metrics(
             rna_seq = batch["rna_seq"].to(device=device, dtype=torch.float32)
             rna_seq_mask = batch["rna_seq_mask"].to(device=device)
 
+            target_length = rna_seq.shape[-1]
+            if (
+                model.head_type == "linear"
+                and linear_target_space == "binned128-log1p-mean"
+            ):
+                target_length = target_length // 128
             prediction = model(
                 dna_sequence,
-                target_length=rna_seq.shape[-1],
+                target_length=target_length,
                 return_scaled=False,
             )
             if isinstance(prediction, dict):
@@ -920,7 +1160,14 @@ def evaluate_128bp_binned_pointwise_metrics(
                     raise ValueError(
                         "linear_prediction_transform must be 'log1p' or 'none'"
                     )
-                prediction_128 = bin_rna_seq_target(prediction_raw, 128)
+                if linear_target_space == "binned128-log1p-mean":
+                    prediction_128 = prediction_raw * 128.0
+                elif linear_target_space == "full-log1p":
+                    prediction_128 = bin_rna_seq_target(prediction_raw, 128)
+                else:
+                    raise ValueError(
+                        f"Unsupported linear target space: {linear_target_space}"
+                    )
 
             target_128 = bin_rna_seq_target(rna_seq, 128)
             if metric_transform == "log1p-mean":

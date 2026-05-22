@@ -63,6 +63,7 @@ def raw_prediction_128bp(
     prediction: torch.Tensor | dict[int, torch.Tensor],
     *,
     checkpoint_target_transform: str,
+    linear_target_space: str,
 ) -> torch.Tensor:
     if isinstance(prediction, dict):
         if 128 in prediction:
@@ -81,7 +82,11 @@ def raw_prediction_128bp(
             "checkpoint target_transform must be 'log1p' or 'none', got "
             f"{checkpoint_target_transform}"
         )
-    return bin_rna_seq_target(raw_prediction, 128)
+    if linear_target_space == "binned128-log1p-mean":
+        return raw_prediction * 128.0
+    if linear_target_space == "full-log1p":
+        return bin_rna_seq_target(raw_prediction, 128)
+    raise ValueError(f"Unsupported linear target space: {linear_target_space}")
 
 
 def safe_ratio(numerator: torch.Tensor, denominator: torch.Tensor) -> torch.Tensor:
@@ -122,6 +127,9 @@ def main() -> None:
         else int(checkpoint["organism_index"])
     )
     checkpoint_target_transform = str(checkpoint.get("target_transform", "log1p"))
+    linear_head_architecture = str(checkpoint.get("linear_head_architecture", "conv1x1"))
+    linear_hidden_channels = int(checkpoint.get("linear_hidden_channels", 256))
+    linear_target_space = str(checkpoint.get("linear_target_space", "full-log1p"))
 
     dataloader = make_dataloader(
         dataset_dir,
@@ -143,6 +151,9 @@ def main() -> None:
     print(f"n_examples\t{len(dataloader.dataset)}")
     print(f"n_tracks\t{n_tracks}")
     print(f"checkpoint_target_transform\t{checkpoint_target_transform}")
+    print(f"linear_head_architecture\t{linear_head_architecture}")
+    print(f"linear_hidden_channels\t{linear_hidden_channels}")
+    print(f"linear_target_space\t{linear_target_space}")
     print(f"head_type\t{head_type}")
     print(f"head_resolutions\t{','.join(map(str, head_resolutions))}")
     print(f"embedding_resolution\t{embedding_resolution}")
@@ -161,6 +172,9 @@ def main() -> None:
         organism_index=organism_index,
         head_type=head_type,
         head_resolutions=head_resolutions,
+        linear_head_architecture=linear_head_architecture,
+        linear_hidden_channels=linear_hidden_channels,
+        linear_track_means=checkpoint_head_state.get("track_means"),
         track_means=track_means,
     ).to(device)
     model.head.load_state_dict(checkpoint_head_state)
@@ -192,15 +206,19 @@ def main() -> None:
             rna_seq = batch["rna_seq"].to(device=device, dtype=torch.float32)
             rna_seq_mask = batch["rna_seq_mask"].to(device=device)
 
+            target_length = rna_seq.shape[-1]
+            if head_type == "linear" and linear_target_space == "binned128-log1p-mean":
+                target_length = target_length // 128
             prediction = model(
                 dna_sequence,
-                target_length=rna_seq.shape[-1],
+                target_length=target_length,
                 return_scaled=False,
             )
             prediction_128 = raw_prediction_128bp(
                 model,
                 prediction,
                 checkpoint_target_transform=checkpoint_target_transform,
+                linear_target_space=linear_target_space,
             )
             target_128 = bin_rna_seq_target(rna_seq, 128)
             mask = expand_mask(rna_seq_mask, prediction_128)
