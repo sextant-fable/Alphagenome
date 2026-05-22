@@ -47,17 +47,18 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 - Command:
 
 ```bash
-nohup conda run -n alphagenome python -u scripts/rna_seq11_run_128bp_log1p_sweep.py \
+setsid /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/rna_seq11_run_128bp_log1p_sweep.py \
   --date-tag 20260522 \
   --gpus 0,1,2,3 \
-  > logs/rna_seq11_128bp_log1p_sweep_20260522/driver.log 2>&1 &
+  > logs/rna_seq11_128bp_log1p_sweep_20260522/driver.log 2>&1 < /dev/null &
 ```
 
 - Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`
 - Output path: ignored run directories under `runs/rna_seq11_sweep_*`; summary TSV `runs/rna_seq11_128bp_log1p_sweep_20260522/sweep_results.tsv`; logs under `logs/rna_seq11_128bp_log1p_sweep_20260522/`
 - Result summary: Launched; results are pending.
 - Verification: Pre-launch checks confirmed host `HY-GPU`, repository path `/home/zelinli6/Alphagenome`, commit `b211afd2c114b11fb21b8d9c7e9c1ae8938921b3`, conda environment `alphagenome`, PyTorch CUDA availability, and idle GPUs 0-3.
-- Failures or warnings: The branch could not be pushed before launch because HTTPS credentials are unavailable in this environment. Generated logs, checkpoints, and run outputs remain ignored and must not be committed.
+- Failures or warnings: The branch could not be pushed before launch because HTTPS credentials are unavailable in this environment. A first `nohup conda run ... &` launch attempt exited without starting the driver in the Codex tool environment, so the active launch uses `setsid` and the conda environment's direct Python executable. Generated logs, checkpoints, and run outputs remain ignored and must not be committed.
 - Next actions: Monitor `logs/rna_seq11_128bp_log1p_sweep_20260522/driver.log` and summarize valid-only results after the launcher completes the staged sweep.
 - Claim status: verified
 
