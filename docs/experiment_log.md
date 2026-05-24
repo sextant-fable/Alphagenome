@@ -34,6 +34,35 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-25 - Full-MSE Selection Phase 2 Head Screen
+
+- Run type: training
+- Purpose: Run the 13-job Phase 2 1000-step head screen on train/valid only, selecting best checkpoints by validation full MSE for residual hidden/scale variants, `conv3x2`, `conv7`, and dilated `conv3` heads.
+- Git commit: `84685050e50e0e19a122a9a09858905c8dcc0942`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`
+- Command:
+
+```bash
+PYTHONUNBUFFERED=1 /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/rna_seq11_run_adaptation_phase_sweep.py \
+  --date-tag 20260524 \
+  --phase phase2-screen \
+  --gpus 0,1,2,3 \
+  --selection-metric full-mse
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`
+- Output path: Summary TSV `runs/rna_seq11_adaptation_phase_sweep_20260524/sweep_results.tsv`; logs under `logs/rna_seq11_adaptation_phase_sweep_20260524/`; checkpoints under ignored `runs/rna_seq11_phase2_head_screen_1000_*`
+- Result summary: Completed 13/13 validation-only 1000-step screens. Top full-MSE configs were `residual-conv3` hidden `512`, residual scale `0.1`, full MSE `0.95572846`; `dilated-conv3` dilation `2`, full MSE `0.95791135`; and `residual-conv3` hidden `512`, residual scale `1.0`, full MSE `0.95821054`. For comparison, Phase 1 `conv5` seed `20260522` had full MSE `0.959042` at 1000 steps and later reached `0.88662339` at 4500 steps.
+- Verification: Driver reported `stage_end` and `sweep_done` at `2026-05-25T05:46:50`; all Phase 2 screen rows have status `completed`, return code `0`, and `selection_metric=full-mse`. Held-out test split was not used.
+- Failures or warnings: Metrics are validation-only model-selection results, not held-out test results. Generated logs, checkpoints, and run outputs remain ignored and must not be committed. The branch still could not be pushed from this environment because HTTPS Git credentials are unavailable.
+- Next actions: Promote the top 2-3 Phase 2 screen configs to 5000-step runs while retaining Phase 1 `conv5` as the current validation leader.
+- Claim status: verified validation-only
+
 ## 2026-05-25 - Full-MSE Selection Phase 1 Winner Stability
 
 - Run type: training
