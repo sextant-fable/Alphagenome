@@ -28,6 +28,7 @@ VALID_DIR = "alphagenome_custom/datasets/rna_seq_npz_valid"
 WEIGHTS = "weights/alphagenome_pytorch/model_all_folds.safetensors"
 BENCHMARK_VALID_MSE = 1.0609935
 BENCHMARK_VALID_PEARSON = 0.58809888
+PHASES = ("phase1", "phase2", "phase3", "phase4")
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,7 @@ class SweepConfig:
     early_stopping_min_steps: int = 0
     early_stopping_patience: int | None = None
     rank_label: str = ""
+    run_id_override: str = ""
 
     @property
     def target_label(self) -> str:
@@ -63,6 +65,8 @@ class SweepConfig:
 
     @property
     def run_id(self) -> str:
+        if self.run_id_override:
+            return self.run_id_override
         pieces = [
             "rna_seq11_sweep",
             self.stage,
@@ -113,6 +117,26 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--date-tag", default="20260522")
     parser.add_argument("--gpus", default="0,1,2,3")
+    parser.add_argument(
+        "--phase",
+        choices=[*PHASES, "all"],
+        default="all",
+        help=(
+            "Run a staged subset. phase1=hyperparameter and baseline seed "
+            "screens; phase2=head and binned-target screens; "
+            "phase3=promotion and optional extension; phase4=final seed "
+            "confirmation and valid diagnostics. No phase uses the test split."
+        ),
+    )
+    parser.add_argument(
+        "--selection-metric",
+        choices=["full-mse", "full-pearson", "common128-mse"],
+        default="full-mse",
+        help=(
+            "Validation metric used for full-resolution candidate ranking. "
+            "The default preserves the original best full-validation MSE rule."
+        ),
+    )
     parser.add_argument(
         "--skip-final-seeds",
         action="store_true",
@@ -354,6 +378,66 @@ def parse_metric_tsv(path: Path) -> tuple[float | None, float | None, float | No
     return None, None, None
 
 
+def parse_summary(path: Path) -> list[SweepResult]:
+    if not path.exists():
+        return []
+    results: list[SweepResult] = []
+    with path.open("r", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        for row in reader:
+            try:
+                config = SweepConfig(
+                    stage=row["stage"],
+                    arch=row["arch"],
+                    lr_label=row["lr"],
+                    lr=float(row["lr"]),
+                    wd_label=row["weight_decay"],
+                    wd=float(row["weight_decay"]),
+                    loss=row["loss"],
+                    target_space=row["target_space"],
+                    seed=int(row["seed"]),
+                    max_steps=int(row["max_steps"]),
+                    run_id_override=row.get("run_id", ""),
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+            results.append(
+                SweepResult(
+                    config=config,
+                    status=row.get("status", ""),
+                    returncode=int(row.get("returncode") or 0),
+                    gpu=row.get("gpu", ""),
+                    train_best_step=parse_optional_int(row.get("train_best_step")),
+                    train_best_loss=parse_optional_float(row.get("train_best_loss")),
+                    full_mse=parse_optional_float(row.get("full_mse")),
+                    full_mae=parse_optional_float(row.get("full_mae")),
+                    full_pearson=parse_optional_float(row.get("full_pearson")),
+                    common128_mse=parse_optional_float(row.get("common128_mse")),
+                    common128_mae=parse_optional_float(row.get("common128_mae")),
+                    common128_pearson=parse_optional_float(row.get("common128_pearson")),
+                )
+            )
+    return results
+
+
+def parse_optional_float(value: str | None) -> float | None:
+    if value in {None, ""}:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def parse_optional_int(value: str | None) -> int | None:
+    if value in {None, ""}:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
 def result_from_files(config: SweepConfig, *, status: str, gpu: str, returncode: int) -> SweepResult:
     out_dir = run_dir(config)
     best_step, best_loss = parse_training_best(out_dir / "metrics.tsv")
@@ -526,14 +610,38 @@ def completed(results: Iterable[SweepResult]) -> list[SweepResult]:
     ]
 
 
-def best_by_full_mse(results: Iterable[SweepResult], *, n: int) -> list[SweepResult]:
+def selection_value(result: SweepResult, metric: str) -> float | None:
+    if metric == "full-mse":
+        return result.full_mse
+    if metric == "full-pearson":
+        if result.full_pearson is None:
+            return None
+        return -float(result.full_pearson)
+    if metric == "common128-mse":
+        return result.common128_mse
+    raise ValueError(f"Unsupported selection metric: {metric}")
+
+
+def best_by_metric(
+    results: Iterable[SweepResult],
+    *,
+    n: int,
+    metric: str,
+) -> list[SweepResult]:
     unique: dict[tuple[str, str, str, str, str], SweepResult] = {}
     for result in completed(results):
+        value = selection_value(result, metric)
+        if value is None:
+            continue
         key = result.config.key
         previous = unique.get(key)
-        if previous is None or float(result.full_mse) < float(previous.full_mse):
+        previous_value = selection_value(previous, metric) if previous is not None else None
+        if previous is None or previous_value is None or value < previous_value:
             unique[key] = result
-    return sorted(unique.values(), key=lambda item: float(item.full_mse))[:n]
+    return sorted(
+        unique.values(),
+        key=lambda item: float(selection_value(item, metric) or float("inf")),
+    )[:n]
 
 
 def best_binned_by_common128(results: Iterable[SweepResult]) -> SweepResult | None:
@@ -616,6 +724,7 @@ def make_head_configs(best: SweepResult) -> list[SweepConfig]:
             early_stopping_min_steps=0,
             early_stopping_patience=None,
             rank_label="",
+            run_id_override="",
         )
         for arch in [
             "conv1x1",
@@ -642,6 +751,7 @@ def make_binned_configs(best: SweepResult) -> list[SweepConfig]:
             early_stopping_min_steps=0,
             early_stopping_patience=None,
             rank_label="",
+            run_id_override="",
         )
         for arch in ["conv1x1", "mlp1x1", "conv3"]
     ]
@@ -662,6 +772,7 @@ def make_promotion_configs(
                 early_stopping_min_steps=4000,
                 early_stopping_patience=8,
                 rank_label=f"p{index}",
+                run_id_override="",
             )
         )
     if binned_best is not None:
@@ -674,6 +785,7 @@ def make_promotion_configs(
                 early_stopping_min_steps=4000,
                 early_stopping_patience=8,
                 rank_label="binp1",
+                run_id_override="",
             )
         )
     return configs
@@ -690,6 +802,7 @@ def make_10000_configs(promoted: list[SweepResult]) -> list[SweepConfig]:
                     max_steps=10000,
                     early_stopping_min_steps=4000,
                     early_stopping_patience=8,
+                    run_id_override="",
                 )
             )
     return configs
@@ -703,6 +816,7 @@ def make_final_seed_configs(winner: SweepResult) -> list[SweepConfig]:
             stage="finalseed",
             seed=seed,
             rank_label="winner",
+            run_id_override="",
         )
         for seed in [20260515, 20260522, 20260523]
     ]
@@ -736,17 +850,39 @@ def main() -> None:
     print(f"root\t{ROOT}", flush=True)
     print(f"git_commit\t{git_head()}", flush=True)
     print(f"gpus\t{','.join(gpus)}", flush=True)
+    print(f"phase\t{args.phase}", flush=True)
+    print(f"selection_metric\t{args.selection_metric}", flush=True)
     print(f"summary\t{summary_path}", flush=True)
 
-    hyper_results = run_stage(
-        "hyperparameter_screen_1000",
-        make_hyper_configs(),
-        gpus=gpus,
-        date_tag=args.date_tag,
-        summary_path=summary_path,
-        all_results=all_results,
-    )
-    hyper_best = best_by_full_mse(hyper_results, n=1)
+    existing_results = parse_summary(summary_path)
+    all_results.extend(existing_results)
+
+    if args.phase in {"phase1", "all"}:
+        hyper_results = run_stage(
+            "phase1_hyperparameter_screen_1000",
+            make_hyper_configs(),
+            gpus=gpus,
+            date_tag=args.date_tag,
+            summary_path=summary_path,
+            all_results=all_results,
+        )
+        seed_results = run_stage(
+            "phase1_baseline_seed_stability_5000",
+            make_seed_stability_configs(),
+            gpus=gpus,
+            date_tag=args.date_tag,
+            summary_path=summary_path,
+            all_results=all_results,
+        )
+    else:
+        hyper_results = [
+            result for result in existing_results if result.config.stage == "hp1000"
+        ]
+        seed_results = [
+            result for result in existing_results if result.config.stage == "seed5000"
+        ]
+
+    hyper_best = best_by_metric(hyper_results, n=1, metric=args.selection_metric)
     if not hyper_best:
         raise RuntimeError("No completed hyperparameter run is available")
     best_hyper = hyper_best[0]
@@ -756,72 +892,83 @@ def main() -> None:
         flush=True,
     )
 
-    seed_results = run_stage(
-        "baseline_seed_stability_5000",
-        make_seed_stability_configs(),
-        gpus=gpus,
-        date_tag=args.date_tag,
-        summary_path=summary_path,
-        all_results=all_results,
-    )
+    if args.phase in {"phase2", "all"}:
+        head_results = run_stage(
+            "phase2_head_screen_1000",
+            make_head_configs(best_hyper),
+            gpus=gpus,
+            date_tag=args.date_tag,
+            summary_path=summary_path,
+            all_results=all_results,
+        )
+        binned_results = run_stage(
+            "phase2_binned_target_screen_1000",
+            make_binned_configs(best_hyper),
+            gpus=gpus,
+            date_tag=args.date_tag,
+            summary_path=summary_path,
+            all_results=all_results,
+        )
+    else:
+        head_results = [
+            result for result in existing_results if result.config.stage == "head1000"
+        ]
+        binned_results = [
+            result for result in existing_results if result.config.stage == "bin1000"
+        ]
 
-    head_results = run_stage(
-        "head_screen_1000",
-        make_head_configs(best_hyper),
-        gpus=gpus,
-        date_tag=args.date_tag,
-        summary_path=summary_path,
-        all_results=all_results,
+    full_best = best_by_metric(
+        [*hyper_results, *head_results],
+        n=3,
+        metric=args.selection_metric,
     )
-
-    binned_results = run_stage(
-        "binned_target_screen_1000",
-        make_binned_configs(best_hyper),
-        gpus=gpus,
-        date_tag=args.date_tag,
-        summary_path=summary_path,
-        all_results=all_results,
-    )
-
-    full_best = best_by_full_mse([*hyper_results, *head_results], n=3)
     binned_best = best_binned_by_common128(binned_results)
     promotion_configs = make_promotion_configs(full_best, binned_best)
-    promotion_results = run_stage(
-        "promotion_5000",
-        promotion_configs,
-        gpus=gpus,
-        date_tag=args.date_tag,
-        summary_path=summary_path,
-        all_results=all_results,
-    )
+    if args.phase in {"phase3", "all"}:
+        promotion_results = run_stage(
+            "phase3_promotion_5000",
+            promotion_configs,
+            gpus=gpus,
+            date_tag=args.date_tag,
+            summary_path=summary_path,
+            all_results=all_results,
+        )
+    else:
+        promotion_results = [
+            result for result in existing_results if result.config.stage == "promote5000"
+        ]
 
     extend_configs = make_10000_configs(promotion_results)
     extend_results: list[SweepResult] = []
-    if extend_configs:
+    if extend_configs and args.phase in {"phase3", "all"}:
         extend_results = run_stage(
-            "extend_10000",
+            "phase3_extend_10000",
             extend_configs,
             gpus=gpus,
             date_tag=args.date_tag,
             summary_path=summary_path,
             all_results=all_results,
         )
+    elif args.phase not in {"phase3", "all"}:
+        extend_results = [
+            result for result in existing_results if result.config.stage == "extend10000"
+        ]
 
     winner_pool = completed([*promotion_results, *extend_results])
     if not winner_pool:
         winner_pool = completed([*hyper_results, *head_results, *seed_results])
     if not winner_pool:
         raise RuntimeError("No completed run is available for winner selection")
-    winner = min(winner_pool, key=lambda item: float(item.full_mse))
+    winner = best_by_metric(winner_pool, n=1, metric=args.selection_metric)[0]
     print(
         f"[{now()}] winner_candidate\t{winner.config.run_id}\t"
         f"full_mse={winner.full_mse}\tpearson={winner.full_pearson}",
         flush=True,
     )
 
-    if not args.skip_final_seeds:
+    if args.phase in {"phase4", "all"} and not args.skip_final_seeds:
         final_seed_results = run_stage(
-            "final_seed_confirmation",
+            "phase4_final_seed_confirmation",
             make_final_seed_configs(winner),
             gpus=gpus,
             date_tag=args.date_tag,
@@ -830,14 +977,15 @@ def main() -> None:
         )
         completed_final = completed(final_seed_results)
         if completed_final:
-            winner = min(completed_final, key=lambda item: float(item.full_mse))
+            winner = best_by_metric(completed_final, n=1, metric=args.selection_metric)[0]
             print(
                 f"[{now()}] final_winner\t{winner.config.run_id}\t"
                 f"full_mse={winner.full_mse}\tpearson={winner.full_pearson}",
                 flush=True,
             )
 
-    run_diagnostic(winner, gpu=gpus[0], date_tag=args.date_tag)
+    if args.phase in {"phase4", "all"}:
+        run_diagnostic(winner, gpu=gpus[0], date_tag=args.date_tag)
     print(f"[{now()}] sweep_done", flush=True)
 
 

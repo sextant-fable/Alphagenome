@@ -23,11 +23,14 @@ LinearHeadArchitecture = Literal[
     "conv1x1",
     "mlp1x1",
     "conv3",
+    "conv3x2",
     "conv5",
+    "conv7",
+    "dilated-conv3",
     "residual-conv1x1",
     "residual-conv3",
 ]
-LinearLossType = Literal["mse", "smooth-l1"]
+LinearLossType = Literal["mse", "smooth-l1", "hybrid", "hybrid-mse-smooth-l1"]
 LinearTargetSpace = Literal["full-log1p", "binned128-log1p-mean"]
 
 
@@ -100,6 +103,7 @@ class ResidualTrackMeanHead(torch.nn.Module):
         *,
         n_tracks: int,
         track_means: torch.Tensor | Sequence[float] | None,
+        residual_scale_init: float = 1.0,
     ) -> None:
         super().__init__()
         self.base_head = base_head
@@ -107,7 +111,9 @@ class ResidualTrackMeanHead(torch.nn.Module):
             "track_means",
             normalize_linear_track_means(track_means, n_tracks=n_tracks),
         )
-        self.residual_scale = torch.nn.Parameter(torch.ones(1, n_tracks, 1))
+        self.residual_scale = torch.nn.Parameter(
+            torch.full((1, n_tracks, 1), float(residual_scale_init))
+        )
 
     def forward(self, embeddings: torch.Tensor) -> torch.Tensor:
         residual = self.base_head(embeddings)
@@ -123,9 +129,13 @@ def build_linear_head(
     architecture: LinearHeadArchitecture,
     hidden_channels: int,
     track_means: torch.Tensor | Sequence[float] | None = None,
+    residual_scale_init: float = 1.0,
+    dilation: int = 2,
 ) -> torch.nn.Module:
     if hidden_channels < 1:
         raise ValueError("linear hidden channels must be >= 1")
+    if dilation < 1:
+        raise ValueError("linear dilation must be >= 1")
 
     base_architecture = linear_architecture_base(architecture)
     if base_architecture == "conv1x1":
@@ -140,7 +150,7 @@ def build_linear_head(
             torch.nn.GELU(),
             torch.nn.Conv1d(hidden_channels, n_tracks, kernel_size=1),
         )
-    elif base_architecture in {"conv3", "conv5"}:
+    elif base_architecture in {"conv3", "conv5", "conv7"}:
         kernel_size = int(base_architecture.removeprefix("conv"))
         base_head = torch.nn.Sequential(
             torch.nn.Conv1d(in_channels, hidden_channels, kernel_size=1),
@@ -154,6 +164,40 @@ def build_linear_head(
             torch.nn.GELU(),
             torch.nn.Conv1d(hidden_channels, n_tracks, kernel_size=1),
         )
+    elif base_architecture == "conv3x2":
+        base_head = torch.nn.Sequential(
+            torch.nn.Conv1d(in_channels, hidden_channels, kernel_size=1),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(
+                hidden_channels,
+                hidden_channels,
+                kernel_size=3,
+                padding=1,
+            ),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(
+                hidden_channels,
+                hidden_channels,
+                kernel_size=3,
+                padding=1,
+            ),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(hidden_channels, n_tracks, kernel_size=1),
+        )
+    elif base_architecture == "dilated-conv3":
+        base_head = torch.nn.Sequential(
+            torch.nn.Conv1d(in_channels, hidden_channels, kernel_size=1),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(
+                hidden_channels,
+                hidden_channels,
+                kernel_size=3,
+                padding=dilation,
+                dilation=dilation,
+            ),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(hidden_channels, n_tracks, kernel_size=1),
+        )
     else:
         raise ValueError(f"Unsupported linear head architecture: {architecture}")
 
@@ -162,6 +206,7 @@ def build_linear_head(
             base_head,
             n_tracks=n_tracks,
             track_means=track_means,
+            residual_scale_init=residual_scale_init,
         )
     return base_head
 
@@ -315,6 +360,7 @@ def masked_linear_loss(
     *,
     linear_loss_type: LinearLossType = "mse",
     smooth_l1_beta: float = 1.0,
+    hybrid_loss_alpha: float = 0.5,
 ) -> torch.Tensor:
     if linear_loss_type == "mse":
         return masked_mse_loss(prediction, target, mask)
@@ -325,6 +371,17 @@ def masked_linear_loss(
             mask,
             beta=smooth_l1_beta,
         )
+    if linear_loss_type in {"hybrid", "hybrid-mse-smooth-l1"}:
+        if not 0.0 <= hybrid_loss_alpha <= 1.0:
+            raise ValueError("hybrid loss alpha must be between 0 and 1")
+        mse_loss = masked_mse_loss(prediction, target, mask)
+        smooth_l1_loss = masked_smooth_l1_loss(
+            prediction,
+            target,
+            mask,
+            beta=smooth_l1_beta,
+        )
+        return hybrid_loss_alpha * mse_loss + (1.0 - hybrid_loss_alpha) * smooth_l1_loss
     raise ValueError(f"Unsupported linear loss type: {linear_loss_type}")
 
 
@@ -377,6 +434,8 @@ class RnaSeq11Adapter(torch.nn.Module):
         linear_head_architecture: LinearHeadArchitecture = "conv1x1",
         linear_hidden_channels: int = 256,
         linear_track_means: torch.Tensor | Sequence[float] | None = None,
+        linear_residual_scale_init: float = 1.0,
+        linear_dilation: int = 2,
         track_means: torch.Tensor | Sequence[float] | None = None,
         num_head_organisms: int | None = None,
     ) -> None:
@@ -413,6 +472,8 @@ class RnaSeq11Adapter(torch.nn.Module):
                 architecture=linear_head_architecture,
                 hidden_channels=linear_hidden_channels,
                 track_means=linear_track_means,
+                residual_scale_init=linear_residual_scale_init,
+                dilation=linear_dilation,
             )
         else:
             num_organisms = (
@@ -628,6 +689,7 @@ def masked_adapter_loss(
     poisson_weight: float = 1.0,
     linear_loss_type: LinearLossType = "mse",
     smooth_l1_beta: float = 1.0,
+    hybrid_loss_alpha: float = 0.5,
 ) -> torch.Tensor:
     """Compute legacy MSE or AlphaGenome-style RNA-seq count/position loss."""
 
@@ -677,6 +739,7 @@ def masked_adapter_loss(
         mask,
         linear_loss_type=linear_loss_type,
         smooth_l1_beta=smooth_l1_beta,
+        hybrid_loss_alpha=hybrid_loss_alpha,
     )
 
 
@@ -712,6 +775,7 @@ def evaluate_masked_mse(
     linear_loss_type: LinearLossType = "mse",
     linear_target_space: LinearTargetSpace = "full-log1p",
     smooth_l1_beta: float = 1.0,
+    hybrid_loss_alpha: float = 0.5,
 ) -> tuple[float, int, int]:
     model.eval()
     weighted_loss_sum = 0.0
@@ -745,6 +809,7 @@ def evaluate_masked_mse(
                 poisson_weight=poisson_weight,
                 linear_loss_type=linear_loss_type,
                 smooth_l1_beta=smooth_l1_beta,
+                hybrid_loss_alpha=hybrid_loss_alpha,
             )
             batch_size = int(dna_sequence.shape[0])
             weighted_loss_sum += float(loss.detach().cpu()) * batch_size

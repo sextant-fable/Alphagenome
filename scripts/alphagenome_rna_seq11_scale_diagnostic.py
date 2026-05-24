@@ -129,6 +129,10 @@ def main() -> None:
     checkpoint_target_transform = str(checkpoint.get("target_transform", "log1p"))
     linear_head_architecture = str(checkpoint.get("linear_head_architecture", "conv1x1"))
     linear_hidden_channels = int(checkpoint.get("linear_hidden_channels", 256))
+    linear_residual_scale_init = float(
+        checkpoint.get("linear_residual_scale_init", 1.0)
+    )
+    linear_dilation = int(checkpoint.get("linear_dilation", 2))
     linear_target_space = str(checkpoint.get("linear_target_space", "full-log1p"))
 
     dataloader = make_dataloader(
@@ -153,6 +157,8 @@ def main() -> None:
     print(f"checkpoint_target_transform\t{checkpoint_target_transform}")
     print(f"linear_head_architecture\t{linear_head_architecture}")
     print(f"linear_hidden_channels\t{linear_hidden_channels}")
+    print(f"linear_residual_scale_init\t{linear_residual_scale_init}")
+    print(f"linear_dilation\t{linear_dilation}")
     print(f"linear_target_space\t{linear_target_space}")
     print(f"head_type\t{head_type}")
     print(f"head_resolutions\t{','.join(map(str, head_resolutions))}")
@@ -175,6 +181,8 @@ def main() -> None:
         linear_head_architecture=linear_head_architecture,
         linear_hidden_channels=linear_hidden_channels,
         linear_track_means=checkpoint_head_state.get("track_means"),
+        linear_residual_scale_init=linear_residual_scale_init,
+        linear_dilation=linear_dilation,
         track_means=track_means,
     ).to(device)
     model.head.load_state_dict(checkpoint_head_state)

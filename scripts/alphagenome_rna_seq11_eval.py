@@ -115,7 +115,10 @@ def parse_args() -> argparse.Namespace:
             "conv1x1",
             "mlp1x1",
             "conv3",
+            "conv3x2",
             "conv5",
+            "conv7",
+            "dilated-conv3",
             "residual-conv1x1",
             "residual-conv3",
         ],
@@ -129,6 +132,18 @@ def parse_args() -> argparse.Namespace:
         help="Override checkpoint linear hidden channels.",
     )
     parser.add_argument(
+        "--residual-scale-init",
+        type=float,
+        default=None,
+        help="Override residual scale init before checkpoint load.",
+    )
+    parser.add_argument(
+        "--linear-dilation",
+        type=int,
+        default=None,
+        help="Override checkpoint linear dilation for dilated-conv3.",
+    )
+    parser.add_argument(
         "--linear-target-space",
         choices=["full-log1p", "binned128-log1p-mean"],
         default=None,
@@ -136,11 +151,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--linear-loss-type",
-        choices=["mse", "smooth-l1"],
+        choices=["mse", "smooth-l1", "hybrid", "hybrid-mse-smooth-l1"],
         default=None,
         help="Override checkpoint linear loss type for scalar valid_loss.",
     )
     parser.add_argument("--smooth-l1-beta", type=float, default=None)
+    parser.add_argument("--hybrid-loss-alpha", type=float, default=None)
     parser.add_argument(
         "--organism-index",
         type=int,
@@ -596,6 +612,16 @@ def main() -> None:
         if args.linear_hidden_channels is not None
         else int(checkpoint.get("linear_hidden_channels", 256))
     )
+    residual_scale_init = (
+        args.residual_scale_init
+        if args.residual_scale_init is not None
+        else float(checkpoint.get("linear_residual_scale_init", 1.0))
+    )
+    linear_dilation = (
+        args.linear_dilation
+        if args.linear_dilation is not None
+        else int(checkpoint.get("linear_dilation", 2))
+    )
     linear_target_space = (
         args.linear_target_space
         if args.linear_target_space is not None
@@ -610,6 +636,11 @@ def main() -> None:
         args.smooth_l1_beta
         if args.smooth_l1_beta is not None
         else float(checkpoint.get("smooth_l1_beta", 1.0))
+    )
+    hybrid_loss_alpha = (
+        args.hybrid_loss_alpha
+        if args.hybrid_loss_alpha is not None
+        else float(checkpoint.get("hybrid_loss_alpha", 0.5))
     )
     organism_index = (
         args.organism_index
@@ -659,6 +690,10 @@ def main() -> None:
         )
     if loss_type in {"poisson-multinomial", "hybrid-mse-poisson"} and head_type != "genome-tracks":
         raise ValueError(f"{loss_type} evaluation requires genome-tracks")
+    if linear_dilation < 1:
+        raise ValueError("--linear-dilation must be >= 1")
+    if not 0.0 <= hybrid_loss_alpha <= 1.0:
+        raise ValueError("--hybrid-loss-alpha must be between 0 and 1")
     if args.diagnostic_output is not None and args.common_128bp_metrics is not None:
         raise ValueError("--diagnostic-output cannot be combined with --common-128bp-metrics")
 
@@ -697,9 +732,12 @@ def main() -> None:
     print(f"head_resolutions\t{','.join(map(str, head_resolutions))}")
     print(f"linear_head_architecture\t{linear_head_architecture}")
     print(f"linear_hidden_channels\t{linear_hidden_channels}")
+    print(f"residual_scale_init\t{residual_scale_init}")
+    print(f"linear_dilation\t{linear_dilation}")
     print(f"linear_target_space\t{linear_target_space}")
     print(f"linear_loss_type\t{linear_loss_type}")
     print(f"smooth_l1_beta\t{smooth_l1_beta}")
+    print(f"hybrid_loss_alpha\t{hybrid_loss_alpha}")
     print(f"loss_space\t{checkpoint.get('loss_space', 'target_transform')}")
     print(f"loss_type\t{loss_type}")
     print(f"multinomial_num_segments\t{multinomial_num_segments}")
@@ -728,6 +766,8 @@ def main() -> None:
         linear_head_architecture=linear_head_architecture,
         linear_hidden_channels=linear_hidden_channels,
         linear_track_means=checkpoint_head_state.get("track_means"),
+        linear_residual_scale_init=residual_scale_init,
+        linear_dilation=linear_dilation,
         track_means=track_means,
     ).to(device)
     model.head.load_state_dict(checkpoint_head_state)
@@ -783,6 +823,7 @@ def main() -> None:
             linear_loss_type=linear_loss_type,
             linear_target_space=linear_target_space,
             smooth_l1_beta=smooth_l1_beta,
+            hybrid_loss_alpha=hybrid_loss_alpha,
         )
     print(f"valid_batches\t{batches}")
     print(f"valid_examples\t{examples}")
