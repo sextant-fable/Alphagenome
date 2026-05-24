@@ -34,6 +34,35 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-25 - Full-MSE Selection Phase 1 Winner Stability
+
+- Run type: training
+- Purpose: Run the 9-job Phase 1 winner-stability screen on train/valid only, selecting best checkpoints by validation full MSE for `residual-conv3`, `conv3`, and `conv5` heads across seeds `20260515`, `20260522`, and `20260523`.
+- Git commit: `58c46c6bc81f5ec98848c54c82a8e49891b8b784`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`
+- Command:
+
+```bash
+conda run -n alphagenome python -u \
+  scripts/rna_seq11_run_adaptation_phase_sweep.py \
+  --date-tag 20260524 \
+  --phase phase1 \
+  --gpus 0,1,2,3 \
+  --selection-metric full-mse
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`
+- Output path: Summary TSV `runs/rna_seq11_adaptation_phase_sweep_20260524/sweep_results.tsv`; logs under `logs/rna_seq11_adaptation_phase_sweep_20260524/`; checkpoints under ignored `runs/rna_seq11_phase1_*`
+- Result summary: Completed 9/9 validation-only runs. Best single run was `conv5` seed `20260522`, best step `4500`, valid full MSE `0.88662339`, MAE `0.57668143`, Pearson `0.67223756`, common128 MSE `0.87388091`. Head-level mean full MSE was `conv5` `0.89759223`, `conv3` `0.90369701`, and `residual-conv3` `0.91272342`. Head-level mean Pearson was `conv5` `0.66943618`, `conv3` `0.66358423`, and `residual-conv3` `0.66031831`.
+- Verification: Driver reported `stage_end` and `sweep_done` at `2026-05-25T02:38:59`; all runs have status `completed`, return code `0`, and `selection_metric=full-mse`. Held-out test split was not used.
+- Failures or warnings: Metrics are validation-only model-selection results, not held-out test results. Generated logs, checkpoints, and run outputs remain ignored and must not be committed. The branch still could not be pushed from this environment because HTTPS Git credentials are unavailable.
+- Next actions: Use `conv5` as the Phase 2 primary head family and include `conv3` as a close stability comparator; deprioritize default `residual-conv3` unless residual-scale variants recover it.
+- Claim status: verified validation-only
+
 ## 2026-05-24 - Full-MSE Selection Phase 0 Smoke and Phase 1 Launch
 
 - Run type: smoke test and training
