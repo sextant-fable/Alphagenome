@@ -34,6 +34,65 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-24 - Full-MSE Selection Phase 0 Smoke and Phase 1 Launch
+
+- Run type: smoke test and training
+- Purpose: Validate Phase 0 code changes for full-MSE checkpoint selection, richer linear heads, SmoothL1/hybrid loss controls, residual scale init, dilated heads, and staged validation-only launcher; then launch Phase 1 winner-stability training without reading the held-out test split.
+- Git commit: `828e2290a9450aecb33e5b338e9c17e1a24c5a21`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; PyTorch CUDA `12.8`; driver CUDA `13.2`; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`
+- Command:
+
+```bash
+conda run -n alphagenome python -m py_compile scripts/*.py
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome python -u \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_phase0_smoke_20260524_residualconv3_fullmse \
+  --head-type linear \
+  --embedding-resolution 128 \
+  --linear-head-architecture residual-conv3 \
+  --linear-hidden-channels 256 \
+  --residual-scale-init 0.1 \
+  --linear-loss-type smooth-l1 \
+  --smooth-l1-beta 1.0 \
+  --linear-target-space full-log1p \
+  --target-transform log1p \
+  --selection-metric full-mse \
+  --batch-size 1 \
+  --grad-accum-steps 1 \
+  --num-workers 0 \
+  --max-train-examples 1 \
+  --max-valid-examples 1 \
+  --max-steps 1 \
+  --eval-every 1 \
+  --learning-rate 1e-3 \
+  --weight-decay 0 \
+  --seed 20260524 \
+  --device auto
+
+conda run -n alphagenome python -u \
+  scripts/rna_seq11_run_adaptation_phase_sweep.py \
+  --date-tag 20260524 \
+  --phase phase1 \
+  --gpus 0,1,2,3 \
+  --selection-metric full-mse
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`
+- Output path: Phase 0 smoke output `runs/rna_seq11_phase0_smoke_20260524_residualconv3_fullmse`; Phase 1 summary `runs/rna_seq11_adaptation_phase_sweep_20260524/sweep_results.tsv`; Phase 1 logs `logs/rna_seq11_adaptation_phase_sweep_20260524/`
+- Result summary: Phase 0 smoke completed successfully. Phase 1 launch pending in this entry.
+- Verification: Pre-launch checks confirmed host `HY-GPU`, repository path `/home/zelinli6/Alphagenome`, conda environment `alphagenome`, PyTorch CUDA availability, and idle GPUs 0-3. Smoke output included `valid_loss`, `valid_full_mse`, `valid_full_mae`, `valid_pearson`, `valid_common128_mse`, `valid_common128_mae`, `selection_metric=full-mse`, and saved `adapter_head_best.pt`.
+- Failures or warnings: Smoke metrics are environment validation only, not model results. Generated logs, checkpoints, and run outputs remain ignored and must not be committed.
+- Next actions: Launch and monitor Phase 1; summarize validation-only metrics by head and seed before Phase 2.
+- Claim status: verified for Phase 0 smoke; unverified for Phase 1 pending training
+
 ## 2026-05-22 - 128 bp Log1p-MSE Staged Sweep Launch
 
 - Run type: training and evaluation
