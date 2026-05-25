@@ -532,6 +532,29 @@ def best_results(results: Iterable[RunResult], *, n: int, metric: str) -> list[R
     return sorted(candidates, key=value)[:n]
 
 
+def head_signature(config: RunConfig) -> tuple[str, int, float, int]:
+    return (
+        config.arch,
+        config.hidden_channels,
+        config.residual_scale_init,
+        config.linear_dilation,
+    )
+
+
+def best_distinct_head_results(results: Iterable[RunResult], *, n: int, metric: str) -> list[RunResult]:
+    selected: list[RunResult] = []
+    seen: set[tuple[str, int, float, int]] = set()
+    for result in best_results(results, n=10_000, metric=metric):
+        signature = head_signature(result.config)
+        if signature in seen:
+            continue
+        seen.add(signature)
+        selected.append(result)
+        if len(selected) >= n:
+            break
+    return selected
+
+
 def phase1_configs(selection_metric: str) -> list[RunConfig]:
     return [
         RunConfig(
@@ -610,7 +633,7 @@ def promote_configs(results: list[RunResult], *, selection_metric: str, n: int) 
 
 def phase3_configs(top_results: list[RunResult], *, selection_metric: str) -> list[RunConfig]:
     configs: list[RunConfig] = []
-    top = best_results(top_results, n=2, metric=selection_metric)
+    top = best_distinct_head_results(top_results, n=2, metric=selection_metric)
     for rank, result in enumerate(top, start=1):
         base = result.config
         configs.extend(
@@ -707,7 +730,7 @@ def main() -> None:
             dry_run=args.dry_run,
         )
     if args.phase in {"phase3", "all"}:
-        source = phase2_promote_results or phase2_screen_results or phase1_results
+        source = (phase1_results + phase2_promote_results) or phase2_screen_results
         phase3_results = run_stage(
             phase3_configs(source, selection_metric=args.selection_metric),
             gpus=gpus,
