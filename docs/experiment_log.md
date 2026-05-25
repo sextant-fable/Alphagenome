@@ -34,6 +34,192 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-26 - 1bp-B Residual Correction Gate and Extension
+
+- Run type: training and evaluation
+- Purpose: Test whether 1 bp AlphaGenome embeddings add validation-only signal beyond the current 128 bp winner by freezing the 128 bp `conv5` hybrid step-4000 checkpoint as a base prediction and training only a small 1 bp residual correction head. The held-out test split was not used.
+- Git commit: `fae06bf`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`; four independent single-GPU runs were launched in parallel, not DDP.
+- Command:
+
+```bash
+# Initial 1000-step residual gate; repeated across GPUs/configs.
+CUDA_VISIBLE_DEVICES=<gpu> PYTHONUNBUFFERED=1 \
+  /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_1bpB_residual_20260526_<CONFIG> \
+  --head-type linear \
+  --embedding-resolution 1 \
+  --linear-input-bottleneck-channels <64_or_128> \
+  --linear-head-architecture <conv3_or_conv5> \
+  --linear-hidden-channels <64_or_128> \
+  --linear-target-space full-log1p \
+  --target-transform log1p \
+  --linear-loss-type hybrid \
+  --hybrid-loss-alpha 0.5 \
+  --smooth-l1-beta 1.0 \
+  --residual-base-checkpoint runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt \
+  --residual-correction-scale-init <0.01_or_0.1> \
+  --selection-metric full-mse \
+  --batch-size 1 \
+  --grad-accum-steps 1 \
+  --num-workers 0 \
+  --max-steps 1000 \
+  --eval-every 250 \
+  --learning-rate 1e-3 \
+  --seed 20260526 \
+  --device auto
+
+# Warm-start extension; repeated for top configs/losses.
+CUDA_VISIBLE_DEVICES=<gpu> PYTHONUNBUFFERED=1 \
+  /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --init-adapter-checkpoint <1bpB_best_checkpoint> \
+  --learning-rate <3e-4_or_1e-4> \
+  --linear-loss-type <hybrid_or_mse> \
+  ...same dataset/base/residual arguments...
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`; frozen 128 bp base checkpoint `runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt`.
+- Output path: ignored run directories under `runs/rna_seq11_1bpB_residual_20260526_*` and `runs/rna_seq11_1bpB_residual_extend_20260526_*`; logs under `logs/rna_seq11_1bpB_residual_20260526/` and `logs/rna_seq11_1bpB_residual_extend_20260526/`; diagnostics under `runs/rna_seq11_1bpB_best_diagnostics_20260526/`.
+- Result summary: The 1 bp residual correction gate produced a clear validation-only improvement. The best initial 1000-step run was `conv5`, bottleneck/hidden `64`, residual scale init `0.01`, hybrid loss, best step `1000`, valid full MSE `0.84735946`, MAE `0.59909206`, Pearson `0.68895678`, common128 MSE `0.84613023`. Warm-start extension improved further: `conv5`, bottleneck/hidden `128`, residual scale init `0.01`, hybrid loss, lr `3e-4`, initialized from its initial 1000-step checkpoint, reached best step `1000` of the extension with valid full MSE `0.84327834`, MAE `0.59956417`, Pearson `0.69191858`, common128 MSE `0.84077399`. This is the current validation full-MSE leader. The best common128-only result among extension runs was `0.84009590` from `conv5` bottleneck/hidden `64`, hybrid lr `3e-4`, extension step `1000`, but its best full-MSE checkpoint was `0.84387702`.
+- Verification: All reported training rows used train/valid only and `selection_metric=full-mse` for 1bp-B. Smoke tests before the gate verified `prediction_shape=1x11x1048576` for residual correction, frozen base with `base_has_grad=False`, and checkpoint reload for residual models. Final diagnostics for the selected 1bp-B leader reproduced valid full MSE `0.84327834`, MAE `0.59956417`, Pearson `0.69191858`, and common128 MSE `0.84077399`.
+- Failures or warnings: These are validation-only model-selection results, not held-out test results. The selected 1bp-B leader improves full MSE and Pearson but has higher MAE than the previous 128 bp full-MSE leader (`0.59956417` vs `0.58482900`) because zero/low-signal strata worsened while medium/high-signal strata improved strongly. Generated checkpoints, logs, diagnostics, and run outputs remain ignored and must not be committed.
+- Next actions: Treat the 1bp-B residual checkpoint as the new validation-selected candidate, but do not evaluate the held-out test split until model-selection criteria are frozen. If continuing train/valid exploration, compare the full-MSE leader against the common128 leader and inspect high-signal/zero-signal error tradeoffs before any fusion work.
+- Claim status: verified
+
+## 2026-05-26 - 1bp-A Pooled-to-128bp Gate
+
+- Run type: training and evaluation
+- Purpose: Test whether `embeddings_1bp`, bottlenecked and pooled to 128 bp bins, can match or beat direct 128 bp embeddings on the same `binned128-log1p-mean` RNA-seq target. This was a validation-only gate before considering larger 1 bp training.
+- Git commit: `fae06bf`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`; four independent single-GPU runs were launched in parallel.
+- Command:
+
+```bash
+CUDA_VISIBLE_DEVICES=<gpu> PYTHONUNBUFFERED=1 \
+  /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_1bpA_gate_20260526_<CONFIG> \
+  --head-type linear \
+  --embedding-resolution 1 \
+  --linear-input-bottleneck-channels <64_or_128> \
+  --linear-head-architecture <conv3_or_conv5> \
+  --linear-hidden-channels <64_or_128> \
+  --linear-target-space binned128-log1p-mean \
+  --target-transform log1p \
+  --linear-loss-type hybrid \
+  --hybrid-loss-alpha 0.5 \
+  --smooth-l1-beta 1.0 \
+  --selection-metric common128-mse \
+  --batch-size 1 \
+  --grad-accum-steps 1 \
+  --num-workers 0 \
+  --max-steps 1000 \
+  --eval-every 250 \
+  --learning-rate 1e-3 \
+  --seed 20260526 \
+  --device auto
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`.
+- Output path: ignored run directories under `runs/rna_seq11_1bpA_gate_20260526_*`; logs under `logs/rna_seq11_1bp_gate_20260526/`.
+- Result summary: The 1bp-A gate did not pass. Best common128 MSE was `0.99800044` from `conv5`, bottleneck/hidden `64`, hybrid loss, best step `1000`; other best common128 MSEs were `1.00116930` (`conv5` bottleneck/hidden `128`), `1.01619440` (`conv3` bottleneck/hidden `64`), and `1.02019590` (`conv3` bottleneck/hidden `128`). These are far worse than the direct 128 bp common128 reference around `0.853-0.855`.
+- Verification: All runs completed with status code `0`, used `selection_metric=common128-mse`, and only read train/valid data. Prediction shape was `1x11x8192`, confirming pooling to 128 bp bins.
+- Failures or warnings: Metrics are validation-only and do not use test. Because 1bp-A did not approach the 128 bp common128 reference, it was not extended to 2000 steps.
+- Next actions: Do not promote 1bp-A as a standalone replacement for 128 bp embeddings. Use 1bp only as residual/correction signal unless future train/valid evidence changes this.
+- Claim status: verified
+
+## 2026-05-26 - Current 128bp Best Validation Diagnostics
+
+- Run type: evaluation and analysis
+- Purpose: Diagnose the current 128 bp full-MSE validation leader and the 128 bp common128 comparator before launching 1 bp experiments. The held-out test split was not used.
+- Git commit: `fae06bf`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`.
+- Command:
+
+```bash
+CUDA_VISIBLE_DEVICES=<gpu> PYTHONUNBUFFERED=1 \
+  /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_eval.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --checkpoint <128bp_checkpoint> \
+  --point-metrics \
+  --spearman-sample-size 200000 \
+  --spearman-seed 20260526 \
+  --metrics-output <point_metrics.tsv> \
+  --diagnostic-output <diagnostic.tsv> \
+  --device auto
+
+CUDA_VISIBLE_DEVICES=<gpu> PYTHONUNBUFFERED=1 \
+  /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_eval.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --checkpoint <128bp_checkpoint> \
+  --common-128bp-metrics log1p-mean \
+  --metrics-output <common128.tsv> \
+  --device auto
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`; checkpoints `runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt` and `runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_constant_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps/adapter_head_best.pt`.
+- Output path: diagnostics under `runs/rna_seq11_best_diagnostics_20260526/`; logs under `logs/rna_seq11_best_diagnostics_20260526/`.
+- Result summary: The 128 bp full-MSE leader reproduced valid full MSE `0.88032581`, MAE `0.58482900`, Pearson `0.67391665`, common128 MSE `0.86829218`. Its largest stratum error was high signal `log1p>3`, MSE `5.8507643`; worst tracks by MSE were `RNA_SEQ_005`, `RNA_SEQ_004`, and `RNA_SEQ_002`. The 128 bp constant-hybrid comparator had slightly worse full MSE `0.88462103` but better common128 MSE `0.85320788` and lower high-signal stratum MSE `5.2333010`, while worsening zero/low-signal strata.
+- Verification: Diagnostics wrote full point metrics, per-track metrics, per-window rows, strata rows, and common128 metrics for validation only.
+- Failures or warnings: Diagnostics are interpretive validation analyses, not held-out test results. They show a tradeoff: full-MSE selection favored lower zero/low-signal error, while common128/high-signal behavior favored the constant-hybrid comparator.
+- Next actions: Use these diagnostics as the baseline for evaluating 1 bp residual correction; do not use test until model selection is frozen.
+- Claim status: verified
+
+## 2026-05-26 - 1bp Residual Adapter Code Support
+
+- Run type: engineering smoke test and validation
+- Purpose: Add and verify code paths needed for 1bp-A bottleneck pooling and 1bp-B residual correction while preserving old checkpoint loading behavior.
+- Git commit: `fae06bf`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`.
+- Command:
+
+```bash
+/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m py_compile scripts/*.py
+/home/zelinli6/miniconda3/envs/alphagenome/bin/python scripts/alphagenome_rna_seq11_finetune.py --help
+/home/zelinli6/miniconda3/envs/alphagenome/bin/python scripts/alphagenome_rna_seq11_eval.py --help
+
+# Two one-step smoke tests used max one train example and one valid example:
+# 1bp-A bottleneck+pool, no checkpoint;
+# 1bp-B frozen 128bp base plus 1bp residual correction, no checkpoint.
+# A second pair saved tiny checkpoints and reloaded them with eval.py.
+```
+
+- Input data: First train/valid NPZ examples for smoke tests; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`; frozen 128 bp base checkpoint for 1bp-B smoke.
+- Output path: ignored smoke directories under `runs/rna_seq11_1bpA_bottleneck_*` and `runs/rna_seq11_1bpB_residual_*`; logs under `logs/rna_seq11_best_diagnostics_20260526/`.
+- Result summary: Added `--linear-input-bottleneck-channels`, `--residual-base-checkpoint`, and `--residual-correction-scale-init`; checkpoint save/reload now records optional bottleneck and frozen residual-base metadata. Smoke tests confirmed 1bp-A prediction shape `1x11x8192` and 1bp-B prediction shape `1x11x1048576`, with `base_has_grad=False`.
+- Verification: `python -m py_compile scripts/*.py` passed; `finetune.py --help` and `eval.py --help` exposed the new options; save/reload smoke tests completed successfully.
+- Failures or warnings: `git push` failed because HTTPS credentials are unavailable in this environment: `fatal: could not read Username for 'https://github.com': No such device or address`.
+- Next actions: Use the new code path for validation-only 1bp-A and 1bp-B pilots, keeping test split untouched.
+- Claim status: verified
+
 ## 2026-05-26 - 1bp-A Binned128 Conv3 Smoke
 
 - Run type: smoke test
