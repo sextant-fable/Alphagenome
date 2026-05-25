@@ -34,6 +34,54 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-26 - 1bp-A Binned128 Conv3 Smoke
+
+- Run type: smoke test
+- Purpose: Verify the prepared 1bp-A path on one train example and one validation example: `embeddings_1bp` with 1536 channels, average pooling to 128 bp bins before the linear conv head, `conv3` hidden `64`, and `binned128-log1p-mean` target. This was a pipeline sanity check only, not a model-comparison run.
+- Git commit: `0a760f8c3acdb3e0828cf1a01ea574409b49518e`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; `CUDA_VISIBLE_DEVICES=2`; user explicitly allowed GPUs `0,1,2,3`
+- Command:
+
+```bash
+CUDA_VISIBLE_DEVICES=2 PYTHONUNBUFFERED=1 /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_1bpA_binned128_conv3_h64_smoke_20260526_1step \
+  --head-type linear \
+  --embedding-resolution 1 \
+  --linear-head-architecture conv3 \
+  --linear-hidden-channels 64 \
+  --linear-target-space binned128-log1p-mean \
+  --target-transform log1p \
+  --linear-loss-type mse \
+  --selection-metric full-mse \
+  --batch-size 1 \
+  --grad-accum-steps 1 \
+  --num-workers 0 \
+  --max-train-examples 1 \
+  --max-valid-examples 1 \
+  --max-steps 1 \
+  --eval-every 1 \
+  --learning-rate 1e-4 \
+  --seed 20260526 \
+  --device auto \
+  --no-save-checkpoint
+```
+
+- Input data: First train example from `alphagenome_custom/datasets/rna_seq_npz_train` and first validation example from `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`. The held-out test split was not used.
+- Output path: `runs/rna_seq11_1bpA_binned128_conv3_h64_smoke_20260526_1step/` and log `logs/rna_seq11_1bpA_binned128_conv3_h64_smoke_20260526_1step.log`; no checkpoint was saved.
+- Result summary: Completed successfully. Observed `embedding_resolution=1`, `linear_target_space=binned128-log1p-mean`, `linear_head_architecture=conv3`, `linear_hidden_channels=64`, `trainable_parameters=111435`, `prediction_shape=1x11x8192`, `base_has_grad=False`, one-step train loss `3.09554`, and one-example validation full MSE `1.96545`.
+- Verification: This confirms the 1bp-A binned path can execute with real AlphaGenome 1 bp embeddings and produce 128 bp-bin predictions. It does not test whether 1bp-A can beat the 128 bp binned baseline.
+- Failures or warnings: Smoke metrics are environment and wiring validation only, not model results. Generated logs and run outputs remain ignored and must not be committed.
+- Next actions: If continuing 1bp-A, run a 1000-step train/valid screen on GPU only after deciding the exact hidden size and loss; do not touch the held-out test split.
+- Claim status: verified smoke-only
+
 ## 2026-05-26 - Full-MSE Selection Phase 4 LR Schedule Sweep
 
 - Run type: training
