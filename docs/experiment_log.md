@@ -34,6 +34,35 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-25 - Full-MSE Selection Phase 3 Loss Sweep and MSE Fine-Tune
+
+- Run type: training
+- Purpose: Run Phase 3 validation-only loss variants on the top distinct 5000-step heads (`conv5` and `conv3`) plus two low-LR MSE fine-tunes from the Phase 1 `conv5` winner checkpoint, selecting all checkpoints by validation full MSE and not reading the held-out test split.
+- Git commit: `8a661b11a79d33cc54fa1302768d564b6aef2f45`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; user explicitly allowed `CUDA_VISIBLE_DEVICES=0,1,2,3`
+- Command:
+
+```bash
+PYTHONUNBUFFERED=1 /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/rna_seq11_run_adaptation_phase_sweep.py \
+  --date-tag 20260524 \
+  --phase phase3 \
+  --gpus 0,1,2,3 \
+  --selection-metric full-mse
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`; MSE fine-tunes initialized from `runs/rna_seq11_phase1_winner_stability_5000_conv5_h256_fulllog1p_smoothl1_b1_lr0.001_seed20260522_5000steps/adapter_head_best.pt`
+- Output path: Summary TSV `runs/rna_seq11_adaptation_phase_sweep_20260524/sweep_results.tsv`; logs under `logs/rna_seq11_adaptation_phase_sweep_20260524/`; checkpoints under ignored `runs/rna_seq11_phase3_*`
+- Result summary: Completed 8/8 validation-only Phase 3 runs. New best validation run was `conv5` hybrid loss (`0.5*MSE + 0.5*SmoothL1`, beta `1.0`), best step `4500`, valid full MSE `0.88446225`, MAE `0.60360136`, Pearson `0.67363609`, common128 MSE `0.85788156`, checkpoint `runs/rna_seq11_phase3_loss_sweep_5000_conv5_h256_top1_hybrid_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps/adapter_head_best.pt`. This improves over the Phase 1 `conv5` validation leader full MSE `0.88662339` but remains validation-only.
+- Verification: Driver reported `stage_end` and `sweep_done` at `2026-05-25T18:56:43`; all Phase 3 rows have status `completed`, return code `0`, and `selection_metric=full-mse`. Held-out test split was not used.
+- Failures or warnings: Metrics are validation-only model-selection results, not held-out test results. Generated logs, checkpoints, and run outputs remain ignored and must not be committed. Low-LR MSE fine-tunes did not beat the hybrid-loss winner; best MSE fine-tune full MSE was `0.88974877` at lr `1e-4`.
+- Next actions: Run Phase 4 LR schedule comparison on the new `conv5` hybrid configuration: constant `1e-3`, cosine decay, step decay at `3000`, and step decay at `4000`.
+- Claim status: verified validation-only
+
 ## 2026-05-25 - Full-MSE Selection Phase 2 Promote
 
 - Run type: training
