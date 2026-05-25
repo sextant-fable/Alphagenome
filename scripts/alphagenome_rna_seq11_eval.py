@@ -132,6 +132,12 @@ def parse_args() -> argparse.Namespace:
         help="Override checkpoint linear hidden channels.",
     )
     parser.add_argument(
+        "--linear-input-bottleneck-channels",
+        type=int,
+        default=None,
+        help="Override checkpoint linear input bottleneck channels.",
+    )
+    parser.add_argument(
         "--residual-scale-init",
         type=float,
         default=None,
@@ -142,6 +148,17 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=None,
         help="Override checkpoint linear dilation for dilated-conv3.",
+    )
+    parser.add_argument(
+        "--residual-base-checkpoint",
+        default=None,
+        help="Override checkpoint frozen residual-base checkpoint path.",
+    )
+    parser.add_argument(
+        "--residual-correction-scale-init",
+        type=float,
+        default=None,
+        help="Override residual correction scale init before checkpoint load.",
     )
     parser.add_argument(
         "--linear-target-space",
@@ -612,6 +629,11 @@ def main() -> None:
         if args.linear_hidden_channels is not None
         else int(checkpoint.get("linear_hidden_channels", 256))
     )
+    linear_input_bottleneck_channels = (
+        args.linear_input_bottleneck_channels
+        if args.linear_input_bottleneck_channels is not None
+        else checkpoint.get("linear_input_bottleneck_channels")
+    )
     residual_scale_init = (
         args.residual_scale_init
         if args.residual_scale_init is not None
@@ -621,6 +643,16 @@ def main() -> None:
         args.linear_dilation
         if args.linear_dilation is not None
         else int(checkpoint.get("linear_dilation", 2))
+    )
+    residual_base_checkpoint_path = (
+        args.residual_base_checkpoint
+        if args.residual_base_checkpoint is not None
+        else checkpoint.get("residual_base_checkpoint")
+    )
+    residual_correction_scale_init = (
+        args.residual_correction_scale_init
+        if args.residual_correction_scale_init is not None
+        else float(checkpoint.get("residual_correction_scale_init", 0.01))
     )
     linear_target_space = (
         args.linear_target_space
@@ -732,8 +764,11 @@ def main() -> None:
     print(f"head_resolutions\t{','.join(map(str, head_resolutions))}")
     print(f"linear_head_architecture\t{linear_head_architecture}")
     print(f"linear_hidden_channels\t{linear_hidden_channels}")
+    print(f"linear_input_bottleneck_channels\t{linear_input_bottleneck_channels}")
     print(f"residual_scale_init\t{residual_scale_init}")
     print(f"linear_dilation\t{linear_dilation}")
+    print(f"residual_base_checkpoint\t{residual_base_checkpoint_path}")
+    print(f"residual_correction_scale_init\t{residual_correction_scale_init}")
     print(f"linear_target_space\t{linear_target_space}")
     print(f"linear_loss_type\t{linear_loss_type}")
     print(f"smooth_l1_beta\t{smooth_l1_beta}")
@@ -756,6 +791,40 @@ def main() -> None:
     base_model = AlphaGenome.from_pretrained(weights, device=device)
     checkpoint_head_state = checkpoint["adapter_head_state_dict"]
     track_means = checkpoint_head_state.get("track_means")
+    residual_base_head = None
+    residual_base_input_bottleneck = None
+    residual_base_resolution = 128
+    if residual_base_checkpoint_path is not None:
+        residual_base_checkpoint = load_adapter_checkpoint(
+            str(residual_base_checkpoint_path)
+        )
+        residual_base_resolution = int(residual_base_checkpoint["embedding_resolution"])
+        residual_base_probe = RnaSeq11Adapter(
+            base_model,
+            n_tracks=n_tracks,
+            embedding_resolution=residual_base_resolution,
+            organism_index=organism_index,
+            head_type="linear",
+            head_resolutions=(residual_base_resolution,),
+            linear_head_architecture=str(
+                residual_base_checkpoint.get("linear_head_architecture", "conv1x1")
+            ),
+            linear_hidden_channels=int(
+                residual_base_checkpoint.get("linear_hidden_channels", 256)
+            ),
+            linear_input_bottleneck_channels=residual_base_checkpoint.get(
+                "linear_input_bottleneck_channels"
+            ),
+            linear_residual_scale_init=float(
+                residual_base_checkpoint.get("linear_residual_scale_init", 1.0)
+            ),
+            linear_dilation=int(residual_base_checkpoint.get("linear_dilation", 2)),
+        ).to(device)
+        residual_base_probe.load_adapter_head_state_dict(
+            residual_base_checkpoint["adapter_head_state_dict"]
+        )
+        residual_base_head = residual_base_probe.head
+        residual_base_input_bottleneck = residual_base_probe.linear_input_bottleneck
     model = RnaSeq11Adapter(
         base_model,
         n_tracks=n_tracks,
@@ -765,12 +834,17 @@ def main() -> None:
         head_resolutions=head_resolutions,
         linear_head_architecture=linear_head_architecture,
         linear_hidden_channels=linear_hidden_channels,
+        linear_input_bottleneck_channels=linear_input_bottleneck_channels,
         linear_track_means=checkpoint_head_state.get("track_means"),
         linear_residual_scale_init=residual_scale_init,
         linear_dilation=linear_dilation,
+        linear_residual_base_head=residual_base_head,
+        linear_residual_base_input_bottleneck=residual_base_input_bottleneck,
+        linear_residual_base_resolution=residual_base_resolution,
+        linear_residual_correction_scale_init=residual_correction_scale_init,
         track_means=track_means,
     ).to(device)
-    model.head.load_state_dict(checkpoint_head_state)
+    model.load_adapter_head_state_dict(checkpoint_head_state)
 
     print(f"base_parameters\t{count_parameters(model.base_model)}")
     print(f"total_parameters\t{count_parameters(model)}")

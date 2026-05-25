@@ -185,6 +185,15 @@ def parse_args() -> argparse.Namespace:
         help="Hidden channels for non-legacy linear head variants.",
     )
     parser.add_argument(
+        "--linear-input-bottleneck-channels",
+        type=int,
+        default=None,
+        help=(
+            "Optional 1x1 bottleneck before pooling/interpolation for linear heads, "
+            "for example 1536 -> 64 before 1 bp to 128 bp pooling."
+        ),
+    )
+    parser.add_argument(
         "--residual-scale-init",
         type=float,
         default=1.0,
@@ -195,6 +204,20 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=2,
         help="Dilation for --linear-head-architecture dilated-conv3.",
+    )
+    parser.add_argument(
+        "--residual-base-checkpoint",
+        default=None,
+        help=(
+            "Optional frozen linear checkpoint whose prediction is used as the "
+            "base for 1 bp residual correction."
+        ),
+    )
+    parser.add_argument(
+        "--residual-correction-scale-init",
+        type=float,
+        default=0.01,
+        help="Initial trainable output scale for --residual-base-checkpoint.",
     )
     parser.add_argument(
         "--linear-loss-type",
@@ -935,8 +958,11 @@ def save_training_checkpoint(
     head_resolutions: tuple[int, ...],
     linear_head_architecture: str,
     linear_hidden_channels: int,
+    linear_input_bottleneck_channels: int | None,
     linear_residual_scale_init: float,
     linear_dilation: int,
+    residual_base_checkpoint: str | None,
+    residual_correction_scale_init: float,
     linear_loss_type: str,
     linear_target_space: str,
     smooth_l1_beta: float,
@@ -953,15 +979,18 @@ def save_training_checkpoint(
     track_means_max_examples: int | None,
 ) -> None:
     checkpoint = {
-        "adapter_head_state_dict": model.head.state_dict(),
+        "adapter_head_state_dict": model.adapter_head_state_dict(),
         "n_tracks": n_tracks,
         "embedding_resolution": embedding_resolution,
         "head_type": head_type,
         "head_resolutions": list(head_resolutions),
         "linear_head_architecture": linear_head_architecture,
         "linear_hidden_channels": linear_hidden_channels,
+        "linear_input_bottleneck_channels": linear_input_bottleneck_channels,
         "linear_residual_scale_init": linear_residual_scale_init,
         "linear_dilation": linear_dilation,
+        "residual_base_checkpoint": residual_base_checkpoint,
+        "residual_correction_scale_init": residual_correction_scale_init,
         "linear_loss_type": linear_loss_type,
         "linear_target_space": linear_target_space,
         "smooth_l1_beta": smooth_l1_beta,
@@ -1008,6 +1037,11 @@ def main() -> None:
         raise ValueError("--freeze-head requires --enable-last-block-lora")
     if args.linear_hidden_channels < 1:
         raise ValueError("--linear-hidden-channels must be >= 1")
+    if (
+        args.linear_input_bottleneck_channels is not None
+        and args.linear_input_bottleneck_channels < 1
+    ):
+        raise ValueError("--linear-input-bottleneck-channels must be >= 1")
     if args.linear_dilation < 1:
         raise ValueError("--linear-dilation must be >= 1")
     if args.smooth_l1_beta <= 0.0:
@@ -1055,6 +1089,13 @@ def main() -> None:
         )
     if args.head_type == "genome-tracks" and args.linear_target_space != "full-log1p":
         raise ValueError("--linear-target-space is only supported for linear heads")
+    if args.residual_base_checkpoint is not None:
+        if args.head_type != "linear":
+            raise ValueError("--residual-base-checkpoint requires --head-type linear")
+        if args.linear_target_space != "full-log1p":
+            raise ValueError(
+                "--residual-base-checkpoint currently requires full-log1p targets"
+            )
     if args.loss_type in {"poisson-multinomial", "hybrid-mse-poisson"}:
         if args.head_type != "genome-tracks":
             raise ValueError(f"--loss-type {args.loss_type} requires genome-tracks")
@@ -1197,8 +1238,18 @@ def main() -> None:
     print_main(rank, f"head_resolutions\t{','.join(map(str, head_resolutions))}")
     print_main(rank, f"linear_head_architecture\t{args.linear_head_architecture}")
     print_main(rank, f"linear_hidden_channels\t{args.linear_hidden_channels}")
+    print_main(
+        rank,
+        "linear_input_bottleneck_channels\t"
+        f"{args.linear_input_bottleneck_channels}",
+    )
     print_main(rank, f"residual_scale_init\t{args.residual_scale_init}")
     print_main(rank, f"linear_dilation\t{args.linear_dilation}")
+    print_main(rank, f"residual_base_checkpoint\t{args.residual_base_checkpoint}")
+    print_main(
+        rank,
+        f"residual_correction_scale_init\t{args.residual_correction_scale_init}",
+    )
     print_main(rank, f"linear_loss_type\t{args.linear_loss_type}")
     print_main(rank, f"smooth_l1_beta\t{args.smooth_l1_beta}")
     print_main(rank, f"hybrid_loss_alpha\t{args.hybrid_loss_alpha}")
@@ -1262,6 +1313,57 @@ def main() -> None:
         print_main(rank, f"cuda_device\t{torch.cuda.get_device_name(device)}")
 
     base_model = AlphaGenome.from_pretrained(weights, device=device)
+    residual_base_head = None
+    residual_base_input_bottleneck = None
+    residual_base_resolution = 128
+    if args.residual_base_checkpoint is not None:
+        residual_base_checkpoint = load_adapter_checkpoint(args.residual_base_checkpoint)
+        residual_base_n_tracks = int(residual_base_checkpoint["n_tracks"])
+        residual_base_head_type = str(
+            residual_base_checkpoint.get("head_type", "linear")
+        )
+        residual_base_target_space = str(
+            residual_base_checkpoint.get("linear_target_space", "full-log1p")
+        )
+        residual_base_resolution = int(residual_base_checkpoint["embedding_resolution"])
+        if residual_base_n_tracks != n_tracks:
+            raise ValueError(
+                "Residual base checkpoint n_tracks="
+                f"{residual_base_n_tracks}, dataset n_tracks={n_tracks}"
+            )
+        if residual_base_head_type != "linear":
+            raise ValueError("--residual-base-checkpoint must be a linear head")
+        if residual_base_target_space != "full-log1p":
+            raise ValueError(
+                "--residual-base-checkpoint currently must use full-log1p"
+            )
+        residual_base_probe = RnaSeq11Adapter(
+            base_model,
+            n_tracks=n_tracks,
+            embedding_resolution=residual_base_resolution,
+            organism_index=args.organism_index,
+            head_type="linear",
+            head_resolutions=(residual_base_resolution,),
+            linear_head_architecture=str(
+                residual_base_checkpoint.get("linear_head_architecture", "conv1x1")
+            ),
+            linear_hidden_channels=int(
+                residual_base_checkpoint.get("linear_hidden_channels", 256)
+            ),
+            linear_input_bottleneck_channels=residual_base_checkpoint.get(
+                "linear_input_bottleneck_channels"
+            ),
+            linear_residual_scale_init=float(
+                residual_base_checkpoint.get("linear_residual_scale_init", 1.0)
+            ),
+            linear_dilation=int(residual_base_checkpoint.get("linear_dilation", 2)),
+        ).to(device)
+        residual_base_probe.load_adapter_head_state_dict(
+            residual_base_checkpoint["adapter_head_state_dict"]
+        )
+        residual_base_head = residual_base_probe.head
+        residual_base_input_bottleneck = residual_base_probe.linear_input_bottleneck
+
     model = RnaSeq11Adapter(
         base_model,
         n_tracks=n_tracks,
@@ -1272,9 +1374,14 @@ def main() -> None:
         head_resolutions=head_resolutions,
         linear_head_architecture=args.linear_head_architecture,
         linear_hidden_channels=args.linear_hidden_channels,
+        linear_input_bottleneck_channels=args.linear_input_bottleneck_channels,
         linear_track_means=linear_track_means,
         linear_residual_scale_init=args.residual_scale_init,
         linear_dilation=args.linear_dilation,
+        linear_residual_base_head=residual_base_head,
+        linear_residual_base_input_bottleneck=residual_base_input_bottleneck,
+        linear_residual_base_resolution=residual_base_resolution,
+        linear_residual_correction_scale_init=args.residual_correction_scale_init,
         track_means=track_means,
     ).to(device)
 
@@ -1295,6 +1402,9 @@ def main() -> None:
         )
         checkpoint_linear_hidden_channels = int(
             init_checkpoint.get("linear_hidden_channels", args.linear_hidden_channels)
+        )
+        checkpoint_linear_input_bottleneck_channels = init_checkpoint.get(
+            "linear_input_bottleneck_channels"
         )
         checkpoint_linear_dilation = int(
             init_checkpoint.get("linear_dilation", args.linear_dilation)
@@ -1337,6 +1447,16 @@ def main() -> None:
                     f"requested={args.linear_hidden_channels}"
                 )
             if (
+                checkpoint_linear_input_bottleneck_channels
+                != args.linear_input_bottleneck_channels
+            ):
+                raise ValueError(
+                    "Init checkpoint linear_input_bottleneck_channels="
+                    f"{checkpoint_linear_input_bottleneck_channels}, "
+                    "requested="
+                    f"{args.linear_input_bottleneck_channels}"
+                )
+            if (
                 checkpoint_linear_head_architecture == "dilated-conv3"
                 and checkpoint_linear_dilation != args.linear_dilation
             ):
@@ -1349,7 +1469,7 @@ def main() -> None:
                     "Init checkpoint linear_target_space="
                     f"{checkpoint_linear_target_space}, requested={args.linear_target_space}"
                 )
-        model.head.load_state_dict(init_checkpoint["adapter_head_state_dict"])
+        model.load_adapter_head_state_dict(init_checkpoint["adapter_head_state_dict"])
 
     lora_target_modules: list[str] = []
     lora_parameters: list[torch.nn.Parameter] = []
@@ -1646,8 +1766,15 @@ def main() -> None:
                         head_resolutions=head_resolutions,
                         linear_head_architecture=args.linear_head_architecture,
                         linear_hidden_channels=args.linear_hidden_channels,
+                        linear_input_bottleneck_channels=(
+                            args.linear_input_bottleneck_channels
+                        ),
                         linear_residual_scale_init=args.residual_scale_init,
                         linear_dilation=args.linear_dilation,
+                        residual_base_checkpoint=args.residual_base_checkpoint,
+                        residual_correction_scale_init=(
+                            args.residual_correction_scale_init
+                        ),
                         linear_loss_type=args.linear_loss_type,
                         linear_target_space=args.linear_target_space,
                         smooth_l1_beta=args.smooth_l1_beta,
@@ -1719,8 +1846,11 @@ def main() -> None:
             head_resolutions=head_resolutions,
             linear_head_architecture=args.linear_head_architecture,
             linear_hidden_channels=args.linear_hidden_channels,
+            linear_input_bottleneck_channels=args.linear_input_bottleneck_channels,
             linear_residual_scale_init=args.residual_scale_init,
             linear_dilation=args.linear_dilation,
+            residual_base_checkpoint=args.residual_base_checkpoint,
+            residual_correction_scale_init=args.residual_correction_scale_init,
             linear_loss_type=args.linear_loss_type,
             linear_target_space=args.linear_target_space,
             smooth_l1_beta=args.smooth_l1_beta,
