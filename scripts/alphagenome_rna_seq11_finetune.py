@@ -1048,9 +1048,6 @@ def main() -> None:
     )
     if args.head_type == "linear" and head_resolutions != (args.embedding_resolution,):
         raise ValueError("linear head requires --head-resolutions to match --embedding-resolution")
-    if args.head_type == "linear" and args.linear_target_space == "binned128-log1p-mean":
-        if args.embedding_resolution != 128:
-            raise ValueError("binned128-log1p-mean requires --embedding-resolution 128")
     if args.head_type == "genome-tracks" and args.target_transform != "none":
         raise ValueError(
             "--head-type genome-tracks requires --target-transform none so raw "

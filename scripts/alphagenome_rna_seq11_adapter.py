@@ -574,7 +574,20 @@ class RnaSeq11Adapter(torch.nn.Module):
             )
 
         key = f"embeddings_{self.embedding_resolution}bp"
-        prediction = self.head(embeddings[key].to(dtype=self.head_dtype()))
+        head_input = embeddings[key].to(dtype=self.head_dtype())
+        if (
+            target_length is not None
+            and head_input.shape[-1] > target_length
+            and head_input.shape[-1] % target_length == 0
+        ):
+            pool_factor = head_input.shape[-1] // target_length
+            head_input = F.avg_pool1d(
+                head_input,
+                kernel_size=pool_factor,
+                stride=pool_factor,
+            )
+
+        prediction = self.head(head_input)
         if target_length is not None and prediction.shape[-1] != target_length:
             prediction = F.interpolate(
                 prediction,
