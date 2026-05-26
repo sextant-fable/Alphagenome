@@ -487,6 +487,10 @@ class RnaSeq11Adapter(torch.nn.Module):
         linear_residual_base_input_bottleneck: torch.nn.Module | None = None,
         linear_residual_base_resolution: int = 128,
         linear_residual_correction_scale_init: float = 0.01,
+        linear_residual_base_gate: str = "none",
+        linear_residual_base_gate_center: float = 0.5,
+        linear_residual_base_gate_sharpness: float = 4.0,
+        linear_residual_base_gate_floor: float = 0.0,
         track_means: torch.Tensor | Sequence[float] | None = None,
         num_head_organisms: int | None = None,
     ) -> None:
@@ -510,6 +514,18 @@ class RnaSeq11Adapter(torch.nn.Module):
         self.linear_hidden_channels = linear_hidden_channels
         self.linear_input_bottleneck_channels = linear_input_bottleneck_channels
         self.linear_residual_base_resolution = linear_residual_base_resolution
+        self.linear_residual_base_gate = linear_residual_base_gate
+        self.linear_residual_base_gate_center = float(linear_residual_base_gate_center)
+        self.linear_residual_base_gate_sharpness = float(
+            linear_residual_base_gate_sharpness
+        )
+        self.linear_residual_base_gate_floor = float(linear_residual_base_gate_floor)
+        if self.linear_residual_base_gate not in {"none", "sigmoid"}:
+            raise ValueError("linear_residual_base_gate must be 'none' or 'sigmoid'")
+        if self.linear_residual_base_gate_sharpness <= 0.0:
+            raise ValueError("linear_residual_base_gate_sharpness must be > 0")
+        if not 0.0 <= self.linear_residual_base_gate_floor <= 1.0:
+            raise ValueError("linear_residual_base_gate_floor must be between 0 and 1")
 
         if self.head_type == "linear":
             if len(self.head_resolutions) != 1:
@@ -629,7 +645,12 @@ class RnaSeq11Adapter(torch.nn.Module):
         target_length: int | None = None,
         *,
         return_scaled: bool = False,
-    ) -> torch.Tensor | dict[int, torch.Tensor]:
+        return_linear_residual_update: bool = False,
+    ) -> (
+        torch.Tensor
+        | dict[int, torch.Tensor]
+        | tuple[torch.Tensor | dict[int, torch.Tensor], torch.Tensor]
+    ):
         """Return RNA-seq predictions in [B, C, S] format."""
 
         organism_index = self.organism_index_tensor(
@@ -663,6 +684,10 @@ class RnaSeq11Adapter(torch.nn.Module):
             )
 
         if self.head_type == "genome-tracks":
+            if return_linear_residual_update:
+                raise ValueError(
+                    "return_linear_residual_update is only supported for linear heads"
+                )
             head_dtype = next(self.head.parameters()).dtype
             embeddings_by_resolution = {
                 resolution: embeddings[f"embeddings_{resolution}bp"].to(dtype=head_dtype)
@@ -691,11 +716,35 @@ class RnaSeq11Adapter(torch.nn.Module):
                 target_length=target_length,
             )
             assert self.linear_residual_correction_scale is not None
-            prediction = base_prediction.detach() + (
+            residual_update = (
                 self.linear_residual_correction_scale.to(dtype=prediction.dtype)
+                * self._linear_residual_gate(base_prediction, prediction.dtype)
                 * prediction
             )
+            prediction = base_prediction.detach() + residual_update
+            if return_linear_residual_update:
+                return prediction, residual_update
+        elif return_linear_residual_update:
+            raise ValueError(
+                "return_linear_residual_update requires a residual base head"
+            )
         return prediction
+
+    def _linear_residual_gate(
+        self,
+        base_prediction: torch.Tensor,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if self.linear_residual_base_gate == "none":
+            return torch.ones((), dtype=dtype, device=base_prediction.device)
+
+        gate_input = (
+            self.linear_residual_base_gate_sharpness
+            * (base_prediction.detach().to(dtype=dtype) - self.linear_residual_base_gate_center)
+        )
+        gate = torch.sigmoid(gate_input)
+        floor = self.linear_residual_base_gate_floor
+        return floor + (1.0 - floor) * gate
 
     def _linear_prediction_from_embeddings(
         self,

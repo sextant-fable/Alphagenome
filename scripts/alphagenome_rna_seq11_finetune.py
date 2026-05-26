@@ -136,7 +136,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Freeze the RNA-seq adapter head and train only enabled LoRA parameters.",
     )
-    parser.add_argument("--seed", type=int, default=20260514)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=20260514,
+        help="Random seed. Use -1 to draw and record a non-deterministic seed.",
+    )
     parser.add_argument("--organism-index", type=int, default=0)
     parser.add_argument(
         "--embedding-resolution",
@@ -218,6 +223,42 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.01,
         help="Initial trainable output scale for --residual-base-checkpoint.",
+    )
+    parser.add_argument(
+        "--residual-correction-l2",
+        type=float,
+        default=0.0,
+        help=(
+            "Training-only L2 penalty weight on the 1 bp residual update after "
+            "scale/gating. Use with --residual-base-checkpoint."
+        ),
+    )
+    parser.add_argument(
+        "--residual-base-gate",
+        choices=["none", "sigmoid"],
+        default="none",
+        help=(
+            "Optional non-parametric gate on 1 bp residual correction based on "
+            "the frozen base prediction."
+        ),
+    )
+    parser.add_argument(
+        "--residual-base-gate-center",
+        type=float,
+        default=0.5,
+        help="Center used by --residual-base-gate sigmoid in log1p prediction space.",
+    )
+    parser.add_argument(
+        "--residual-base-gate-sharpness",
+        type=float,
+        default=4.0,
+        help="Positive sharpness used by --residual-base-gate sigmoid.",
+    )
+    parser.add_argument(
+        "--residual-base-gate-floor",
+        type=float,
+        default=0.0,
+        help="Minimum gate value for --residual-base-gate sigmoid.",
     )
     parser.add_argument(
         "--linear-loss-type",
@@ -483,6 +524,17 @@ def masked_smooth_l1_loss_local(
         beta=beta,
     )
     return (loss * mask).sum() / mask.expand_as(loss).sum().clamp_min(1.0)
+
+
+def masked_residual_update_l2(
+    residual_update: torch.Tensor,
+    mask: torch.Tensor,
+) -> torch.Tensor:
+    while mask.ndim < residual_update.ndim:
+        mask = mask.unsqueeze(-1)
+    mask = mask.to(device=residual_update.device, dtype=residual_update.dtype)
+    penalty = residual_update.square()
+    return (penalty * mask).sum() / mask.expand_as(penalty).sum().clamp_min(1.0)
 
 
 def adapter_loss_for_training(
@@ -835,6 +887,12 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+def resolve_seed(seed: int) -> int:
+    if seed >= 0:
+        return seed
+    return int.from_bytes(os.urandom(4), byteorder="big") % (2**31 - 1)
+
+
 def write_config(
     path: Path,
     *,
@@ -963,6 +1021,11 @@ def save_training_checkpoint(
     linear_dilation: int,
     residual_base_checkpoint: str | None,
     residual_correction_scale_init: float,
+    residual_correction_l2: float,
+    residual_base_gate: str,
+    residual_base_gate_center: float,
+    residual_base_gate_sharpness: float,
+    residual_base_gate_floor: float,
     linear_loss_type: str,
     linear_target_space: str,
     smooth_l1_beta: float,
@@ -991,6 +1054,11 @@ def save_training_checkpoint(
         "linear_dilation": linear_dilation,
         "residual_base_checkpoint": residual_base_checkpoint,
         "residual_correction_scale_init": residual_correction_scale_init,
+        "residual_correction_l2": residual_correction_l2,
+        "residual_base_gate": residual_base_gate,
+        "residual_base_gate_center": residual_base_gate_center,
+        "residual_base_gate_sharpness": residual_base_gate_sharpness,
+        "residual_base_gate_floor": residual_base_gate_floor,
         "linear_loss_type": linear_loss_type,
         "linear_target_space": linear_target_space,
         "smooth_l1_beta": smooth_l1_beta,
@@ -1027,6 +1095,9 @@ def save_training_checkpoint(
 
 def main() -> None:
     args = parse_args()
+    requested_seed = args.seed
+    args.seed = resolve_seed(args.seed)
+    args.seed_request = requested_seed
     set_seed(args.seed)
     is_distributed, rank, local_rank, world_size, device = setup_distributed(args.device)
     if args.grad_accum_steps < 1:
@@ -1048,6 +1119,12 @@ def main() -> None:
         raise ValueError("--smooth-l1-beta must be > 0")
     if not 0.0 <= args.hybrid_loss_alpha <= 1.0:
         raise ValueError("--hybrid-loss-alpha must be between 0 and 1")
+    if args.residual_correction_l2 < 0.0:
+        raise ValueError("--residual-correction-l2 must be >= 0")
+    if args.residual_base_gate_sharpness <= 0.0:
+        raise ValueError("--residual-base-gate-sharpness must be > 0")
+    if not 0.0 <= args.residual_base_gate_floor <= 1.0:
+        raise ValueError("--residual-base-gate-floor must be between 0 and 1")
     step_decay_steps = parse_int_list(
         args.step_decay_steps,
         option_name="--step-decay-steps",
@@ -1096,6 +1173,11 @@ def main() -> None:
             raise ValueError(
                 "--residual-base-checkpoint currently requires full-log1p targets"
             )
+    elif args.residual_correction_l2 > 0.0 or args.residual_base_gate != "none":
+        raise ValueError(
+            "--residual-correction-l2 and --residual-base-gate require "
+            "--residual-base-checkpoint"
+        )
     if args.loss_type in {"poisson-multinomial", "hybrid-mse-poisson"}:
         if args.head_type != "genome-tracks":
             raise ValueError(f"--loss-type {args.loss_type} requires genome-tracks")
@@ -1250,6 +1332,17 @@ def main() -> None:
         rank,
         f"residual_correction_scale_init\t{args.residual_correction_scale_init}",
     )
+    print_main(rank, f"residual_correction_l2\t{args.residual_correction_l2}")
+    print_main(rank, f"residual_base_gate\t{args.residual_base_gate}")
+    print_main(
+        rank,
+        f"residual_base_gate_center\t{args.residual_base_gate_center}",
+    )
+    print_main(
+        rank,
+        f"residual_base_gate_sharpness\t{args.residual_base_gate_sharpness}",
+    )
+    print_main(rank, f"residual_base_gate_floor\t{args.residual_base_gate_floor}")
     print_main(rank, f"linear_loss_type\t{args.linear_loss_type}")
     print_main(rank, f"smooth_l1_beta\t{args.smooth_l1_beta}")
     print_main(rank, f"hybrid_loss_alpha\t{args.hybrid_loss_alpha}")
@@ -1303,6 +1396,7 @@ def main() -> None:
         rank,
         f"global_effective_batch_size\t{args.batch_size * args.grad_accum_steps * world_size}",
     )
+    print_main(rank, f"seed_request\t{args.seed_request}")
     print_main(rank, f"seed\t{args.seed}")
     print_main(rank, f"device\t{device}")
     print_main(rank, f"distributed\t{is_distributed}")
@@ -1382,6 +1476,10 @@ def main() -> None:
         linear_residual_base_input_bottleneck=residual_base_input_bottleneck,
         linear_residual_base_resolution=residual_base_resolution,
         linear_residual_correction_scale_init=args.residual_correction_scale_init,
+        linear_residual_base_gate=args.residual_base_gate,
+        linear_residual_base_gate_center=args.residual_base_gate_center,
+        linear_residual_base_gate_sharpness=args.residual_base_gate_sharpness,
+        linear_residual_base_gate_floor=args.residual_base_gate_floor,
         track_means=track_means,
     ).to(device)
 
@@ -1591,11 +1689,17 @@ def main() -> None:
                 if args.head_type == "linear" else rna_seq
             )
 
-            prediction = train_model(
+            prediction_result = train_model(
                 dna_sequence,
                 target_length=loss_target.shape[-1],
                 return_scaled=prediction_return_scaled_for_loss(model, args.loss_type),
+                return_linear_residual_update=args.residual_correction_l2 > 0.0,
             )
+            residual_update = None
+            if isinstance(prediction_result, tuple):
+                prediction, residual_update = prediction_result
+            else:
+                prediction = prediction_result
             loss = adapter_loss_for_training(
                 model,
                 prediction,
@@ -1611,6 +1715,15 @@ def main() -> None:
                 smooth_l1_beta=args.smooth_l1_beta,
                 hybrid_loss_alpha=args.hybrid_loss_alpha,
             )
+            if args.residual_correction_l2 > 0.0:
+                if residual_update is None:
+                    raise RuntimeError(
+                        "--residual-correction-l2 requires residual update output"
+                    )
+                loss = loss + args.residual_correction_l2 * masked_residual_update_l2(
+                    residual_update,
+                    rna_seq_mask,
+                )
             (loss / args.grad_accum_steps).backward()
 
             accumulated_train_loss += float(loss.detach().cpu())
@@ -1775,6 +1888,13 @@ def main() -> None:
                         residual_correction_scale_init=(
                             args.residual_correction_scale_init
                         ),
+                        residual_correction_l2=args.residual_correction_l2,
+                        residual_base_gate=args.residual_base_gate,
+                        residual_base_gate_center=args.residual_base_gate_center,
+                        residual_base_gate_sharpness=(
+                            args.residual_base_gate_sharpness
+                        ),
+                        residual_base_gate_floor=args.residual_base_gate_floor,
                         linear_loss_type=args.linear_loss_type,
                         linear_target_space=args.linear_target_space,
                         smooth_l1_beta=args.smooth_l1_beta,
@@ -1851,6 +1971,11 @@ def main() -> None:
             linear_dilation=args.linear_dilation,
             residual_base_checkpoint=args.residual_base_checkpoint,
             residual_correction_scale_init=args.residual_correction_scale_init,
+            residual_correction_l2=args.residual_correction_l2,
+            residual_base_gate=args.residual_base_gate,
+            residual_base_gate_center=args.residual_base_gate_center,
+            residual_base_gate_sharpness=args.residual_base_gate_sharpness,
+            residual_base_gate_floor=args.residual_base_gate_floor,
             linear_loss_type=args.linear_loss_type,
             linear_target_space=args.linear_target_space,
             smooth_l1_beta=args.smooth_l1_beta,

@@ -161,6 +161,15 @@ def parse_args() -> argparse.Namespace:
         help="Override residual correction scale init before checkpoint load.",
     )
     parser.add_argument(
+        "--residual-base-gate",
+        choices=["none", "sigmoid"],
+        default=None,
+        help="Override checkpoint residual base gate.",
+    )
+    parser.add_argument("--residual-base-gate-center", type=float, default=None)
+    parser.add_argument("--residual-base-gate-sharpness", type=float, default=None)
+    parser.add_argument("--residual-base-gate-floor", type=float, default=None)
+    parser.add_argument(
         "--linear-target-space",
         choices=["full-log1p", "binned128-log1p-mean"],
         default=None,
@@ -654,6 +663,26 @@ def main() -> None:
         if args.residual_correction_scale_init is not None
         else float(checkpoint.get("residual_correction_scale_init", 0.01))
     )
+    residual_base_gate = (
+        args.residual_base_gate
+        if args.residual_base_gate is not None
+        else str(checkpoint.get("residual_base_gate", "none"))
+    )
+    residual_base_gate_center = (
+        args.residual_base_gate_center
+        if args.residual_base_gate_center is not None
+        else float(checkpoint.get("residual_base_gate_center", 0.5))
+    )
+    residual_base_gate_sharpness = (
+        args.residual_base_gate_sharpness
+        if args.residual_base_gate_sharpness is not None
+        else float(checkpoint.get("residual_base_gate_sharpness", 4.0))
+    )
+    residual_base_gate_floor = (
+        args.residual_base_gate_floor
+        if args.residual_base_gate_floor is not None
+        else float(checkpoint.get("residual_base_gate_floor", 0.0))
+    )
     linear_target_space = (
         args.linear_target_space
         if args.linear_target_space is not None
@@ -726,6 +755,10 @@ def main() -> None:
         raise ValueError("--linear-dilation must be >= 1")
     if not 0.0 <= hybrid_loss_alpha <= 1.0:
         raise ValueError("--hybrid-loss-alpha must be between 0 and 1")
+    if residual_base_gate_sharpness <= 0.0:
+        raise ValueError("--residual-base-gate-sharpness must be > 0")
+    if not 0.0 <= residual_base_gate_floor <= 1.0:
+        raise ValueError("--residual-base-gate-floor must be between 0 and 1")
     if args.diagnostic_output is not None and args.common_128bp_metrics is not None:
         raise ValueError("--diagnostic-output cannot be combined with --common-128bp-metrics")
 
@@ -769,6 +802,10 @@ def main() -> None:
     print(f"linear_dilation\t{linear_dilation}")
     print(f"residual_base_checkpoint\t{residual_base_checkpoint_path}")
     print(f"residual_correction_scale_init\t{residual_correction_scale_init}")
+    print(f"residual_base_gate\t{residual_base_gate}")
+    print(f"residual_base_gate_center\t{residual_base_gate_center}")
+    print(f"residual_base_gate_sharpness\t{residual_base_gate_sharpness}")
+    print(f"residual_base_gate_floor\t{residual_base_gate_floor}")
     print(f"linear_target_space\t{linear_target_space}")
     print(f"linear_loss_type\t{linear_loss_type}")
     print(f"smooth_l1_beta\t{smooth_l1_beta}")
@@ -842,6 +879,10 @@ def main() -> None:
         linear_residual_base_input_bottleneck=residual_base_input_bottleneck,
         linear_residual_base_resolution=residual_base_resolution,
         linear_residual_correction_scale_init=residual_correction_scale_init,
+        linear_residual_base_gate=residual_base_gate,
+        linear_residual_base_gate_center=residual_base_gate_center,
+        linear_residual_base_gate_sharpness=residual_base_gate_sharpness,
+        linear_residual_base_gate_floor=residual_base_gate_floor,
         track_means=track_means,
     ).to(device)
     model.load_adapter_head_state_dict(checkpoint_head_state)
