@@ -34,6 +34,82 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-26 - RNA-seq11 1bp-B Upper-Bound Residual L2 Sweep
+
+- Run type: training and evaluation
+- Purpose: Continue validation-only 1bp-B residual-correction exploration from the best 1bp-B warm-start checkpoint, using the 128 bp `conv5` hybrid step-4000 checkpoint as a frozen base prediction and training only a 1 bp residual correction head. The held-out test split was not used.
+- Git commit: `222cd09`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; user explicitly allowed GPUs `0,1,2,3`; independent single-GPU jobs were launched and monitored by the main controller, not DDP.
+- Command:
+
+```bash
+# Main winning continuation, launched on one GPU.
+CUDA_VISIBLE_DEVICES=2 PYTHONUNBUFFERED=1 \
+  /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_1bpB_upper_w2_resl2_1e-3_from_w1a05lr1e4_seedrand_2000steps \
+  --init-adapter-checkpoint runs/rna_seq11_1bpB_upper_w1_hybrid_a05_lr1e-4_seedrand_4000steps/adapter_head_best.pt \
+  --residual-base-checkpoint runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt \
+  --head-type linear \
+  --embedding-resolution 1 \
+  --linear-head-architecture conv5 \
+  --linear-hidden-channels 128 \
+  --linear-input-bottleneck-channels 128 \
+  --linear-loss-type hybrid \
+  --hybrid-loss-alpha 0.5 \
+  --smooth-l1-beta 1.0 \
+  --linear-target-space full-log1p \
+  --target-transform log1p \
+  --batch-size 1 \
+  --grad-accum-steps 1 \
+  --num-workers 0 \
+  --max-steps 2000 \
+  --eval-every 250 \
+  --learning-rate 1e-4 \
+  --lr-schedule constant \
+  --selection-metric full-mse \
+  --residual-correction-l2 0.001 \
+  --seed -1 \
+  --device auto
+
+# Follow-up variants used the same train/valid data, base checkpoint, head, target,
+# selection metric, and random seed sentinel, changing only one or two fields:
+# --residual-correction-l2 0.0005, 0.0015, or 0.003
+# --residual-base-gate sigmoid --residual-base-gate-floor 0.5, 0.75
+# --init-adapter-checkpoint <winning 1bp-B best> with --learning-rate 1e-5 or 3e-5
+
+# Valid-only diagnostics for final 1bp-B best and the 128 bp baseline.
+CUDA_VISIBLE_DEVICES=<free_gpu> PYTHONUNBUFFERED=1 \
+  /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_eval.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --checkpoint <checkpoint> \
+  --diagnostic-output runs/rna_seq11_1bpB_upper_diagnostics_20260526/<name>_diagnostics.tsv \
+  --point-metrics \
+  --batch-size 1 \
+  --num-workers 0 \
+  --device auto
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`; base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`; frozen 128 bp base checkpoint `runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt`; 1bp-B warm-start checkpoint `runs/rna_seq11_1bpB_upper_w1_hybrid_a05_lr1e-4_seedrand_4000steps/adapter_head_best.pt`. The held-out test split was not used.
+- Output path: Ignored run directories under `runs/rna_seq11_1bpB_upper_w*_...`; logs under `logs/rna_seq11_1bpB_upper_20260526/`; diagnostics under `runs/rna_seq11_1bpB_upper_diagnostics_20260526/`. These generated outputs must not be committed.
+- Result summary: The best validation-only checkpoint is `runs/rna_seq11_1bpB_upper_w2_resl2_1e-3_from_w1a05lr1e4_seedrand_2000steps/adapter_head_best.pt`, selected by valid full MSE at step 2000. Metrics: full MSE `0.83941437`, MAE `0.59241352`, Pearson `0.69303060`, common128 MSE `0.83968694`, common128 MAE `0.58274677`. The step-1500 checkpoint was nearly tied on full MSE (`0.83941991`) and had better MAE/Pearson/common128 (`0.59154043`, `0.69311764`, `0.83934808`), but the stored best follows the configured `full-mse` selection metric.
+- Additional results: Residual L2 `1e-3` was the strongest variant. `5e-4`, `1.5e-3`, and `3e-3` did not beat it. Base-gated residual variants improved MAE in some early checkpoints but worsened full MSE/common128. Low-learning-rate fine-tunes from the step-1500 checkpoint (`1e-5`, `3e-5`) did not beat the main constant-`1e-4` continuation by full MSE.
+- Comparison: Versus the 128 bp validation baseline (`0.88032581` full MSE, Pearson `0.67391665`, common128 MSE `0.86829218`), the final 1bp-B best improved full MSE by `0.04091144`, Pearson by `0.01911395`, and common128 MSE by `0.02860524`, while MAE worsened from `0.58482900` to `0.59241352`. Versus the previous 1bp-B leader (`0.84327834` full MSE, MAE `0.59956417`, Pearson `0.69191858`, common128 MSE `0.84077399`), it improved all four headline metrics.
+- Diagnostics: Final 1bp-B diagnostics were written to `runs/rna_seq11_1bpB_upper_diagnostics_20260526/w2_resl2_1e-3_final_best_diagnostics.tsv`; 128 bp baseline diagnostics were written to `runs/rna_seq11_1bpB_upper_diagnostics_20260526/baseline128_conv5_hybrid_step4000_diagnostics.tsv`. The final 1bp-B best improved per-track MSE and Pearson over the 128 bp baseline for all 11 tracks. Remaining high-MSE tracks are intestine T4 (`1.0291699`), intestine T3 (`1.0110442`), and intestine T1 (`0.98541102`). Muscle tracks remain stronger, with Pearson about `0.724` to `0.731`.
+- Verification: `python -m py_compile scripts/*.py` passed in the `alphagenome` conda environment. `nvidia-smi` and process checks showed no remaining `alphagenome_rna_seq11_finetune.py` or `alphagenome_rna_seq11_eval.py` jobs after cleanup.
+- Failures or warnings: These are validation-only model-selection results, not held-out test results. Several dominated jobs were intentionally terminated after enough validation evidence to conserve GPU time. The push of commit `222cd09` still requires user-side GitHub credentials.
+- Next actions: Treat `runs/rna_seq11_1bpB_upper_w2_resl2_1e-3_from_w1a05lr1e4_seedrand_2000steps/adapter_head_best.pt` as the current validation leader. For the next round, consider diagnostics-guided work on intestine tracks and a small confirmation run around the step-1500/2000 tradeoff before any held-out test evaluation.
+- Claim status: verified
+
 ## 2026-05-26 - 1bp-B Residual Correction Gate and Extension
 
 - Run type: training and evaluation
