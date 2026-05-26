@@ -282,6 +282,30 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--track-loss-weight-preset",
+        choices=[
+            "uniform",
+            "intestine-boost-1.25",
+            "intestine-boost-1.5",
+            "intestine-boost-2.0",
+            "intestine-hard-boost-1.5",
+            "intestine-hard-boost-2.0",
+        ],
+        default="uniform",
+        help=(
+            "Optional per-track training loss weighting preset for linear heads. "
+            "Validation full MSE/Pearson/common128 metrics remain unweighted."
+        ),
+    )
+    parser.add_argument(
+        "--track-loss-weights",
+        default=None,
+        help=(
+            "Optional comma-separated per-track training loss weights. Overrides "
+            "--track-loss-weight-preset. Validation full metrics remain unweighted."
+        ),
+    )
+    parser.add_argument(
         "--linear-target-space",
         choices=["full-log1p", "binned128-log1p-mean"],
         default="full-log1p",
@@ -466,6 +490,52 @@ def parse_float_list(value: str | None, *, option_name: str) -> list[float]:
     return values
 
 
+def resolve_track_loss_weights(
+    *,
+    weights_text: str | None,
+    preset: str,
+    n_tracks: int,
+) -> list[float] | None:
+    """Return optional per-track training weights; None means uniform."""
+
+    if weights_text:
+        weights = parse_float_list(weights_text, option_name="--track-loss-weights")
+        if len(weights) != n_tracks:
+            raise ValueError(
+                f"--track-loss-weights has {len(weights)} values; expected {n_tracks}"
+            )
+    else:
+        weights = [1.0] * n_tracks
+        if preset == "uniform":
+            pass
+        elif preset.startswith("intestine-boost-"):
+            if n_tracks != 11:
+                raise ValueError(f"{preset} expects 11 RNA-seq tracks")
+            boost = float(preset.rsplit("-", maxsplit=1)[1])
+            for index in range(5):
+                weights[index] = boost
+        elif preset.startswith("intestine-hard-boost-"):
+            if n_tracks != 11:
+                raise ValueError(f"{preset} expects 11 RNA-seq tracks")
+            boost = float(preset.rsplit("-", maxsplit=1)[1])
+            for index in (1, 3, 4):
+                weights[index] = boost
+        else:
+            raise ValueError(f"Unsupported --track-loss-weight-preset: {preset}")
+
+    if any(weight <= 0.0 for weight in weights):
+        raise ValueError("Track loss weights must be > 0")
+    if all(abs(weight - 1.0) < 1e-12 for weight in weights):
+        return None
+    return weights
+
+
+def format_track_loss_weights(weights: list[float] | None) -> str:
+    if weights is None:
+        return "uniform"
+    return ",".join(f"{weight:.8g}" for weight in weights)
+
+
 def learning_rate_for_step(
     *,
     step: int,
@@ -499,12 +569,26 @@ def masked_mse_loss_local(
     prediction: torch.Tensor,
     target: torch.Tensor,
     mask: torch.Tensor,
+    track_loss_weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
     while mask.ndim < prediction.ndim:
         mask = mask.unsqueeze(-1)
     mask = mask.to(device=prediction.device, dtype=prediction.dtype)
     error = (prediction - target.to(dtype=prediction.dtype)).square()
-    return (error * mask).sum() / mask.expand_as(error).sum().clamp_min(1.0)
+    denominator = mask.expand_as(error)
+    if track_loss_weights is not None:
+        if prediction.ndim != 3:
+            raise ValueError("Track loss weights require [batch, tracks, length] tensors")
+        if int(track_loss_weights.numel()) != int(prediction.shape[1]):
+            raise ValueError(
+                "Track loss weights have "
+                f"{track_loss_weights.numel()} tracks; expected {prediction.shape[1]}"
+            )
+        weights = track_loss_weights.to(device=prediction.device, dtype=prediction.dtype)
+        weights = weights.view(1, -1, 1)
+        error = error * weights
+        denominator = denominator * weights
+    return (error * mask).sum() / denominator.sum().clamp_min(1.0)
 
 
 def masked_smooth_l1_loss_local(
@@ -513,6 +597,7 @@ def masked_smooth_l1_loss_local(
     mask: torch.Tensor,
     *,
     beta: float,
+    track_loss_weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
     while mask.ndim < prediction.ndim:
         mask = mask.unsqueeze(-1)
@@ -523,7 +608,20 @@ def masked_smooth_l1_loss_local(
         reduction="none",
         beta=beta,
     )
-    return (loss * mask).sum() / mask.expand_as(loss).sum().clamp_min(1.0)
+    denominator = mask.expand_as(loss)
+    if track_loss_weights is not None:
+        if prediction.ndim != 3:
+            raise ValueError("Track loss weights require [batch, tracks, length] tensors")
+        if int(track_loss_weights.numel()) != int(prediction.shape[1]):
+            raise ValueError(
+                "Track loss weights have "
+                f"{track_loss_weights.numel()} tracks; expected {prediction.shape[1]}"
+            )
+        weights = track_loss_weights.to(device=prediction.device, dtype=prediction.dtype)
+        weights = weights.view(1, -1, 1)
+        loss = loss * weights
+        denominator = denominator * weights
+    return (loss * mask).sum() / denominator.sum().clamp_min(1.0)
 
 
 def masked_residual_update_l2(
@@ -552,8 +650,11 @@ def adapter_loss_for_training(
     linear_loss_type: str,
     smooth_l1_beta: float,
     hybrid_loss_alpha: float,
+    track_loss_weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    if linear_loss_type != "hybrid-mse-smooth-l1" or isinstance(prediction, dict):
+    if isinstance(prediction, dict):
+        if track_loss_weights is not None:
+            raise ValueError("Track loss weights are only supported for linear heads")
         return masked_adapter_loss(
             model,
             prediction,
@@ -570,12 +671,53 @@ def adapter_loss_for_training(
             hybrid_loss_alpha=hybrid_loss_alpha,
         )
 
-    mse_loss = masked_mse_loss_local(prediction, target, mask)
+    if track_loss_weights is None and linear_loss_type != "hybrid-mse-smooth-l1":
+        return masked_adapter_loss(
+            model,
+            prediction,
+            target,
+            mask,
+            loss_type=loss_type,
+            multinomial_num_segments=multinomial_num_segments,
+            positional_weight=positional_weight,
+            count_weight=count_weight,
+            mse_weight=mse_weight,
+            poisson_weight=poisson_weight,
+            linear_loss_type=linear_loss_type,
+            smooth_l1_beta=smooth_l1_beta,
+            hybrid_loss_alpha=hybrid_loss_alpha,
+        )
+
+    if linear_loss_type == "mse":
+        return masked_mse_loss_local(
+            prediction,
+            target,
+            mask,
+            track_loss_weights=track_loss_weights,
+        )
+    if linear_loss_type == "smooth-l1":
+        return masked_smooth_l1_loss_local(
+            prediction,
+            target,
+            mask,
+            beta=smooth_l1_beta,
+            track_loss_weights=track_loss_weights,
+        )
+    if linear_loss_type not in {"hybrid", "hybrid-mse-smooth-l1"}:
+        raise ValueError(f"Unsupported linear loss type: {linear_loss_type}")
+
+    mse_loss = masked_mse_loss_local(
+        prediction,
+        target,
+        mask,
+        track_loss_weights=track_loss_weights,
+    )
     smooth_l1_loss = masked_smooth_l1_loss_local(
         prediction,
         target,
         mask,
         beta=smooth_l1_beta,
+        track_loss_weights=track_loss_weights,
     )
     return hybrid_loss_alpha * mse_loss + (1.0 - hybrid_loss_alpha) * smooth_l1_loss
 
@@ -737,6 +879,7 @@ def evaluate_validation_metrics(
     target_transform: str,
     smooth_l1_beta: float,
     hybrid_loss_alpha: float,
+    track_loss_weights: torch.Tensor | None = None,
 ) -> dict[str, float | int]:
     model.eval()
     weighted_loss_sum = 0.0
@@ -782,6 +925,7 @@ def evaluate_validation_metrics(
                 linear_loss_type=linear_loss_type,
                 smooth_l1_beta=smooth_l1_beta,
                 hybrid_loss_alpha=hybrid_loss_alpha,
+                track_loss_weights=track_loss_weights,
             )
 
             metric_prediction = (
@@ -1030,6 +1174,8 @@ def save_training_checkpoint(
     linear_target_space: str,
     smooth_l1_beta: float,
     hybrid_loss_alpha: float,
+    track_loss_weight_preset: str,
+    track_loss_weights: list[float] | None,
     loss_space: str,
     loss_type: str,
     multinomial_num_segments: int,
@@ -1063,6 +1209,8 @@ def save_training_checkpoint(
         "linear_target_space": linear_target_space,
         "smooth_l1_beta": smooth_l1_beta,
         "hybrid_loss_alpha": hybrid_loss_alpha,
+        "track_loss_weight_preset": track_loss_weight_preset,
+        "track_loss_weights": track_loss_weights,
         "organism_index": organism_index,
         "target_transform": target_transform,
         "loss_space": loss_space,
@@ -1250,6 +1398,17 @@ def main() -> None:
         max_examples=args.max_valid_examples,
     )
     n_tracks = int(train_loader.dataset.metadata["n_tracks"])
+    track_loss_weights = resolve_track_loss_weights(
+        weights_text=args.track_loss_weights,
+        preset=args.track_loss_weight_preset,
+        n_tracks=n_tracks,
+    )
+    track_loss_weights_tensor = (
+        None
+        if track_loss_weights is None else torch.tensor(track_loss_weights, dtype=torch.float32)
+    )
+    if track_loss_weights_tensor is not None and args.head_type != "linear":
+        raise ValueError("--track-loss-weights are only supported for linear heads")
 
     track_means = None
     if args.head_type == "genome-tracks":
@@ -1346,6 +1505,11 @@ def main() -> None:
     print_main(rank, f"linear_loss_type\t{args.linear_loss_type}")
     print_main(rank, f"smooth_l1_beta\t{args.smooth_l1_beta}")
     print_main(rank, f"hybrid_loss_alpha\t{args.hybrid_loss_alpha}")
+    print_main(rank, f"track_loss_weight_preset\t{args.track_loss_weight_preset}")
+    print_main(
+        rank,
+        f"track_loss_weights\t{format_track_loss_weights(track_loss_weights)}",
+    )
     print_main(rank, f"linear_target_space\t{args.linear_target_space}")
     if linear_track_means is not None:
         print_main(
@@ -1714,6 +1878,7 @@ def main() -> None:
                 linear_loss_type=args.linear_loss_type,
                 smooth_l1_beta=args.smooth_l1_beta,
                 hybrid_loss_alpha=args.hybrid_loss_alpha,
+                track_loss_weights=track_loss_weights_tensor,
             )
             if args.residual_correction_l2 > 0.0:
                 if residual_update is None:
@@ -1899,6 +2064,8 @@ def main() -> None:
                         linear_target_space=args.linear_target_space,
                         smooth_l1_beta=args.smooth_l1_beta,
                         hybrid_loss_alpha=args.hybrid_loss_alpha,
+                        track_loss_weight_preset=args.track_loss_weight_preset,
+                        track_loss_weights=track_loss_weights,
                         loss_space=loss_space_for_config(
                             args.head_type,
                             args.loss_type,
@@ -1980,6 +2147,8 @@ def main() -> None:
             linear_target_space=args.linear_target_space,
             smooth_l1_beta=args.smooth_l1_beta,
             hybrid_loss_alpha=args.hybrid_loss_alpha,
+            track_loss_weight_preset=args.track_loss_weight_preset,
+            track_loss_weights=track_loss_weights,
             loss_space=loss_space_for_config(
                 args.head_type,
                 args.loss_type,
