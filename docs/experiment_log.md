@@ -34,6 +34,80 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-27 - RNA-seq11 1bp-B Broad Beta-0.5 Continuation
+
+- Run type: training and evaluation
+- Purpose: Continue validation-only 1 bp residual-correction exploration without using the held-out test split. The main question was whether the best 1bp-B residual-correction model could be improved by hard-intestine track-weighted training with `SmoothL1 beta=0.5`, staged continuation, and low-learning-rate or uniform-loss polish runs.
+- Git commit: `13ef2c6`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; user initially allowed GPUs `0,1,2,3`, then requested GPUs `0,1` for urgent work, after which only GPUs `2,3` were used for AlphaGenome jobs. Jobs were independent single-GPU runs, not DDP.
+- Command:
+
+```bash
+# Representative best continuation command. Follow-up runs changed only the
+# output/init checkpoint, learning rate, or track-loss-weight preset.
+CUDA_VISIBLE_DEVICES=<gpu> PYTHONUNBUFFERED=1 \
+  /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --output-dir runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps \
+  --init-adapter-checkpoint runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps/init_beta05_w10best1000.pt \
+  --residual-base-checkpoint runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt \
+  --head-type linear \
+  --embedding-resolution 1 \
+  --linear-head-architecture conv5 \
+  --linear-hidden-channels 128 \
+  --linear-input-bottleneck-channels 128 \
+  --linear-loss-type hybrid \
+  --hybrid-loss-alpha 0.5 \
+  --smooth-l1-beta 0.5 \
+  --track-loss-weight-preset intestine-hard-boost-1.5 \
+  --linear-target-space full-log1p \
+  --target-transform log1p \
+  --batch-size 1 \
+  --grad-accum-steps 1 \
+  --num-workers 0 \
+  --max-steps 1500 \
+  --eval-every 250 \
+  --learning-rate 1e-5 \
+  --lr-schedule constant \
+  --selection-metric full-mse \
+  --residual-correction-l2 0.001 \
+  --early-stopping-min-steps 750 \
+  --early-stopping-patience 4 \
+  --seed -1 \
+  --device auto
+
+# Valid-only diagnostics for the final selected checkpoint.
+CUDA_VISIBLE_DEVICES=2 PYTHONUNBUFFERED=1 \
+  /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_eval.py \
+  --dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --checkpoint runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps/adapter_head_best.pt \
+  --diagnostic-output runs/rna_seq11_1bpB_broad_diagnostics_20260527/w12_beta05_step750_best_diagnostics.tsv \
+  --point-metrics \
+  --batch-size 1 \
+  --num-workers 0 \
+  --device auto
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`; base model weights `weights/alphagenome_pytorch/model_all_folds.safetensors`; frozen 128 bp residual base checkpoint `runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt`. The held-out test split was not used.
+- Output path: Ignored run directories under `runs/rna_seq11_1bpB_broad_w*_...`; logs under `logs/rna_seq11_1bpB_broad_20260526/`; diagnostics under `runs/rna_seq11_1bpB_broad_diagnostics_20260527/`. These generated outputs must not be committed.
+- Result summary: The best validation-only checkpoint from this round is `runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps/adapter_head_best.pt`, selected by valid full MSE at step 750. Metrics: full MSE `0.83557710`, MAE `0.58180543`, Pearson `0.69463443`, common128 MSE `0.83737121`, common128 MAE `0.57279302`.
+- Additional results: The strongest direction was continuing hard-intestine weighted `hybrid alpha=0.5` with `SmoothL1 beta=0.5` at `lr=1e-5`. Low-learning-rate `3e-6` and `1e-6` polish runs from the best checkpoints improved or preserved MAE in some checkpoints but did not beat the best full MSE. Uniform-loss polish also did not beat the hard-intestine weighted objective by full MSE.
+- Comparison: Versus the previous 1bp-B best (`0.83941437` full MSE, MAE `0.59241352`, Pearson `0.69303060`, common128 MSE `0.83968694`), this round improved full MSE by `0.00383727`, MAE by `0.01060809`, Pearson by `0.00160383`, and common128 MSE by `0.00231573`. Versus the 128 bp validation baseline (`0.88032581` full MSE, MAE `0.58482900`, Pearson `0.67391665`, common128 MSE `0.86829218`), it improved full MSE by `0.04474871`, MAE by `0.00302357`, Pearson by `0.02071778`, and common128 MSE by `0.03092097`.
+- Diagnostics: Valid-only diagnostics were written to `runs/rna_seq11_1bpB_broad_diagnostics_20260527/w12_beta05_step750_best_diagnostics.tsv`. The hardest tracks by MSE remain intestine T4 (`1.0252335`), intestine T3 (`1.0082711`), and intestine T1 (`0.98125877`). Muscle tracks have the highest Pearson values, around `0.7256` to `0.7325`.
+- Verification: The final process check showed no remaining `alphagenome_rna_seq11_finetune.py` or `alphagenome_rna_seq11_eval.py` jobs. GPU indices `0` and `1` were not used by AlphaGenome after the user requested them for urgent work.
+- Failures or warnings: These are validation-only model-selection results, not held-out test results. Several dominated runs were intentionally stopped to conserve GPU time. Generated run directories, logs, diagnostics, checkpoints, and weights remain ignored artifacts and must not be committed.
+- Next actions: Treat the `w12` step-750 checkpoint as the current validation leader. Recommended follow-up is a concise confirmation/diagnostic pass around same-learning-rate beta-0.5 continuation and per-track error analysis before any held-out test evaluation.
+- Claim status: verified
+
 ## 2026-05-26 - RNA-seq11 1bp-B Upper-Bound Residual L2 Sweep
 
 - Run type: training and evaluation
