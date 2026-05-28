@@ -177,6 +177,7 @@ def parse_args() -> argparse.Namespace:
             "conv5",
             "conv7",
             "dilated-conv3",
+            "depthwise-separable-conv",
             "residual-conv1x1",
             "residual-conv3",
         ],
@@ -211,11 +212,27 @@ def parse_args() -> argparse.Namespace:
         help="Dilation for --linear-head-architecture dilated-conv3.",
     )
     parser.add_argument(
+        "--linear-kernel-size",
+        type=int,
+        default=15,
+        help="Kernel size for --linear-head-architecture depthwise-separable-conv.",
+    )
+    parser.add_argument(
         "--residual-base-checkpoint",
         default=None,
         help=(
             "Optional frozen linear checkpoint whose prediction is used as the "
             "base for 1 bp residual correction."
+        ),
+    )
+    parser.add_argument(
+        "--linear-residual-fusion",
+        choices=["none", "base-prediction"],
+        default="none",
+        help=(
+            "Optional fusion input for 1 bp residual correction. base-prediction "
+            "concatenates the frozen residual-base prediction to the correction "
+            "head input before predicting the residual update."
         ),
     )
     parser.add_argument(
@@ -1163,7 +1180,9 @@ def save_training_checkpoint(
     linear_input_bottleneck_channels: int | None,
     linear_residual_scale_init: float,
     linear_dilation: int,
+    linear_kernel_size: int,
     residual_base_checkpoint: str | None,
+    linear_residual_fusion: str,
     residual_correction_scale_init: float,
     residual_correction_l2: float,
     residual_base_gate: str,
@@ -1198,7 +1217,9 @@ def save_training_checkpoint(
         "linear_input_bottleneck_channels": linear_input_bottleneck_channels,
         "linear_residual_scale_init": linear_residual_scale_init,
         "linear_dilation": linear_dilation,
+        "linear_kernel_size": linear_kernel_size,
         "residual_base_checkpoint": residual_base_checkpoint,
+        "linear_residual_fusion": linear_residual_fusion,
         "residual_correction_scale_init": residual_correction_scale_init,
         "residual_correction_l2": residual_correction_l2,
         "residual_base_gate": residual_base_gate,
@@ -1263,6 +1284,8 @@ def main() -> None:
         raise ValueError("--linear-input-bottleneck-channels must be >= 1")
     if args.linear_dilation < 1:
         raise ValueError("--linear-dilation must be >= 1")
+    if args.linear_kernel_size < 1:
+        raise ValueError("--linear-kernel-size must be >= 1")
     if args.smooth_l1_beta <= 0.0:
         raise ValueError("--smooth-l1-beta must be > 0")
     if not 0.0 <= args.hybrid_loss_alpha <= 1.0:
@@ -1326,6 +1349,11 @@ def main() -> None:
             "--residual-correction-l2 and --residual-base-gate require "
             "--residual-base-checkpoint"
         )
+    if (
+        args.linear_residual_fusion != "none"
+        and args.residual_base_checkpoint is None
+    ):
+        raise ValueError("--linear-residual-fusion requires --residual-base-checkpoint")
     if args.loss_type in {"poisson-multinomial", "hybrid-mse-poisson"}:
         if args.head_type != "genome-tracks":
             raise ValueError(f"--loss-type {args.loss_type} requires genome-tracks")
@@ -1486,7 +1514,9 @@ def main() -> None:
     )
     print_main(rank, f"residual_scale_init\t{args.residual_scale_init}")
     print_main(rank, f"linear_dilation\t{args.linear_dilation}")
+    print_main(rank, f"linear_kernel_size\t{args.linear_kernel_size}")
     print_main(rank, f"residual_base_checkpoint\t{args.residual_base_checkpoint}")
+    print_main(rank, f"linear_residual_fusion\t{args.linear_residual_fusion}")
     print_main(
         rank,
         f"residual_correction_scale_init\t{args.residual_correction_scale_init}",
@@ -1615,6 +1645,9 @@ def main() -> None:
                 residual_base_checkpoint.get("linear_residual_scale_init", 1.0)
             ),
             linear_dilation=int(residual_base_checkpoint.get("linear_dilation", 2)),
+            linear_kernel_size=int(
+                residual_base_checkpoint.get("linear_kernel_size", 15)
+            ),
         ).to(device)
         residual_base_probe.load_adapter_head_state_dict(
             residual_base_checkpoint["adapter_head_state_dict"]
@@ -1636,9 +1669,11 @@ def main() -> None:
         linear_track_means=linear_track_means,
         linear_residual_scale_init=args.residual_scale_init,
         linear_dilation=args.linear_dilation,
+        linear_kernel_size=args.linear_kernel_size,
         linear_residual_base_head=residual_base_head,
         linear_residual_base_input_bottleneck=residual_base_input_bottleneck,
         linear_residual_base_resolution=residual_base_resolution,
+        linear_residual_fusion=args.linear_residual_fusion,
         linear_residual_correction_scale_init=args.residual_correction_scale_init,
         linear_residual_base_gate=args.residual_base_gate,
         linear_residual_base_gate_center=args.residual_base_gate_center,
@@ -1670,6 +1705,12 @@ def main() -> None:
         )
         checkpoint_linear_dilation = int(
             init_checkpoint.get("linear_dilation", args.linear_dilation)
+        )
+        checkpoint_linear_kernel_size = int(
+            init_checkpoint.get("linear_kernel_size", args.linear_kernel_size)
+        )
+        checkpoint_linear_residual_fusion = str(
+            init_checkpoint.get("linear_residual_fusion", "none")
         )
         checkpoint_linear_target_space = str(
             init_checkpoint.get("linear_target_space", "full-log1p")
@@ -1725,6 +1766,21 @@ def main() -> None:
                 raise ValueError(
                     "Init checkpoint linear_dilation="
                     f"{checkpoint_linear_dilation}, requested={args.linear_dilation}"
+                )
+            if (
+                checkpoint_linear_head_architecture == "depthwise-separable-conv"
+                and checkpoint_linear_kernel_size != args.linear_kernel_size
+            ):
+                raise ValueError(
+                    "Init checkpoint linear_kernel_size="
+                    f"{checkpoint_linear_kernel_size}, "
+                    f"requested={args.linear_kernel_size}"
+                )
+            if checkpoint_linear_residual_fusion != args.linear_residual_fusion:
+                raise ValueError(
+                    "Init checkpoint linear_residual_fusion="
+                    f"{checkpoint_linear_residual_fusion}, "
+                    f"requested={args.linear_residual_fusion}"
                 )
             if checkpoint_linear_target_space != args.linear_target_space:
                 raise ValueError(
@@ -2049,7 +2105,9 @@ def main() -> None:
                         ),
                         linear_residual_scale_init=args.residual_scale_init,
                         linear_dilation=args.linear_dilation,
+                        linear_kernel_size=args.linear_kernel_size,
                         residual_base_checkpoint=args.residual_base_checkpoint,
+                        linear_residual_fusion=args.linear_residual_fusion,
                         residual_correction_scale_init=(
                             args.residual_correction_scale_init
                         ),
@@ -2136,7 +2194,9 @@ def main() -> None:
             linear_input_bottleneck_channels=args.linear_input_bottleneck_channels,
             linear_residual_scale_init=args.residual_scale_init,
             linear_dilation=args.linear_dilation,
+            linear_kernel_size=args.linear_kernel_size,
             residual_base_checkpoint=args.residual_base_checkpoint,
+            linear_residual_fusion=args.linear_residual_fusion,
             residual_correction_scale_init=args.residual_correction_scale_init,
             residual_correction_l2=args.residual_correction_l2,
             residual_base_gate=args.residual_base_gate,

@@ -27,6 +27,7 @@ LinearHeadArchitecture = Literal[
     "conv5",
     "conv7",
     "dilated-conv3",
+    "depthwise-separable-conv",
     "residual-conv1x1",
     "residual-conv3",
 ]
@@ -131,11 +132,14 @@ def build_linear_head(
     track_means: torch.Tensor | Sequence[float] | None = None,
     residual_scale_init: float = 1.0,
     dilation: int = 2,
+    kernel_size: int = 15,
 ) -> torch.nn.Module:
     if hidden_channels < 1:
         raise ValueError("linear hidden channels must be >= 1")
     if dilation < 1:
         raise ValueError("linear dilation must be >= 1")
+    if kernel_size < 1:
+        raise ValueError("linear kernel size must be >= 1")
 
     base_architecture = linear_architecture_base(architecture)
     if base_architecture == "conv1x1":
@@ -198,6 +202,21 @@ def build_linear_head(
             torch.nn.GELU(),
             torch.nn.Conv1d(hidden_channels, n_tracks, kernel_size=1),
         )
+    elif base_architecture == "depthwise-separable-conv":
+        base_head = torch.nn.Sequential(
+            torch.nn.Conv1d(in_channels, hidden_channels, kernel_size=1),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(
+                hidden_channels,
+                hidden_channels,
+                kernel_size=kernel_size,
+                padding=kernel_size // 2,
+                groups=hidden_channels,
+            ),
+            torch.nn.Conv1d(hidden_channels, hidden_channels, kernel_size=1),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(hidden_channels, n_tracks, kernel_size=1),
+        )
     else:
         raise ValueError(f"Unsupported linear head architecture: {architecture}")
 
@@ -231,6 +250,7 @@ def build_linear_modules_from_checkpoint(
         checkpoint.get("linear_residual_scale_init", 1.0)
     )
     dilation = int(checkpoint.get("linear_dilation", 2))
+    kernel_size = int(checkpoint.get("linear_kernel_size", 15))
     input_bottleneck_channels = optional_int(
         checkpoint.get("linear_input_bottleneck_channels")
     )
@@ -253,6 +273,7 @@ def build_linear_modules_from_checkpoint(
         hidden_channels=hidden_channels,
         residual_scale_init=residual_scale_init,
         dilation=dilation,
+        kernel_size=kernel_size,
     )
     return head, input_bottleneck
 
@@ -483,9 +504,11 @@ class RnaSeq11Adapter(torch.nn.Module):
         linear_track_means: torch.Tensor | Sequence[float] | None = None,
         linear_residual_scale_init: float = 1.0,
         linear_dilation: int = 2,
+        linear_kernel_size: int = 15,
         linear_residual_base_head: torch.nn.Module | None = None,
         linear_residual_base_input_bottleneck: torch.nn.Module | None = None,
         linear_residual_base_resolution: int = 128,
+        linear_residual_fusion: str = "none",
         linear_residual_correction_scale_init: float = 0.01,
         linear_residual_base_gate: str = "none",
         linear_residual_base_gate_center: float = 0.5,
@@ -514,6 +537,7 @@ class RnaSeq11Adapter(torch.nn.Module):
         self.linear_hidden_channels = linear_hidden_channels
         self.linear_input_bottleneck_channels = linear_input_bottleneck_channels
         self.linear_residual_base_resolution = linear_residual_base_resolution
+        self.linear_residual_fusion = linear_residual_fusion
         self.linear_residual_base_gate = linear_residual_base_gate
         self.linear_residual_base_gate_center = float(linear_residual_base_gate_center)
         self.linear_residual_base_gate_sharpness = float(
@@ -522,6 +546,10 @@ class RnaSeq11Adapter(torch.nn.Module):
         self.linear_residual_base_gate_floor = float(linear_residual_base_gate_floor)
         if self.linear_residual_base_gate not in {"none", "sigmoid"}:
             raise ValueError("linear_residual_base_gate must be 'none' or 'sigmoid'")
+        if self.linear_residual_fusion not in {"none", "base-prediction"}:
+            raise ValueError(
+                "linear_residual_fusion must be 'none' or 'base-prediction'"
+            )
         if self.linear_residual_base_gate_sharpness <= 0.0:
             raise ValueError("linear_residual_base_gate_sharpness must be > 0")
         if not 0.0 <= self.linear_residual_base_gate_floor <= 1.0:
@@ -547,6 +575,13 @@ class RnaSeq11Adapter(torch.nn.Module):
             else:
                 self.linear_input_bottleneck = None
                 in_channels = raw_in_channels
+            if self.linear_residual_fusion == "base-prediction":
+                if linear_residual_base_head is None:
+                    raise ValueError(
+                        "linear_residual_fusion='base-prediction' requires "
+                        "linear_residual_base_head"
+                    )
+                in_channels += n_tracks
             self.head = build_linear_head(
                 in_channels=in_channels,
                 n_tracks=n_tracks,
@@ -555,6 +590,7 @@ class RnaSeq11Adapter(torch.nn.Module):
                 track_means=linear_track_means,
                 residual_scale_init=linear_residual_scale_init,
                 dilation=linear_dilation,
+                kernel_size=linear_kernel_size,
             )
             if linear_residual_base_head is not None:
                 if linear_residual_base_resolution not in {1, 128}:
@@ -700,13 +736,7 @@ class RnaSeq11Adapter(torch.nn.Module):
                 channels_last=False,
             )
 
-        prediction = self._linear_prediction_from_embeddings(
-            embeddings,
-            resolution=self.embedding_resolution,
-            prediction_head=self.head,
-            input_bottleneck=self.linear_input_bottleneck,
-            target_length=target_length,
-        )
+        base_prediction = None
         if self.linear_residual_base_head is not None:
             base_prediction = self._linear_prediction_from_embeddings(
                 embeddings,
@@ -715,6 +745,19 @@ class RnaSeq11Adapter(torch.nn.Module):
                 input_bottleneck=self.linear_residual_base_input_bottleneck,
                 target_length=target_length,
             )
+        prediction = self._linear_prediction_from_embeddings(
+            embeddings,
+            resolution=self.embedding_resolution,
+            prediction_head=self.head,
+            input_bottleneck=self.linear_input_bottleneck,
+            target_length=target_length,
+            extra_head_input=(
+                None
+                if self.linear_residual_fusion == "none"
+                else base_prediction.detach()
+            ),
+        )
+        if base_prediction is not None:
             assert self.linear_residual_correction_scale is not None
             residual_update = (
                 self.linear_residual_correction_scale.to(dtype=prediction.dtype)
@@ -754,6 +797,7 @@ class RnaSeq11Adapter(torch.nn.Module):
         prediction_head: torch.nn.Module,
         input_bottleneck: torch.nn.Module | None,
         target_length: int | None,
+        extra_head_input: torch.Tensor | None = None,
     ) -> torch.Tensor:
         key = f"embeddings_{resolution}bp"
         head_input = embeddings[key].to(dtype=next(prediction_head.parameters()).dtype)
@@ -770,6 +814,19 @@ class RnaSeq11Adapter(torch.nn.Module):
                 kernel_size=pool_factor,
                 stride=pool_factor,
             )
+        if extra_head_input is not None:
+            extra_head_input = extra_head_input.to(
+                device=head_input.device,
+                dtype=head_input.dtype,
+            )
+            if extra_head_input.shape[-1] != head_input.shape[-1]:
+                extra_head_input = F.interpolate(
+                    extra_head_input,
+                    size=head_input.shape[-1],
+                    mode="linear",
+                    align_corners=False,
+                )
+            head_input = torch.cat([head_input, extra_head_input], dim=1)
 
         prediction = prediction_head(head_input)
         if target_length is not None and prediction.shape[-1] != target_length:
