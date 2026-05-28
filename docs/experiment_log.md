@@ -34,6 +34,70 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-28 - RNA-seq11 1bp-B Head, Fusion, and 1bp-C Sanity Sweep
+
+- Run type: training and evaluation
+- Purpose: Continue validation-only exploration on HY-GPU GPUs `2,3` after GPUs `0,1` were reserved for other work. The run tested whether expanding the current 1bp-B residual-correction head, adding base-prediction fusion, or using direct full-resolution 1bp-C depthwise heads could improve over the current validation leader without touching the held-out test split.
+- Git commit: `0b2b0ce`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server
+- Slurm request: Not applicable
+- Environment: Conda environment `alphagenome`; independent single-GPU jobs with `CUDA_VISIBLE_DEVICES=2` or `CUDA_VISIBLE_DEVICES=3`; no DDP; no test split used.
+- Command:
+
+```bash
+# Representative command shape. Individual runs changed output-dir,
+# architecture, dilation/kernel, fusion flag, and learning rate.
+CUDA_VISIBLE_DEVICES=<2-or-3> PYTHONUNBUFFERED=1 \
+  /home/zelinli6/miniconda3/envs/alphagenome/bin/python -u \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --residual-base-checkpoint runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt \
+  --init-adapter-checkpoint runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps/adapter_head_best.pt \
+  --init-adapter-checkpoint-mode matching-shapes \
+  --head-type linear \
+  --embedding-resolution 1 \
+  --linear-loss-type hybrid \
+  --hybrid-loss-alpha 0.5 \
+  --smooth-l1-beta 0.5 \
+  --track-loss-weight-preset intestine-hard-boost-1.5 \
+  --linear-target-space full-log1p \
+  --target-transform log1p \
+  --batch-size 1 \
+  --grad-accum-steps 1 \
+  --num-workers 0 \
+  --eval-every 250 \
+  --learning-rate 3e-5 \
+  --lr-schedule constant \
+  --selection-metric full-mse \
+  --residual-correction-l2 0.001 \
+  --residual-correction-scale-init 0.01 \
+  --seed -1 \
+  --device auto
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train`, `alphagenome_custom/datasets/rna_seq_npz_valid`, base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`, frozen 128 bp base checkpoint `runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt`, current 1bp-B leader checkpoint `runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps/adapter_head_best.pt`
+- Output path: `runs/rna_seq11_1bpB_head_sweep_20260528_*`, `runs/rna_seq11_1bpB_fusion_20260528_*`, `runs/rna_seq11_1bpC_sanity_20260528_*`; logs under `logs/rna_seq11_next_20260528/`
+- Result summary: No run improved over the current validation leader `0.83557710` full MSE. Best new result was base-prediction fusion conv5 at `0.84498210` full MSE. Match-initialized head/fusion variants clustered around `0.845-0.852`; direct 1bp-C full-head sanity runs were much worse (`1.15-1.42` full MSE at 250 steps).
+- Verification:
+  - `fusion basepred conv5 b128 h128`: valid step 250 full MSE `0.84498210`, MAE `0.58407372`, Pearson `0.69025205`, common128 MSE `0.84939837`
+  - `conv7 matchinit`: valid step 250 full MSE `0.84499249`, MAE `0.59198224`, Pearson `0.69008607`, common128 MSE `0.84404808`
+  - `dilated-conv3 d4 matchinit`: valid step 250 full MSE `0.84734383`, Pearson `0.68874216`
+  - `dilated-conv3 d2 matchinit`: valid step 250 full MSE `0.84758516`, Pearson `0.68842723`
+  - `fusion basepred conv7`: valid step 250 full MSE `0.85084183`, Pearson `0.68730186`
+  - `conv3x2 matchinit`: valid step 250 full MSE `0.85233903`, Pearson `0.68717763`
+  - `conv5 b128 h256 fresh beta1 lr1e-4`: best observed valid full MSE `0.86154250` at step 500
+  - `conv5 b256 h128 fresh beta1 lr1e-4`: best observed valid full MSE `0.86482886` at step 500
+  - `1bp-C depthwise k31 lr3e-4`: valid step 250 full MSE `1.15021460`, Pearson `0.55297077`
+  - `1bp-C depthwise k15 lr3e-4`: valid step 250 full MSE `1.27282590`, Pearson `0.53974875`
+  - `1bp-C depthwise k15 lr1e-4`: valid step 250 full MSE `1.41703420`, Pearson `0.39250081`
+- Failures or warnings: Two initial capacity runs were identified as weak because changed head shapes prevented strict warm-start and they effectively trained fresh correction heads at low learning rate; they were stopped after step-500 validation. Subsequent architecture/fusion runs used `--init-adapter-checkpoint-mode matching-shapes`. Weak runs were stopped after enough validation evidence to avoid unnecessary GPU use.
+- Next actions: Keep the current 1bp-B leader as best validation checkpoint. Do not continue direct 1bp-C from scratch. If exploring further, prioritize diagnostics-guided objective changes around the existing leader or carefully designed residual/fusion methods that preserve the current conv5 correction behavior.
+- Claim status: verified
+
 ## 2026-05-27 - RNA-seq11 1bp-B Broad Beta-0.5 Continuation
 
 - Run type: training and evaluation
