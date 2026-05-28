@@ -71,6 +71,16 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional adapter checkpoint used to initialize the 11-track head.",
     )
+    parser.add_argument(
+        "--init-adapter-checkpoint-mode",
+        choices=["strict", "matching-shapes"],
+        default="strict",
+        help=(
+            "How to load --init-adapter-checkpoint. strict requires an exact "
+            "adapter architecture match; matching-shapes copies only adapter "
+            "state_dict entries with identical names and shapes."
+        ),
+    )
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--max-steps", type=int, default=20)
@@ -1085,6 +1095,30 @@ def write_config(
         handle.write("\n")
 
 
+def load_matching_adapter_head_state_dict(
+    model: RnaSeq11Adapter,
+    state_dict: dict[str, torch.Tensor],
+) -> tuple[list[str], list[str]]:
+    """Load adapter parameters whose names and shapes match the current model."""
+
+    target_state = model.adapter_head_state_dict()
+    merged_state: dict[str, torch.Tensor] = {}
+    loaded_keys: list[str] = []
+    skipped_keys: list[str] = []
+    for key, target_value in target_state.items():
+        source_value = state_dict.get(key)
+        if source_value is not None and tuple(source_value.shape) == tuple(
+            target_value.shape
+        ):
+            merged_state[key] = source_value
+            loaded_keys.append(key)
+        else:
+            merged_state[key] = target_value
+            skipped_keys.append(key)
+    model.load_adapter_head_state_dict(merged_state)
+    return loaded_keys, skipped_keys
+
+
 def append_metric(
     path: Path,
     *,
@@ -1173,6 +1207,7 @@ def save_training_checkpoint(
     lora_alpha: int,
     freeze_head: bool,
     init_adapter_checkpoint: str | None,
+    init_adapter_checkpoint_mode: str,
     head_type: str,
     head_resolutions: tuple[int, ...],
     linear_head_architecture: str,
@@ -1255,6 +1290,7 @@ def save_training_checkpoint(
         ),
         "freeze_head": freeze_head,
         "init_adapter_checkpoint": init_adapter_checkpoint,
+        "init_adapter_checkpoint_mode": init_adapter_checkpoint_mode,
         "track_means_source": track_means_source,
         "track_means_tsv": track_means_tsv,
         "track_means_max_examples": track_means_max_examples,
@@ -1488,6 +1524,11 @@ def main() -> None:
     print_main(rank, f"output_dir\t{output_dir}")
     print_main(rank, f"config_path\t{config_path}")
     print_main(rank, f"metrics_path\t{metrics_path}")
+    print_main(rank, f"init_adapter_checkpoint\t{args.init_adapter_checkpoint}")
+    print_main(
+        rank,
+        f"init_adapter_checkpoint_mode\t{args.init_adapter_checkpoint_mode}",
+    )
     print_main(
         rank,
         f"checkpoint_path\t{checkpoint_path if not args.no_save_checkpoint else 'disabled'}",
@@ -1729,12 +1770,21 @@ def main() -> None:
                 "Init checkpoint head_resolutions="
                 f"{checkpoint_head_resolutions}, requested={head_resolutions}"
             )
-        if args.head_type == "linear" and checkpoint_resolution != args.embedding_resolution:
+        if (
+            args.head_type == "linear"
+            and checkpoint_resolution != args.embedding_resolution
+        ):
             raise ValueError(
                 "Init checkpoint embedding_resolution="
                 f"{checkpoint_resolution}, requested={args.embedding_resolution}"
             )
         if args.head_type == "linear":
+            if checkpoint_linear_target_space != args.linear_target_space:
+                raise ValueError(
+                    "Init checkpoint linear_target_space="
+                    f"{checkpoint_linear_target_space}, requested={args.linear_target_space}"
+                )
+        if args.head_type == "linear" and args.init_adapter_checkpoint_mode == "strict":
             if checkpoint_linear_head_architecture != args.linear_head_architecture:
                 raise ValueError(
                     "Init checkpoint linear_head_architecture="
@@ -1782,12 +1832,27 @@ def main() -> None:
                     f"{checkpoint_linear_residual_fusion}, "
                     f"requested={args.linear_residual_fusion}"
                 )
-            if checkpoint_linear_target_space != args.linear_target_space:
-                raise ValueError(
-                    "Init checkpoint linear_target_space="
-                    f"{checkpoint_linear_target_space}, requested={args.linear_target_space}"
+        if args.init_adapter_checkpoint_mode == "strict":
+            model.load_adapter_head_state_dict(
+                init_checkpoint["adapter_head_state_dict"]
+            )
+        else:
+            loaded_keys, skipped_keys = load_matching_adapter_head_state_dict(
+                model,
+                init_checkpoint["adapter_head_state_dict"],
+            )
+            print_main(rank, f"init_matching_loaded_keys\t{len(loaded_keys)}")
+            print_main(rank, f"init_matching_skipped_keys\t{len(skipped_keys)}")
+            if loaded_keys:
+                print_main(
+                    rank,
+                    "init_matching_loaded_key_list\t" + ",".join(loaded_keys),
                 )
-        model.load_adapter_head_state_dict(init_checkpoint["adapter_head_state_dict"])
+            if skipped_keys:
+                print_main(
+                    rank,
+                    "init_matching_skipped_key_list\t" + ",".join(skipped_keys),
+                )
 
     lora_target_modules: list[str] = []
     lora_parameters: list[torch.nn.Parameter] = []
@@ -2096,6 +2161,7 @@ def main() -> None:
                         lora_alpha=args.lora_alpha,
                         freeze_head=args.freeze_head,
                         init_adapter_checkpoint=args.init_adapter_checkpoint,
+                        init_adapter_checkpoint_mode=args.init_adapter_checkpoint_mode,
                         head_type=args.head_type,
                         head_resolutions=head_resolutions,
                         linear_head_architecture=args.linear_head_architecture,
@@ -2187,6 +2253,7 @@ def main() -> None:
             lora_alpha=args.lora_alpha,
             freeze_head=args.freeze_head,
             init_adapter_checkpoint=args.init_adapter_checkpoint,
+            init_adapter_checkpoint_mode=args.init_adapter_checkpoint_mode,
             head_type=args.head_type,
             head_resolutions=head_resolutions,
             linear_head_architecture=args.linear_head_architecture,
