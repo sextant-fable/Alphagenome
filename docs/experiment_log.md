@@ -34,6 +34,53 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-29 - RNA-seq11 Top-15 Extended Valid Diagnostics
+
+- Run type: evaluation and analysis
+- Purpose: Compute extended valid-only diagnostics for the top 15 existing RNA-seq11 checkpoints ranked by valid full-resolution log1p MSE with Pearson as tie-breaker. Diagnostics include per-track MSE/MAE/Pearson/sampled Spearman, signal strata, gene-level expression, TSS/promoter/gene-body/exon/intron/intergenic regions, high-signal top-bin overlap, and resolution-specific pooled/gradient metrics.
+- Git commit: `be22349` at run start, with `scripts/rna_seq11_top15_extended_diagnostics.py` added in the working tree for this run.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server.
+- Slurm request: Not applicable.
+- Environment: Conda environment `alphagenome`; GPU work restricted to `CUDA_VISIBLE_DEVICES=2` and `CUDA_VISIBLE_DEVICES=3` for two evaluation shards. GPU `1` had an unrelated VLLM process; GPU `0` was not used.
+- Command:
+
+```bash
+conda activate alphagenome
+cd /home/zelinli6/Alphagenome
+
+python -m py_compile scripts/rna_seq11_top15_extended_diagnostics.py
+
+python scripts/rna_seq11_top15_extended_diagnostics.py \
+  --only-write-top15 \
+  --output-dir runs/rna_seq11_top15_extended_diagnostics_20260529
+
+CUDA_VISIBLE_DEVICES=2 python scripts/rna_seq11_top15_extended_diagnostics.py \
+  --top-n 15 \
+  --num-shards 2 \
+  --rank-shard 0 \
+  --output-dir runs/rna_seq11_top15_extended_diagnostics_20260529/shard0 \
+  --device auto \
+  --spearman-sample-size 300000
+
+CUDA_VISIBLE_DEVICES=3 python scripts/rna_seq11_top15_extended_diagnostics.py \
+  --top-n 15 \
+  --num-shards 2 \
+  --rank-shard 1 \
+  --output-dir runs/rna_seq11_top15_extended_diagnostics_20260529/shard1 \
+  --device auto \
+  --spearman-sample-size 300000
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_valid` only; GTF annotations from `alphagenome_custom/reference/Caenorhabditis_elegans.WBcel235.115.gtf`; checkpoints selected from existing `runs/` outputs. The test split was not read.
+- Output path: `runs/rna_seq11_top15_extended_diagnostics_20260529`; summary report at `docs/rna_seq11_top15_extended_diagnostics_20260529.md`.
+- Result summary: Rank 1 is `runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps/adapter_head_best.pt`, valid MSE `0.83557710`, MAE `0.58180543`, Pearson `0.69463443`. It improves over the prior 128 bp conv5 hybrid step4000 baseline by `-0.04474871` MSE and `+0.02071778` Pearson. Extended diagnostics show remaining weakness in intestine tracks, high-signal/top-quantile regions, exon/gene-body regions, and local high-resolution gradient behavior.
+- Verification: `py_compile` passed. Smoke diagnostics with `--top-n 1 --max-examples 1` completed before full evaluation. The merged tables cover ranks `1-15`; row counts were `per_track=180`, `signal_strata=1260`, `region=900`, `resolution=1440`, `window=585`, `gene=180`, `high_signal_localization=360`, and `model_config=15`.
+- Failures or warnings: Full-resolution Spearman is sampled at about 300,000 positions per track rather than exact over all bases. Region and gene-level metrics use non-overlapping valid-window cores to avoid double-counting overlapping valid windows. No test metrics were computed.
+- Next actions: Treat rank 1 as the MSE winner and rank 3 as a co-best gene/pooled-resolution candidate. Next exploration should target high-signal, exon/gene-body, and gene-level calibration objectives rather than more tiny low-learning-rate continuations.
+- Claim status: verified
+
 ## 2026-05-28 - RNA-seq11 1bp-B Head, Fusion, and 1bp-C Sanity Sweep
 
 - Run type: training and evaluation
