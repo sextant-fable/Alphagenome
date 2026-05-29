@@ -34,6 +34,71 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-29 - RNA-seq11 Adaptive Objective and Calibration Screen
+
+- Run type: training, evaluation, and analysis
+- Purpose: Implement and test validation-only adaptive training objectives targeting high-signal amplitude, exon/gene-body error, intestine tracks, gene-level expression, and local 1 bp boundary/gradient behavior. Model selection remained unweighted valid full-resolution MSE; the held-out test split was not read.
+- Git commit: `71ee5dd`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server.
+- Slurm request: Not applicable.
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; jobs restricted to `CUDA_VISIBLE_DEVICES=2` and `CUDA_VISIBLE_DEVICES=3`.
+- Command:
+
+```bash
+conda activate alphagenome
+cd /home/zelinli6/Alphagenome
+
+python -m py_compile \
+  scripts/alphagenome_rna_seq11_adapter.py \
+  scripts/alphagenome_rna_seq11_finetune.py \
+  scripts/alphagenome_rna_seq11_eval.py \
+  scripts/rna_seq11_top15_extended_diagnostics.py
+
+# Representative training command shape. Individual runs varied init checkpoint,
+# output-dir, weighted objective flags, calibration flags, learning rate, and steps.
+CUDA_VISIBLE_DEVICES=<2-or-3> PYTHONUNBUFFERED=1 \
+conda run -n alphagenome python -u scripts/alphagenome_rna_seq11_finetune.py \
+  --train-dataset-dir alphagenome_custom/datasets/rna_seq_npz_train \
+  --valid-dataset-dir alphagenome_custom/datasets/rna_seq_npz_valid \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --residual-base-checkpoint runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt \
+  --head-type linear \
+  --embedding-resolution 1 \
+  --linear-head-architecture conv5 \
+  --linear-hidden-channels 128 \
+  --linear-input-bottleneck-channels 128 \
+  --linear-loss-type hybrid \
+  --hybrid-loss-alpha 0.75 \
+  --smooth-l1-beta 0.5 \
+  --linear-target-space full-log1p \
+  --target-transform log1p \
+  --track-loss-weight-preset intestine-hard-boost-1.5 \
+  --selection-metric full-mse \
+  --batch-size 1 \
+  --grad-accum-steps 1 \
+  --num-workers 0 \
+  --device auto
+
+CUDA_VISIBLE_DEVICES=2 PYTHONUNBUFFERED=1 \
+conda run -n alphagenome python -u scripts/rna_seq11_top15_extended_diagnostics.py \
+  --runs-dir runs/rna_seq11_phase5_final_diag_candidates_20260529 \
+  --output-dir runs/rna_seq11_phase5_final_diagnostics_20260529 \
+  --top-n 8 \
+  --device auto \
+  --batch-size 1 \
+  --num-workers 0
+```
+
+- Input data: `alphagenome_custom/datasets/rna_seq_npz_train` and `alphagenome_custom/datasets/rna_seq_npz_valid`; GTF annotations from `alphagenome_custom/reference/Caenorhabditis_elegans.WBcel235.115.gtf`; base weights from `weights/alphagenome_pytorch/model_all_folds.safetensors`; frozen 128 bp residual base checkpoint from `runs/rna_seq11_phase4_lr_schedule_5000_conv5_h256_step4000_fulllog1p_hybrid_b1_lr0.001_seed20260522_5000steps_step_s4000/adapter_head_best.pt`.
+- Output path: Run outputs under `runs/rna_seq11_1bpB_sigweight_*`, `runs/rna_seq11_1bpB_region_*`, `runs/rna_seq11_1bpB_geneaux_*`, `runs/rna_seq11_1bpB_calib_*`; diagnostics under `runs/rna_seq11_phase1_sigweight_diagnostics_20260529`, `runs/rna_seq11_phase2_region_diagnostics_v1v2_20260529`, `runs/rna_seq11_phase3_geneaux_diagnostics_20260529`, and `runs/rna_seq11_phase5_final_diagnostics_20260529`; detailed run record at `docs/rna_seq11_adaptive_objective_screen_20260529.md`.
+- Result summary: No new candidate improved unweighted valid full MSE over the current rank1 baseline `0.83557710`. Best new full-MSE candidate was `rank1_calib_trackaffine_lr3e5` at `0.83577257`. Signal weighting improved high-signal amplitude metrics but hurt full MSE. Region weighting improved exon/gene-body MSE but hurt full MSE and intergenic error. Gene auxiliary loss at `lambda=0.03` did not improve gene-MSE. Track-affine calibration slightly improved high-signal amplitude but did not improve full MSE, so high-signal-gated calibration was not run.
+- Verification: `py_compile` passed for the edited scripts. Phase0 2-step smoke run completed at `runs/rna_seq11_phase0_code_smoke_20260529_sig_region_gene_calib_2steps`. Final diagnostics completed for 8 candidates with row counts `per_track=97`, `gene=97`, `signal_strata=673`, `region=481`, and `resolution=769`.
+- Failures or warnings: Git push of commit `71ee5dd` was not attempted successfully in this session because the checkout lacks GitHub HTTPS credentials; this is not a code failure. Several runs were deliberately stopped after intermediate validation showed plateau or full-MSE degradation. No test metrics were computed.
+- Next actions: Keep the current rank1 checkpoint as the main validation winner and rank3 as a gene-level co-reference. Future work should change model capacity or target parameterization for high-signal amplitude/local-boundary behavior rather than simply increasing loss weights on the same residual head.
+- Claim status: verified
+
 ## 2026-05-29 - RNA-seq11 Top-15 Extended Valid Diagnostics
 
 - Run type: evaluation and analysis
