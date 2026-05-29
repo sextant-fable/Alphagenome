@@ -888,6 +888,15 @@ def main() -> None:
             linear_kernel_size=int(
                 residual_base_checkpoint.get("linear_kernel_size", 15)
             ),
+            linear_output_calibration=str(
+                residual_base_checkpoint.get("linear_output_calibration", "none")
+            ),
+            linear_output_calibration_gate_center=float(
+                residual_base_checkpoint.get("calibration_gate_center", 3.0)
+            ),
+            linear_output_calibration_gate_sharpness=float(
+                residual_base_checkpoint.get("calibration_gate_sharpness", 3.0)
+            ),
         ).to(device)
         residual_base_probe.load_adapter_head_state_dict(
             residual_base_checkpoint["adapter_head_state_dict"]
@@ -917,6 +926,15 @@ def main() -> None:
         linear_residual_base_gate_center=residual_base_gate_center,
         linear_residual_base_gate_sharpness=residual_base_gate_sharpness,
         linear_residual_base_gate_floor=residual_base_gate_floor,
+        linear_output_calibration=str(
+            checkpoint.get("linear_output_calibration", "none")
+        ),
+        linear_output_calibration_gate_center=float(
+            checkpoint.get("calibration_gate_center", 3.0)
+        ),
+        linear_output_calibration_gate_sharpness=float(
+            checkpoint.get("calibration_gate_sharpness", 3.0)
+        ),
         track_means=track_means,
     ).to(device)
     model.load_adapter_head_state_dict(checkpoint_head_state)

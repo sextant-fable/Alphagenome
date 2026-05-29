@@ -33,6 +33,7 @@ LinearHeadArchitecture = Literal[
 ]
 LinearLossType = Literal["mse", "smooth-l1", "hybrid", "hybrid-mse-smooth-l1"]
 LinearTargetSpace = Literal["full-log1p", "binned128-log1p-mean"]
+LinearOutputCalibrationMode = Literal["none", "track-affine", "high-signal-gated"]
 
 
 def parse_resolutions(
@@ -120,6 +121,47 @@ class ResidualTrackMeanHead(torch.nn.Module):
         residual = self.base_head(embeddings)
         return self.track_means.to(dtype=residual.dtype) + (
             self.residual_scale.to(dtype=residual.dtype) * residual
+        )
+
+
+class LinearOutputCalibration(torch.nn.Module):
+    """Lightweight per-track calibration in linear head prediction space."""
+
+    def __init__(
+        self,
+        *,
+        n_tracks: int,
+        mode: LinearOutputCalibrationMode,
+        gate_center: float = 3.0,
+        gate_sharpness: float = 3.0,
+    ) -> None:
+        super().__init__()
+        if mode not in {"track-affine", "high-signal-gated"}:
+            raise ValueError("LinearOutputCalibration mode must be non-none")
+        if gate_sharpness <= 0.0:
+            raise ValueError("linear output calibration gate sharpness must be > 0")
+        self.mode = mode
+        self.gate_center = float(gate_center)
+        self.gate_sharpness = float(gate_sharpness)
+        if mode == "track-affine":
+            self.scale = torch.nn.Parameter(torch.ones(1, n_tracks, 1))
+            self.bias = torch.nn.Parameter(torch.zeros(1, n_tracks, 1))
+        else:
+            self.high_scale = torch.nn.Parameter(torch.zeros(1, n_tracks, 1))
+
+    def forward(self, prediction: torch.Tensor) -> torch.Tensor:
+        if self.mode == "track-affine":
+            return (
+                self.scale.to(dtype=prediction.dtype) * prediction
+                + self.bias.to(dtype=prediction.dtype)
+            )
+
+        gate = torch.sigmoid(
+            self.gate_sharpness
+            * (prediction - torch.as_tensor(self.gate_center, device=prediction.device))
+        )
+        return prediction + (
+            gate * self.high_scale.to(dtype=prediction.dtype) * prediction
         )
 
 
@@ -514,6 +556,9 @@ class RnaSeq11Adapter(torch.nn.Module):
         linear_residual_base_gate_center: float = 0.5,
         linear_residual_base_gate_sharpness: float = 4.0,
         linear_residual_base_gate_floor: float = 0.0,
+        linear_output_calibration: LinearOutputCalibrationMode = "none",
+        linear_output_calibration_gate_center: float = 3.0,
+        linear_output_calibration_gate_sharpness: float = 3.0,
         track_means: torch.Tensor | Sequence[float] | None = None,
         num_head_organisms: int | None = None,
     ) -> None:
@@ -544,8 +589,26 @@ class RnaSeq11Adapter(torch.nn.Module):
             linear_residual_base_gate_sharpness
         )
         self.linear_residual_base_gate_floor = float(linear_residual_base_gate_floor)
+        self.linear_output_calibration_mode = linear_output_calibration
+        self.linear_output_calibration_gate_center = float(
+            linear_output_calibration_gate_center
+        )
+        self.linear_output_calibration_gate_sharpness = float(
+            linear_output_calibration_gate_sharpness
+        )
         if self.linear_residual_base_gate not in {"none", "sigmoid"}:
             raise ValueError("linear_residual_base_gate must be 'none' or 'sigmoid'")
+        if self.linear_output_calibration_mode not in {
+            "none",
+            "track-affine",
+            "high-signal-gated",
+        }:
+            raise ValueError(
+                "linear_output_calibration must be 'none', 'track-affine', "
+                "or 'high-signal-gated'"
+            )
+        if self.head_type != "linear" and self.linear_output_calibration_mode != "none":
+            raise ValueError("linear output calibration is only supported for linear heads")
         if self.linear_residual_fusion not in {"none", "base-prediction"}:
             raise ValueError(
                 "linear_residual_fusion must be 'none' or 'base-prediction'"
@@ -554,6 +617,8 @@ class RnaSeq11Adapter(torch.nn.Module):
             raise ValueError("linear_residual_base_gate_sharpness must be > 0")
         if not 0.0 <= self.linear_residual_base_gate_floor <= 1.0:
             raise ValueError("linear_residual_base_gate_floor must be between 0 and 1")
+        if self.linear_output_calibration_gate_sharpness <= 0.0:
+            raise ValueError("linear output calibration gate sharpness must be > 0")
 
         if self.head_type == "linear":
             if len(self.head_resolutions) != 1:
@@ -614,11 +679,22 @@ class RnaSeq11Adapter(torch.nn.Module):
                 self.linear_residual_base_head = None
                 self.linear_residual_base_input_bottleneck = None
                 self.linear_residual_correction_scale = None
+            self.linear_output_calibration = (
+                None
+                if self.linear_output_calibration_mode == "none"
+                else LinearOutputCalibration(
+                    n_tracks=n_tracks,
+                    mode=self.linear_output_calibration_mode,
+                    gate_center=self.linear_output_calibration_gate_center,
+                    gate_sharpness=self.linear_output_calibration_gate_sharpness,
+                )
+            )
         else:
             self.linear_input_bottleneck = None
             self.linear_residual_base_head = None
             self.linear_residual_base_input_bottleneck = None
             self.linear_residual_correction_scale = None
+            self.linear_output_calibration = None
             num_organisms = (
                 max(organism_index + 1, 1)
                 if num_head_organisms is None
@@ -757,6 +833,7 @@ class RnaSeq11Adapter(torch.nn.Module):
                 else base_prediction.detach()
             ),
         )
+        residual_update = None
         if base_prediction is not None:
             assert self.linear_residual_correction_scale is not None
             residual_update = (
@@ -765,12 +842,15 @@ class RnaSeq11Adapter(torch.nn.Module):
                 * prediction
             )
             prediction = base_prediction.detach() + residual_update
-            if return_linear_residual_update:
-                return prediction, residual_update
         elif return_linear_residual_update:
             raise ValueError(
                 "return_linear_residual_update requires a residual base head"
             )
+        if self.linear_output_calibration is not None:
+            prediction = self.linear_output_calibration(prediction)
+        if return_linear_residual_update:
+            assert residual_update is not None
+            return prediction, residual_update
         return prediction
 
     def _linear_residual_gate(
@@ -842,6 +922,7 @@ class RnaSeq11Adapter(torch.nn.Module):
         if (
             self.linear_input_bottleneck is None
             and self.linear_residual_base_head is None
+            and self.linear_output_calibration is None
         ):
             return self.head.state_dict()
 
@@ -876,13 +957,33 @@ class RnaSeq11Adapter(torch.nn.Module):
                 state_dict["linear_residual_correction_scale"] = (
                     self.linear_residual_correction_scale.detach().clone()
                 )
+        if self.linear_output_calibration is not None:
+            state_dict.update(
+                {
+                    f"linear_output_calibration.{key}": value
+                    for key, value in self.linear_output_calibration.state_dict().items()
+                }
+            )
         return state_dict
 
     def load_adapter_head_state_dict(
         self,
         state_dict: dict[str, torch.Tensor],
     ) -> None:
-        if not any(key.startswith("head.") for key in state_dict):
+        has_prefixed_state = any(
+            key.startswith(
+                (
+                    "head.",
+                    "linear_input_bottleneck.",
+                    "linear_residual_base_head.",
+                    "linear_residual_base_input_bottleneck.",
+                    "linear_output_calibration.",
+                )
+            )
+            or key == "linear_residual_correction_scale"
+            for key in state_dict
+        )
+        if not has_prefixed_state:
             self.head.load_state_dict(state_dict)
             return
 
@@ -929,6 +1030,14 @@ class RnaSeq11Adapter(torch.nn.Module):
                         dtype=self.linear_residual_correction_scale.dtype,
                     )
                 )
+        if self.linear_output_calibration is not None:
+            calibration_state = {
+                key.removeprefix("linear_output_calibration."): value
+                for key, value in state_dict.items()
+                if key.startswith("linear_output_calibration.")
+            }
+            if calibration_state:
+                self.linear_output_calibration.load_state_dict(calibration_state)
 
 
 def prediction_return_scaled_for_loss(model: RnaSeq11Adapter, loss_type: LossType) -> bool:

@@ -9,6 +9,7 @@ import json
 import math
 import os
 import random
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -288,6 +289,29 @@ def parse_args() -> argparse.Namespace:
         help="Minimum gate value for --residual-base-gate sigmoid.",
     )
     parser.add_argument(
+        "--linear-output-calibration",
+        choices=["none", "track-affine", "high-signal-gated"],
+        default="none",
+        help="Optional lightweight calibration applied after the linear head output.",
+    )
+    parser.add_argument(
+        "--calibration-gate-center",
+        type=float,
+        default=3.0,
+        help="Center for --linear-output-calibration high-signal-gated.",
+    )
+    parser.add_argument(
+        "--calibration-gate-sharpness",
+        type=float,
+        default=3.0,
+        help="Sharpness for --linear-output-calibration high-signal-gated.",
+    )
+    parser.add_argument(
+        "--train-only-calibration",
+        action="store_true",
+        help="Freeze existing head modules and update only calibration parameters.",
+    )
+    parser.add_argument(
         "--linear-loss-type",
         choices=["mse", "smooth-l1", "hybrid", "hybrid-mse-smooth-l1"],
         default="mse",
@@ -331,6 +355,71 @@ def parse_args() -> argparse.Namespace:
             "Optional comma-separated per-track training loss weights. Overrides "
             "--track-loss-weight-preset. Validation full metrics remain unweighted."
         ),
+    )
+    parser.add_argument(
+        "--signal-loss-weight-preset",
+        choices=[
+            "none",
+            "high-gt3-x1.5",
+            "high-gt3-x2",
+            "high-gt3-x3",
+            "top5-x2",
+            "top5-x3",
+            "top1-x5",
+            "intestine-high-x3",
+        ],
+        default="none",
+        help=(
+            "Optional elementwise training loss weighting from train-batch signal. "
+            "Validation metrics remain unweighted."
+        ),
+    )
+    parser.add_argument(
+        "--signal-high-threshold",
+        type=float,
+        default=3.0,
+        help="Loss-space threshold for high-gt3 signal weighting presets.",
+    )
+    parser.add_argument(
+        "--signal-top-quantile",
+        type=float,
+        default=None,
+        help=(
+            "Optional dynamic train-batch quantile for top-signal presets. "
+            "Defaults are 0.95 for top5 and 0.99 for top1."
+        ),
+    )
+    parser.add_argument(
+        "--region-loss-weight-preset",
+        choices=["none", "exon-gene-v1", "exon-gene-v2"],
+        default="none",
+        help=(
+            "Optional GTF-derived train-batch region weighting. Validation metrics "
+            "remain unweighted."
+        ),
+    )
+    parser.add_argument(
+        "--gtf",
+        default="alphagenome_custom/reference/Caenorhabditis_elegans.WBcel235.115.gtf",
+        help="GTF used for train-only region weighting and gene auxiliary loss.",
+    )
+    parser.add_argument(
+        "--promoter-radius-bp",
+        type=int,
+        default=1000,
+        help="Promoter half-width around transcript TSS for region weighting.",
+    )
+    parser.add_argument(
+        "--gene-aux-loss-weight",
+        type=float,
+        default=0.0,
+        help="Training-only auxiliary MSE on per-gene gene-body mean predictions.",
+    )
+    parser.add_argument(
+        "--gene-aux-min-bases",
+        type=int,
+        default=128,
+        help="Minimum overlapped bases/bins for a gene to contribute aux loss.",
     )
     parser.add_argument(
         "--linear-target-space",
@@ -563,6 +652,400 @@ def format_track_loss_weights(weights: list[float] | None) -> str:
     return ",".join(f"{weight:.8g}" for weight in weights)
 
 
+@dataclass(frozen=True)
+class GenomicInterval:
+    chrom: str
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
+class GtfAnnotations:
+    genes: dict[str, list[GenomicInterval]]
+    exons: dict[str, list[GenomicInterval]]
+    promoters: dict[str, list[GenomicInterval]]
+
+
+def parse_gtf_attributes(value: str) -> dict[str, str]:
+    attributes: dict[str, str] = {}
+    for part in value.strip().split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        if " " not in part:
+            attributes[part] = ""
+            continue
+        key, raw_value = part.split(" ", maxsplit=1)
+        attributes[key] = raw_value.strip().strip('"')
+    return attributes
+
+
+def merge_genomic_intervals(intervals: list[GenomicInterval]) -> list[GenomicInterval]:
+    merged: list[GenomicInterval] = []
+    for interval in sorted(intervals, key=lambda item: (item.chrom, item.start, item.end)):
+        if (
+            not merged
+            or interval.chrom != merged[-1].chrom
+            or interval.start > merged[-1].end
+        ):
+            merged.append(interval)
+            continue
+        previous = merged[-1]
+        merged[-1] = GenomicInterval(
+            chrom=previous.chrom,
+            start=previous.start,
+            end=max(previous.end, interval.end),
+        )
+    return merged
+
+
+def load_gtf_annotations_for_training(
+    path: Path,
+    *,
+    promoter_radius_bp: int,
+) -> GtfAnnotations:
+    if promoter_radius_bp < 0:
+        raise ValueError("--promoter-radius-bp must be >= 0")
+    genes: dict[str, list[GenomicInterval]] = {}
+    exons: dict[str, list[GenomicInterval]] = {}
+    promoters: dict[str, list[GenomicInterval]] = {}
+
+    with path.open() as handle:
+        for line in handle:
+            if not line or line.startswith("#"):
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) < 9:
+                continue
+            chrom, _source, feature, start_s, end_s, _score, strand, _frame, attr_s = fields
+            try:
+                start = int(start_s) - 1
+                end = int(end_s)
+            except ValueError:
+                continue
+            if end <= start:
+                continue
+            if feature == "gene":
+                genes.setdefault(chrom, []).append(
+                    GenomicInterval(chrom=chrom, start=start, end=end)
+                )
+            elif feature == "exon":
+                exons.setdefault(chrom, []).append(
+                    GenomicInterval(chrom=chrom, start=start, end=end)
+                )
+            elif feature == "transcript":
+                _attrs = parse_gtf_attributes(attr_s)
+                tss = start if strand != "-" else end
+                promoter_start = max(0, tss - promoter_radius_bp)
+                promoter_end = tss + promoter_radius_bp
+                if promoter_end > promoter_start:
+                    promoters.setdefault(chrom, []).append(
+                        GenomicInterval(
+                            chrom=chrom,
+                            start=promoter_start,
+                            end=promoter_end,
+                        )
+                    )
+
+    for container in (genes, exons, promoters):
+        for chrom, intervals in list(container.items()):
+            container[chrom] = merge_genomic_intervals(intervals)
+    return GtfAnnotations(genes=genes, exons=exons, promoters=promoters)
+
+
+def batch_chromosome(batch: dict[str, object], index: int) -> str:
+    chromosomes = batch["interval_chromosome"]
+    if isinstance(chromosomes, (list, tuple)):
+        return str(chromosomes[index])
+    return str(chromosomes)
+
+
+def batch_interval_start_end(batch: dict[str, object], index: int) -> tuple[int, int]:
+    starts = batch["interval_start"]
+    ends = batch["interval_end"]
+    if torch.is_tensor(starts):
+        start = int(starts[index].item())
+    elif isinstance(starts, (list, tuple)):
+        start = int(starts[index])
+    else:
+        start = int(starts)
+    if torch.is_tensor(ends):
+        end = int(ends[index].item())
+    elif isinstance(ends, (list, tuple)):
+        end = int(ends[index])
+    else:
+        end = int(ends)
+    return start, end
+
+
+def interval_mask_for_window(
+    intervals: dict[str, list[GenomicInterval]],
+    *,
+    chrom: str,
+    window_start: int,
+    window_end: int,
+    target_length: int,
+) -> np.ndarray:
+    mask = np.zeros(target_length, dtype=bool)
+    window_width = window_end - window_start
+    if target_length <= 0 or window_width <= 0:
+        return mask
+    scale = window_width / float(target_length)
+    for interval in intervals.get(chrom, []):
+        if interval.end <= window_start:
+            continue
+        if interval.start >= window_end:
+            break
+        overlap_start = max(interval.start, window_start)
+        overlap_end = min(interval.end, window_end)
+        if overlap_end <= overlap_start:
+            continue
+        local_start = overlap_start - window_start
+        local_end = overlap_end - window_start
+        if target_length == window_width:
+            start_index = int(local_start)
+            end_index = int(local_end)
+        else:
+            start_index = int(math.floor(local_start / scale))
+            end_index = int(math.ceil(local_end / scale))
+        start_index = max(0, min(target_length, start_index))
+        end_index = max(0, min(target_length, end_index))
+        if end_index > start_index:
+            mask[start_index:end_index] = True
+    return mask
+
+
+def region_preset_weights(preset: str) -> dict[str, float]:
+    if preset == "exon-gene-v1":
+        return {
+            "exon": 2.0,
+            "gene_body": 1.5,
+            "promoter": 1.25,
+            "intron": 1.0,
+            "intergenic": 0.75,
+        }
+    if preset == "exon-gene-v2":
+        return {
+            "exon": 1.5,
+            "gene_body": 1.25,
+            "promoter": 1.25,
+            "intron": 1.0,
+            "intergenic": 1.0,
+        }
+    raise ValueError(f"Unsupported --region-loss-weight-preset: {preset}")
+
+
+def build_region_loss_weights(
+    *,
+    target: torch.Tensor,
+    batch: dict[str, object],
+    annotations: GtfAnnotations,
+    preset: str,
+) -> torch.Tensor | None:
+    if preset == "none":
+        return None
+    preset_weights = region_preset_weights(preset)
+    batch_size = int(target.shape[0])
+    target_length = int(target.shape[-1])
+    sample_weights: list[torch.Tensor] = []
+    for batch_index in range(batch_size):
+        chrom = batch_chromosome(batch, batch_index)
+        window_start, window_end = batch_interval_start_end(batch, batch_index)
+        gene_mask = interval_mask_for_window(
+            annotations.genes,
+            chrom=chrom,
+            window_start=window_start,
+            window_end=window_end,
+            target_length=target_length,
+        )
+        exon_mask = interval_mask_for_window(
+            annotations.exons,
+            chrom=chrom,
+            window_start=window_start,
+            window_end=window_end,
+            target_length=target_length,
+        )
+        promoter_mask = interval_mask_for_window(
+            annotations.promoters,
+            chrom=chrom,
+            window_start=window_start,
+            window_end=window_end,
+            target_length=target_length,
+        )
+        intron_mask = gene_mask & ~exon_mask
+        weights = np.full(
+            target_length,
+            preset_weights["intergenic"],
+            dtype=np.float32,
+        )
+        weights[intron_mask] = np.maximum(weights[intron_mask], preset_weights["intron"])
+        weights[promoter_mask] = np.maximum(
+            weights[promoter_mask],
+            preset_weights["promoter"],
+        )
+        weights[gene_mask] = np.maximum(weights[gene_mask], preset_weights["gene_body"])
+        weights[exon_mask] = np.maximum(weights[exon_mask], preset_weights["exon"])
+        sample_weights.append(
+            torch.from_numpy(weights).to(device=target.device, dtype=target.dtype)
+        )
+    return torch.stack(sample_weights, dim=0).unsqueeze(1)
+
+
+def signal_preset_factor(preset: str) -> float:
+    factors = {
+        "high-gt3-x1.5": 1.5,
+        "high-gt3-x2": 2.0,
+        "high-gt3-x3": 3.0,
+        "top5-x2": 2.0,
+        "top5-x3": 3.0,
+        "top1-x5": 5.0,
+        "intestine-high-x3": 3.0,
+    }
+    try:
+        return factors[preset]
+    except KeyError as error:
+        raise ValueError(f"Unsupported --signal-loss-weight-preset: {preset}") from error
+
+
+def build_signal_loss_weights(
+    *,
+    target: torch.Tensor,
+    preset: str,
+    high_threshold: float,
+    top_quantile: float | None,
+) -> torch.Tensor | None:
+    if preset == "none":
+        return None
+    if high_threshold < 0.0:
+        raise ValueError("--signal-high-threshold must be >= 0")
+    factor = signal_preset_factor(preset)
+    target_for_mask = target.detach()
+
+    if preset.startswith("high-gt3-"):
+        selected = target_for_mask >= high_threshold
+    elif preset == "intestine-high-x3":
+        if int(target.shape[1]) != 11:
+            raise ValueError("intestine-high-x3 expects 11 RNA-seq tracks")
+        hard_tracks = torch.zeros(
+            int(target.shape[1]),
+            dtype=torch.bool,
+            device=target.device,
+        )
+        hard_tracks[torch.tensor([1, 3, 4], device=target.device)] = True
+        selected = (target_for_mask >= high_threshold) & hard_tracks.view(1, -1, 1)
+    elif preset.startswith("top5-") or preset.startswith("top1-"):
+        quantile = top_quantile
+        if quantile is None:
+            quantile = 0.99 if preset.startswith("top1-") else 0.95
+        if not 0.0 < quantile < 1.0:
+            raise ValueError("--signal-top-quantile must be between 0 and 1")
+        thresholds = torch.quantile(
+            target_for_mask.to(dtype=torch.float32),
+            quantile,
+            dim=-1,
+            keepdim=True,
+        ).to(dtype=target.dtype)
+        selected = target_for_mask >= thresholds
+    else:
+        raise ValueError(f"Unsupported --signal-loss-weight-preset: {preset}")
+
+    return torch.where(
+        selected,
+        torch.as_tensor(factor, dtype=target.dtype, device=target.device),
+        torch.ones((), dtype=target.dtype, device=target.device),
+    )
+
+
+def combine_element_loss_weights(
+    *weights: torch.Tensor | None,
+) -> torch.Tensor | None:
+    combined: torch.Tensor | None = None
+    for weight in weights:
+        if weight is None:
+            continue
+        combined = weight if combined is None else combined * weight
+    return combined
+
+
+def gene_body_overlaps_for_window(
+    annotations: GtfAnnotations,
+    *,
+    chrom: str,
+    window_start: int,
+    window_end: int,
+    target_length: int,
+    min_bases: int,
+) -> list[tuple[int, int]]:
+    overlaps: list[tuple[int, int]] = []
+    window_width = window_end - window_start
+    if target_length <= 0 or window_width <= 0:
+        return overlaps
+    scale = window_width / float(target_length)
+    for interval in annotations.genes.get(chrom, []):
+        if interval.end <= window_start:
+            continue
+        if interval.start >= window_end:
+            break
+        overlap_start = max(interval.start, window_start)
+        overlap_end = min(interval.end, window_end)
+        if overlap_end <= overlap_start:
+            continue
+        local_start = overlap_start - window_start
+        local_end = overlap_end - window_start
+        if target_length == window_width:
+            start_index = int(local_start)
+            end_index = int(local_end)
+        else:
+            start_index = int(math.floor(local_start / scale))
+            end_index = int(math.ceil(local_end / scale))
+        start_index = max(0, min(target_length, start_index))
+        end_index = max(0, min(target_length, end_index))
+        if end_index - start_index >= min_bases:
+            overlaps.append((start_index, end_index))
+    return overlaps
+
+
+def gene_body_mean_aux_loss(
+    prediction: torch.Tensor,
+    target: torch.Tensor,
+    mask: torch.Tensor,
+    *,
+    batch: dict[str, object],
+    annotations: GtfAnnotations,
+    min_bases: int,
+) -> torch.Tensor:
+    if min_bases < 1:
+        raise ValueError("--gene-aux-min-bases must be >= 1")
+    while mask.ndim < prediction.ndim:
+        mask = mask.unsqueeze(-1)
+    mask = mask.to(device=prediction.device, dtype=prediction.dtype)
+
+    total = prediction.new_tensor(0.0)
+    count = prediction.new_tensor(0.0)
+    target_length = int(prediction.shape[-1])
+    for batch_index in range(int(prediction.shape[0])):
+        chrom = batch_chromosome(batch, batch_index)
+        window_start, window_end = batch_interval_start_end(batch, batch_index)
+        overlaps = gene_body_overlaps_for_window(
+            annotations,
+            chrom=chrom,
+            window_start=window_start,
+            window_end=window_end,
+            target_length=target_length,
+            min_bases=min_bases,
+        )
+        if not overlaps:
+            continue
+        track_mask = mask[batch_index, :, 0]
+        for start_index, end_index in overlaps:
+            prediction_mean = prediction[batch_index, :, start_index:end_index].mean(dim=-1)
+            target_mean = target[batch_index, :, start_index:end_index].mean(dim=-1)
+            error = (prediction_mean - target_mean.to(dtype=prediction.dtype)).square()
+            total = total + (error * track_mask).sum()
+            count = count + track_mask.sum()
+    return total / count.clamp_min(1.0)
+
+
 def learning_rate_for_step(
     *,
     step: int,
@@ -597,12 +1080,19 @@ def masked_mse_loss_local(
     target: torch.Tensor,
     mask: torch.Tensor,
     track_loss_weights: torch.Tensor | None = None,
+    loss_weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
     while mask.ndim < prediction.ndim:
         mask = mask.unsqueeze(-1)
     mask = mask.to(device=prediction.device, dtype=prediction.dtype)
     error = (prediction - target.to(dtype=prediction.dtype)).square()
     denominator = mask.expand_as(error)
+    if loss_weights is not None:
+        weights = loss_weights.to(device=prediction.device, dtype=prediction.dtype)
+        if weights.shape != prediction.shape:
+            weights = weights.expand_as(prediction)
+        error = error * weights
+        denominator = denominator * weights
     if track_loss_weights is not None:
         if prediction.ndim != 3:
             raise ValueError("Track loss weights require [batch, tracks, length] tensors")
@@ -625,6 +1115,7 @@ def masked_smooth_l1_loss_local(
     *,
     beta: float,
     track_loss_weights: torch.Tensor | None = None,
+    loss_weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
     while mask.ndim < prediction.ndim:
         mask = mask.unsqueeze(-1)
@@ -636,6 +1127,12 @@ def masked_smooth_l1_loss_local(
         beta=beta,
     )
     denominator = mask.expand_as(loss)
+    if loss_weights is not None:
+        weights = loss_weights.to(device=prediction.device, dtype=prediction.dtype)
+        if weights.shape != prediction.shape:
+            weights = weights.expand_as(prediction)
+        loss = loss * weights
+        denominator = denominator * weights
     if track_loss_weights is not None:
         if prediction.ndim != 3:
             raise ValueError("Track loss weights require [batch, tracks, length] tensors")
@@ -678,10 +1175,11 @@ def adapter_loss_for_training(
     smooth_l1_beta: float,
     hybrid_loss_alpha: float,
     track_loss_weights: torch.Tensor | None = None,
+    loss_weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
     if isinstance(prediction, dict):
-        if track_loss_weights is not None:
-            raise ValueError("Track loss weights are only supported for linear heads")
+        if track_loss_weights is not None or loss_weights is not None:
+            raise ValueError("Weighted training losses are only supported for linear heads")
         return masked_adapter_loss(
             model,
             prediction,
@@ -698,7 +1196,11 @@ def adapter_loss_for_training(
             hybrid_loss_alpha=hybrid_loss_alpha,
         )
 
-    if track_loss_weights is None and linear_loss_type != "hybrid-mse-smooth-l1":
+    if (
+        track_loss_weights is None
+        and loss_weights is None
+        and linear_loss_type != "hybrid-mse-smooth-l1"
+    ):
         return masked_adapter_loss(
             model,
             prediction,
@@ -721,6 +1223,7 @@ def adapter_loss_for_training(
             target,
             mask,
             track_loss_weights=track_loss_weights,
+            loss_weights=loss_weights,
         )
     if linear_loss_type == "smooth-l1":
         return masked_smooth_l1_loss_local(
@@ -729,6 +1232,7 @@ def adapter_loss_for_training(
             mask,
             beta=smooth_l1_beta,
             track_loss_weights=track_loss_weights,
+            loss_weights=loss_weights,
         )
     if linear_loss_type not in {"hybrid", "hybrid-mse-smooth-l1"}:
         raise ValueError(f"Unsupported linear loss type: {linear_loss_type}")
@@ -738,6 +1242,7 @@ def adapter_loss_for_training(
         target,
         mask,
         track_loss_weights=track_loss_weights,
+        loss_weights=loss_weights,
     )
     smooth_l1_loss = masked_smooth_l1_loss_local(
         prediction,
@@ -745,6 +1250,7 @@ def adapter_loss_for_training(
         mask,
         beta=smooth_l1_beta,
         track_loss_weights=track_loss_weights,
+        loss_weights=loss_weights,
     )
     return hybrid_loss_alpha * mse_loss + (1.0 - hybrid_loss_alpha) * smooth_l1_loss
 
@@ -1224,12 +1730,24 @@ def save_training_checkpoint(
     residual_base_gate_center: float,
     residual_base_gate_sharpness: float,
     residual_base_gate_floor: float,
+    linear_output_calibration: str,
+    calibration_gate_center: float,
+    calibration_gate_sharpness: float,
+    train_only_calibration: bool,
     linear_loss_type: str,
     linear_target_space: str,
     smooth_l1_beta: float,
     hybrid_loss_alpha: float,
     track_loss_weight_preset: str,
     track_loss_weights: list[float] | None,
+    signal_loss_weight_preset: str,
+    signal_high_threshold: float,
+    signal_top_quantile: float | None,
+    region_loss_weight_preset: str,
+    gtf: str,
+    promoter_radius_bp: int,
+    gene_aux_loss_weight: float,
+    gene_aux_min_bases: int,
     loss_space: str,
     loss_type: str,
     multinomial_num_segments: int,
@@ -1261,12 +1779,24 @@ def save_training_checkpoint(
         "residual_base_gate_center": residual_base_gate_center,
         "residual_base_gate_sharpness": residual_base_gate_sharpness,
         "residual_base_gate_floor": residual_base_gate_floor,
+        "linear_output_calibration": linear_output_calibration,
+        "calibration_gate_center": calibration_gate_center,
+        "calibration_gate_sharpness": calibration_gate_sharpness,
+        "train_only_calibration": train_only_calibration,
         "linear_loss_type": linear_loss_type,
         "linear_target_space": linear_target_space,
         "smooth_l1_beta": smooth_l1_beta,
         "hybrid_loss_alpha": hybrid_loss_alpha,
         "track_loss_weight_preset": track_loss_weight_preset,
         "track_loss_weights": track_loss_weights,
+        "signal_loss_weight_preset": signal_loss_weight_preset,
+        "signal_high_threshold": signal_high_threshold,
+        "signal_top_quantile": signal_top_quantile,
+        "region_loss_weight_preset": region_loss_weight_preset,
+        "gtf": gtf,
+        "promoter_radius_bp": promoter_radius_bp,
+        "gene_aux_loss_weight": gene_aux_loss_weight,
+        "gene_aux_min_bases": gene_aux_min_bases,
         "organism_index": organism_index,
         "target_transform": target_transform,
         "loss_space": loss_space,
@@ -1332,6 +1862,16 @@ def main() -> None:
         raise ValueError("--residual-base-gate-sharpness must be > 0")
     if not 0.0 <= args.residual_base_gate_floor <= 1.0:
         raise ValueError("--residual-base-gate-floor must be between 0 and 1")
+    if args.calibration_gate_sharpness <= 0.0:
+        raise ValueError("--calibration-gate-sharpness must be > 0")
+    if args.signal_high_threshold < 0.0:
+        raise ValueError("--signal-high-threshold must be >= 0")
+    if args.signal_top_quantile is not None and not 0.0 < args.signal_top_quantile < 1.0:
+        raise ValueError("--signal-top-quantile must be between 0 and 1")
+    if args.gene_aux_loss_weight < 0.0:
+        raise ValueError("--gene-aux-loss-weight must be >= 0")
+    if args.gene_aux_min_bases < 1:
+        raise ValueError("--gene-aux-min-bases must be >= 1")
     step_decay_steps = parse_int_list(
         args.step_decay_steps,
         option_name="--step-decay-steps",
@@ -1373,6 +1913,19 @@ def main() -> None:
         )
     if args.head_type == "genome-tracks" and args.linear_target_space != "full-log1p":
         raise ValueError("--linear-target-space is only supported for linear heads")
+    if args.head_type != "linear" and args.linear_output_calibration != "none":
+        raise ValueError("--linear-output-calibration is only supported for linear heads")
+    if args.train_only_calibration and args.linear_output_calibration == "none":
+        raise ValueError("--train-only-calibration requires --linear-output-calibration")
+    if (
+        args.head_type != "linear"
+        and (
+            args.signal_loss_weight_preset != "none"
+            or args.region_loss_weight_preset != "none"
+            or args.gene_aux_loss_weight > 0.0
+        )
+    ):
+        raise ValueError("Signal/region/gene auxiliary losses are only supported for linear heads")
     if args.residual_base_checkpoint is not None:
         if args.head_type != "linear":
             raise ValueError("--residual-base-checkpoint requires --head-type linear")
@@ -1474,6 +2027,16 @@ def main() -> None:
     if track_loss_weights_tensor is not None and args.head_type != "linear":
         raise ValueError("--track-loss-weights are only supported for linear heads")
 
+    gtf_annotations = None
+    if args.region_loss_weight_preset != "none" or args.gene_aux_loss_weight > 0.0:
+        gtf_path = Path(args.gtf)
+        if not gtf_path.exists():
+            raise FileNotFoundError(f"GTF not found: {gtf_path}")
+        gtf_annotations = load_gtf_annotations_for_training(
+            gtf_path,
+            promoter_radius_bp=args.promoter_radius_bp,
+        )
+
     track_means = None
     if args.head_type == "genome-tracks":
         if args.track_means_source == "ones":
@@ -1573,6 +2136,10 @@ def main() -> None:
         f"residual_base_gate_sharpness\t{args.residual_base_gate_sharpness}",
     )
     print_main(rank, f"residual_base_gate_floor\t{args.residual_base_gate_floor}")
+    print_main(rank, f"linear_output_calibration\t{args.linear_output_calibration}")
+    print_main(rank, f"calibration_gate_center\t{args.calibration_gate_center}")
+    print_main(rank, f"calibration_gate_sharpness\t{args.calibration_gate_sharpness}")
+    print_main(rank, f"train_only_calibration\t{args.train_only_calibration}")
     print_main(rank, f"linear_loss_type\t{args.linear_loss_type}")
     print_main(rank, f"smooth_l1_beta\t{args.smooth_l1_beta}")
     print_main(rank, f"hybrid_loss_alpha\t{args.hybrid_loss_alpha}")
@@ -1581,6 +2148,14 @@ def main() -> None:
         rank,
         f"track_loss_weights\t{format_track_loss_weights(track_loss_weights)}",
     )
+    print_main(rank, f"signal_loss_weight_preset\t{args.signal_loss_weight_preset}")
+    print_main(rank, f"signal_high_threshold\t{args.signal_high_threshold}")
+    print_main(rank, f"signal_top_quantile\t{args.signal_top_quantile}")
+    print_main(rank, f"region_loss_weight_preset\t{args.region_loss_weight_preset}")
+    print_main(rank, f"gtf\t{args.gtf}")
+    print_main(rank, f"promoter_radius_bp\t{args.promoter_radius_bp}")
+    print_main(rank, f"gene_aux_loss_weight\t{args.gene_aux_loss_weight}")
+    print_main(rank, f"gene_aux_min_bases\t{args.gene_aux_min_bases}")
     print_main(rank, f"linear_target_space\t{args.linear_target_space}")
     if linear_track_means is not None:
         print_main(
@@ -1689,6 +2264,15 @@ def main() -> None:
             linear_kernel_size=int(
                 residual_base_checkpoint.get("linear_kernel_size", 15)
             ),
+            linear_output_calibration=str(
+                residual_base_checkpoint.get("linear_output_calibration", "none")
+            ),
+            linear_output_calibration_gate_center=float(
+                residual_base_checkpoint.get("calibration_gate_center", 3.0)
+            ),
+            linear_output_calibration_gate_sharpness=float(
+                residual_base_checkpoint.get("calibration_gate_sharpness", 3.0)
+            ),
         ).to(device)
         residual_base_probe.load_adapter_head_state_dict(
             residual_base_checkpoint["adapter_head_state_dict"]
@@ -1720,6 +2304,9 @@ def main() -> None:
         linear_residual_base_gate_center=args.residual_base_gate_center,
         linear_residual_base_gate_sharpness=args.residual_base_gate_sharpness,
         linear_residual_base_gate_floor=args.residual_base_gate_floor,
+        linear_output_calibration=args.linear_output_calibration,
+        linear_output_calibration_gate_center=args.calibration_gate_center,
+        linear_output_calibration_gate_sharpness=args.calibration_gate_sharpness,
         track_means=track_means,
     ).to(device)
 
@@ -1755,6 +2342,9 @@ def main() -> None:
         )
         checkpoint_linear_target_space = str(
             init_checkpoint.get("linear_target_space", "full-log1p")
+        )
+        checkpoint_linear_output_calibration = str(
+            init_checkpoint.get("linear_output_calibration", "none")
         )
         if checkpoint_n_tracks != n_tracks:
             raise ValueError(
@@ -1832,6 +2422,18 @@ def main() -> None:
                     f"{checkpoint_linear_residual_fusion}, "
                     f"requested={args.linear_residual_fusion}"
                 )
+            if (
+                checkpoint_linear_output_calibration != args.linear_output_calibration
+                and not (
+                    checkpoint_linear_output_calibration == "none"
+                    and args.linear_output_calibration != "none"
+                )
+            ):
+                raise ValueError(
+                    "Init checkpoint linear_output_calibration="
+                    f"{checkpoint_linear_output_calibration}, "
+                    f"requested={args.linear_output_calibration}"
+                )
         if args.init_adapter_checkpoint_mode == "strict":
             model.load_adapter_head_state_dict(
                 init_checkpoint["adapter_head_state_dict"]
@@ -1882,6 +2484,14 @@ def main() -> None:
         for parameter in model.head.parameters():
             parameter.requires_grad = False
 
+    if args.train_only_calibration:
+        if model.linear_output_calibration is None:
+            raise ValueError("--train-only-calibration requires a calibration module")
+        for parameter in model.parameters():
+            parameter.requires_grad = False
+        for parameter in model.linear_output_calibration.parameters():
+            parameter.requires_grad = True
+
     trainable_parameters = [
         parameter for parameter in model.parameters() if parameter.requires_grad
     ]
@@ -1918,6 +2528,11 @@ def main() -> None:
         rank,
         f"head_trainable_parameters\t"
         f"{count_parameters(model.head, trainable_only=True)}",
+    )
+    print_main(
+        rank,
+        "calibration_trainable_parameters\t"
+        f"{count_parameters(model.linear_output_calibration, trainable_only=True) if model.linear_output_calibration is not None else 0}",
     )
     print_main(
         rank,
@@ -1985,6 +2600,26 @@ def main() -> None:
                 prediction, residual_update = prediction_result
             else:
                 prediction = prediction_result
+            signal_loss_weights = build_signal_loss_weights(
+                target=loss_target,
+                preset=args.signal_loss_weight_preset,
+                high_threshold=args.signal_high_threshold,
+                top_quantile=args.signal_top_quantile,
+            )
+            region_loss_weights = None
+            if args.region_loss_weight_preset != "none":
+                if gtf_annotations is None:
+                    raise RuntimeError("GTF annotations were not loaded")
+                region_loss_weights = build_region_loss_weights(
+                    target=loss_target,
+                    batch=batch,
+                    annotations=gtf_annotations,
+                    preset=args.region_loss_weight_preset,
+                )
+            element_loss_weights = combine_element_loss_weights(
+                signal_loss_weights,
+                region_loss_weights,
+            )
             loss = adapter_loss_for_training(
                 model,
                 prediction,
@@ -2000,7 +2635,21 @@ def main() -> None:
                 smooth_l1_beta=args.smooth_l1_beta,
                 hybrid_loss_alpha=args.hybrid_loss_alpha,
                 track_loss_weights=track_loss_weights_tensor,
+                loss_weights=element_loss_weights,
             )
+            if args.gene_aux_loss_weight > 0.0:
+                if gtf_annotations is None:
+                    raise RuntimeError("GTF annotations were not loaded")
+                if not isinstance(prediction, torch.Tensor):
+                    raise RuntimeError("Gene auxiliary loss requires a linear prediction tensor")
+                loss = loss + args.gene_aux_loss_weight * gene_body_mean_aux_loss(
+                    prediction,
+                    loss_target,
+                    rna_seq_mask,
+                    batch=batch,
+                    annotations=gtf_annotations,
+                    min_bases=args.gene_aux_min_bases,
+                )
             if args.residual_correction_l2 > 0.0:
                 if residual_update is None:
                     raise RuntimeError(
@@ -2184,12 +2833,24 @@ def main() -> None:
                             args.residual_base_gate_sharpness
                         ),
                         residual_base_gate_floor=args.residual_base_gate_floor,
+                        linear_output_calibration=args.linear_output_calibration,
+                        calibration_gate_center=args.calibration_gate_center,
+                        calibration_gate_sharpness=args.calibration_gate_sharpness,
+                        train_only_calibration=args.train_only_calibration,
                         linear_loss_type=args.linear_loss_type,
                         linear_target_space=args.linear_target_space,
                         smooth_l1_beta=args.smooth_l1_beta,
                         hybrid_loss_alpha=args.hybrid_loss_alpha,
                         track_loss_weight_preset=args.track_loss_weight_preset,
                         track_loss_weights=track_loss_weights,
+                        signal_loss_weight_preset=args.signal_loss_weight_preset,
+                        signal_high_threshold=args.signal_high_threshold,
+                        signal_top_quantile=args.signal_top_quantile,
+                        region_loss_weight_preset=args.region_loss_weight_preset,
+                        gtf=args.gtf,
+                        promoter_radius_bp=args.promoter_radius_bp,
+                        gene_aux_loss_weight=args.gene_aux_loss_weight,
+                        gene_aux_min_bases=args.gene_aux_min_bases,
                         loss_space=loss_space_for_config(
                             args.head_type,
                             args.loss_type,
@@ -2270,12 +2931,24 @@ def main() -> None:
             residual_base_gate_center=args.residual_base_gate_center,
             residual_base_gate_sharpness=args.residual_base_gate_sharpness,
             residual_base_gate_floor=args.residual_base_gate_floor,
+            linear_output_calibration=args.linear_output_calibration,
+            calibration_gate_center=args.calibration_gate_center,
+            calibration_gate_sharpness=args.calibration_gate_sharpness,
+            train_only_calibration=args.train_only_calibration,
             linear_loss_type=args.linear_loss_type,
             linear_target_space=args.linear_target_space,
             smooth_l1_beta=args.smooth_l1_beta,
             hybrid_loss_alpha=args.hybrid_loss_alpha,
             track_loss_weight_preset=args.track_loss_weight_preset,
             track_loss_weights=track_loss_weights,
+            signal_loss_weight_preset=args.signal_loss_weight_preset,
+            signal_high_threshold=args.signal_high_threshold,
+            signal_top_quantile=args.signal_top_quantile,
+            region_loss_weight_preset=args.region_loss_weight_preset,
+            gtf=args.gtf,
+            promoter_radius_bp=args.promoter_radius_bp,
+            gene_aux_loss_weight=args.gene_aux_loss_weight,
+            gene_aux_min_bases=args.gene_aux_min_bases,
             loss_space=loss_space_for_config(
                 args.head_type,
                 args.loss_type,
