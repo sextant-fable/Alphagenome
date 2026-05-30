@@ -34,6 +34,74 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-05-30 - RNA-seq11 All-Candidate Representation Utility Benchmark
+
+- Run type: evaluation and analysis
+- Purpose: Evaluate all eligible trained RNA-seq11 checkpoints by biological signal utility rather than only full-resolution valid MSE. The run added all-candidate extended valid diagnostics, train/valid gene-profile downstream probes, and composite utility leaderboards. The held-out test split was not read.
+- Git commit: `13d67e6` at run start, with new probe and summary scripts added in the working tree for this run.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU`
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server.
+- Slurm request: Not applicable.
+- Environment: Conda environment `alphagenome`; Python `3.12.13`; PyTorch `2.11.0+cu128`; GPU jobs restricted to `CUDA_VISIBLE_DEVICES=2` and `CUDA_VISIBLE_DEVICES=3`.
+- Command:
+
+```bash
+conda activate alphagenome
+cd /home/zelinli6/Alphagenome
+
+conda run -n alphagenome python scripts/rna_seq11_top15_extended_diagnostics.py \
+  --runs-dir runs \
+  --output-dir runs/rna_seq11_all_representation_inventory_20260530 \
+  --top-n 999 \
+  --only-write-top15
+
+CUDA_VISIBLE_DEVICES=2 PYTHONUNBUFFERED=1 \
+conda run -n alphagenome python -u scripts/rna_seq11_top15_extended_diagnostics.py \
+  --runs-dir runs \
+  --output-dir runs/rna_seq11_all_representation_diagnostics_20260530/shard0 \
+  --top-n 999 --num-shards 2 --rank-shard 0 \
+  --device auto --batch-size 1 --num-workers 0 \
+  --spearman-sample-size 300000
+
+CUDA_VISIBLE_DEVICES=3 PYTHONUNBUFFERED=1 \
+conda run -n alphagenome python -u scripts/rna_seq11_top15_extended_diagnostics.py \
+  --runs-dir runs \
+  --output-dir runs/rna_seq11_all_representation_diagnostics_20260530/shard1 \
+  --top-n 999 --num-shards 2 --rank-shard 1 \
+  --device auto --batch-size 1 --num-workers 0 \
+  --spearman-sample-size 300000
+
+# Shared-embedding downstream probe after smoke validation.
+CUDA_VISIBLE_DEVICES=<2-or-3> PYTHONUNBUFFERED=1 \
+conda run -n alphagenome python -u scripts/rna_seq11_gene_profile_probe.py \
+  --candidate-tsv runs/rna_seq11_all_representation_inventory_20260530/top15_models.tsv \
+  --top-n 999 \
+  --output-dir runs/rna_seq11_gene_profile_probe_all_20260530/shard<0-or-1> \
+  --rank-shard <0-or-1> --num-shards 2 \
+  --batch-size 1 --num-workers 0 \
+  --probe-steps 300 --device auto \
+  --eval-mode shared-embeddings --skip-existing
+
+conda run -n alphagenome python scripts/rna_seq11_representation_utility_summary.py \
+  --inventory-tsv runs/rna_seq11_all_representation_inventory_20260530/top15_models.tsv \
+  --diagnostics-dirs \
+    runs/rna_seq11_all_representation_diagnostics_20260530/shard0 \
+    runs/rna_seq11_all_representation_diagnostics_20260530/shard1 \
+  --probe-dirs \
+    runs/rna_seq11_gene_profile_probe_all_20260530/shard0 \
+    runs/rna_seq11_gene_profile_probe_all_20260530/shard1 \
+  --output-dir runs/rna_seq11_representation_utility_summary_20260530
+```
+
+- Input data: Existing checkpoints under `runs/`; train NPZ data from `alphagenome_custom/datasets/rna_seq_npz_train`; valid NPZ data from `alphagenome_custom/datasets/rna_seq_npz_valid`; GTF annotations from `alphagenome_custom/reference/Caenorhabditis_elegans.WBcel235.115.gtf`; base weights from `weights/alphagenome_pytorch/model_all_folds.safetensors`.
+- Output path: `runs/rna_seq11_all_representation_inventory_20260530`, `runs/rna_seq11_all_representation_diagnostics_20260530`, `runs/rna_seq11_gene_profile_probe_all_20260530`, `runs/rna_seq11_representation_utility_summary_20260530`; logs under `logs/rna_seq11_all_representation_20260530` and `logs/rna_seq11_gene_profile_probe_all_20260530`; report at `docs/rna_seq11_all_representation_utility_20260530.md`.
+- Result summary: 171 unique eligible candidates were evaluated. The full-MSE reference remained `rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps` with full MSE `0.83557710`. The top composite representation-utility candidate was `rna_seq11_1bpB_region_w1_rank1_exongene_v2_lr1e-5_1000steps` with representation utility score `0.88814617` and full MSE `0.83667865`. The exon/gene-body winner was `rna_seq11_1bpB_region_w1_rank1_exongene_v1_lr1e-5_1500steps`; the high-signal amplitude winner was `rna_seq11_1bpB_sigweight_w1_rank1_top5x3_a075_b05_lr1e-5_1500steps`; the near-frontier probe co-winner was `rna_seq11_1bpB_broad_w5_track_hard15_from_w4best2000_lr1e-5_seedrand_1500steps`.
+- Verification: `py_compile` passed for `scripts/rna_seq11_gene_profile_probe.py` and `scripts/rna_seq11_representation_utility_summary.py`. Shared-embedding probe smoke completed for two models and small train/valid subsets. Extended diagnostics row counts were `per_track_metrics.tsv` shard0 `1033` and shard1 `1021`. Final probe metric row counts were shard0 `87` and shard1 `86`; per-track probe row counts were shard0 `2839` and shard1 `2806`. The final utility summary has `172` lines including header and `171` unique run IDs.
+- Failures or warnings: An initial per-model probe implementation was stopped after writing a few rows because it repeated the frozen AlphaGenome encode for every checkpoint and would have taken many hours. A shared-embedding implementation was added, smoke-tested, and used with `--skip-existing` to complete the remaining candidates. No duplicate run IDs were present in the final probe tables. No test metrics were computed.
+- Next actions: Use the representation winner for biological-utility comparisons, retain the full-MSE rank1 checkpoint as the pixel-error reference, and treat signal-weighted runs as high-expression/intestine co-winners rather than all-purpose replacements.
+- Claim status: verified
+
 ## 2026-05-29 - RNA-seq11 Adaptive Objective and Calibration Screen
 
 - Run type: training, evaluation, and analysis
