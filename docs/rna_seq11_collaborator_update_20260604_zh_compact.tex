@@ -60,6 +60,9 @@
   \end{tabular}
 
   \vspace{1.1em}
+  \smallnote{Loss 做法：Improved 128bp model 在 full-log1p target 上训练 hybrid loss，即 $\alpha\cdot$MSE + $(1-\alpha)\cdot$SmoothL1；validation 指标仍用 unweighted full MSE/Pearson。}
+
+  \vspace{0.4em}
   \begin{block}{结论}
     在改变 representation strategy 之前，只通过更合适的 objective 和 schedule，valid MSE 已经从 1.06099 明显降到 0.88033。
   \end{block}
@@ -143,6 +146,7 @@
       \item Top15 模型全部是同一策略的变体：frozen 128bp prediction + 1bp residual correction。
       \item Top15 full-MSE spread 只有约 0.00137。
       \item 模型差异主要来自 warm-start、learning rate、beta 和 track weights。
+      \item Track-weighted loss 做法：训练时给指定 tracks 的每个有效位置乘更高权重；validation full metrics 仍保持 unweighted。
     \end{itemize}
   \end{block}
 
@@ -186,6 +190,9 @@
   \end{tabular}
 
   \vspace{0.8em}
+  \smallnote{Loss 做法：在训练 batch 内按 true signal 选 high $>3$、top5\%、top1\% 或 intestine T1/T3/T4 high-signal 元素，把这些元素的基础 loss 乘上 preset factor，例如 top5x3 表示 top5 true-signal 元素权重为 $3\times$。}
+
+  \vspace{0.4em}
   \begin{block}{结论}
     Signal weighting 可以恢复 high-expression amplitude，但会牺牲 global MSE。它应被视为 high-signal / intestine co-winner，而不是 all-purpose model。
   \end{block}
@@ -204,6 +211,9 @@
   \end{tabular}
 
   \vspace{0.8em}
+  \smallnote{Loss 做法：用 WBcel235 GTF 在每个训练窗口生成 exon、gene-body、promoter、intron、intergenic 位置权重，再把 per-base 基础 loss 乘上这些权重；v1 权重更强，v2 更温和。}
+
+  \vspace{0.4em}
   \begin{block}{结论}
     Region weighting 直接降低 exon/gene-body error。v2 是更平衡的 biological-utility candidate；v1 是最强的 exon/gene-body candidate。
   \end{block}
@@ -211,8 +221,10 @@
 
 \begin{frame}{Gene auxiliary loss 和 calibration 还不是主方向}
   \begin{itemize}
+    \item Gene auxiliary loss 做法：在主 per-base loss 外，加 $\lambda\cdot$MSE(predicted gene-body mean, true gene-body mean)，只统计 gene-body overlap 足够长的基因。
     \item Gene auxiliary loss $\lambda=0.03$ 在测试设置下没有改善 gene-body mean MSE。
     \item 因为低 lambda 没有出现正向 gene-MSE signal，更大的 lambda 值没有被优先推进。
+    \item Calibration 做法：冻结已有 prediction head 后只训练 per-track affine output scale/shift；它是输出校准，不是新的 weighted loss。
     \item Track-affine output calibration 只带来小幅 amplitude 改善，没有形成明确的新 winner。
   \end{itemize}
 
