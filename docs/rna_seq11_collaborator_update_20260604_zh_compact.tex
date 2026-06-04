@@ -97,6 +97,46 @@
   \end{itemize}
 \end{frame}
 
+\begin{frame}{Residual correction 是在 frozen 128bp prediction 上加一个小修正}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{实际做法}
+        \begin{itemize}
+          \item 先用 improved 128bp model 产生 full-resolution base prediction。
+          \item 这个 128bp base head 和 AlphaGenome trunk 都保持 frozen。
+          \item 另加一个 trainable 1bp residual head，只预测 correction update。
+          \item 最终输出不是替换 base，而是 base + scaled 1bp update。
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \begin{block}{模型形式}
+        \[
+          \hat{y}
+          =
+          \mathrm{stopgrad}(\hat{y}_{128})
+          +
+          s_{\mathrm{track}} \cdot \Delta_{1bp}
+        \]
+
+        \vspace{-0.4em}
+        \begin{tabular}{ll}
+          \toprule
+          Term & Meaning \\
+          \midrule
+          $\hat{y}_{128}$ & frozen 128bp base prediction \\
+          $\Delta_{1bp}$ & 1bp head predicted residual \\
+          $s_{\mathrm{track}}$ & trainable per-track scale \\
+          \bottomrule
+        \end{tabular}
+      \end{block}
+    \end{column}
+  \end{columns}
+
+  \vspace{0.6em}
+  \smallnote{直观上：128bp base 保留稳健的 broad RNA-seq prediction；1bp head 只负责补局部、高频或 high-signal 误差。}
+\end{frame}
+
 \begin{frame}{最好的模型已经进入一个很窄的 plateau}
   \begin{block}{Top15 的共同模式}
     \begin{itemize}
