@@ -34,6 +34,41 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-08 - Latest RNA-seq11 Valid/Test Prediction bigWig Export
+
+- Run type: evaluation and generated-artifact export
+- Purpose: Export the latest full-MSE validation leader's valid and test predictions as per-track bigWig files for biological genome-browser review.
+- Git commit: `ac63bd8`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU` (`hy8`)
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server.
+- Slurm request: Not applicable.
+- Environment: Conda environment `alphagenome`; Python `/home/zelinli6/miniconda3/envs/alphagenome/bin/python`; PyTorch `2.11.0+cu128`; export restricted to `CUDA_VISIBLE_DEVICES=2`.
+- Command:
+
+```bash
+mkdir -p logs/rna_seq11_bigwig_exports_20260708
+
+CUDA_VISIBLE_DEVICES=2 conda run -n alphagenome python -u \
+  scripts/alphagenome_rna_seq11_export_bigwig.py \
+  --checkpoint runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps/adapter_head_best.pt \
+  --weights weights/alphagenome_pytorch/model_all_folds.safetensors \
+  --splits valid,test \
+  --output-dir runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps/bigwig_exports/valid_test_20260708_expm1 \
+  --prediction-transform expm1 \
+  --clip-min 0 \
+  --device cuda \
+  > logs/rna_seq11_bigwig_exports_20260708/latest_valid_test_export.log 2>&1
+```
+
+- Input data: Valid NPZ dataset `alphagenome_custom/datasets/rna_seq_npz_valid` (`39` examples on chromosome `V`); test NPZ dataset `alphagenome_custom/datasets/rna_seq_npz_test` (`33` examples on chromosome `X`); base weights `weights/alphagenome_pytorch/model_all_folds.safetensors`; selected checkpoint `runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps/adapter_head_best.pt`, ranked first in `runs/rna_seq11_top15_extended_diagnostics_20260529/top15_models.tsv` with valid full MSE `0.83557710`.
+- Output path: `runs/rna_seq11_1bpB_broad_w12_track_hard15_beta05_from_w10best1000_lr1e-5_seedrand_1500steps/bigwig_exports/valid_test_20260708_expm1/`; log at `logs/rna_seq11_bigwig_exports_20260708/latest_valid_test_export.log`. These generated outputs are ignored by Git.
+- Result summary: Completed successfully. The export wrote 22 prediction bigWigs: 11 valid files under `valid/` and 11 test files under `test/`, plus `bigwig_manifest.tsv` for each split and `export_summary.json`. Predictions were merged by mean over overlapping 1,048,576 bp windows, converted from model log1p space back to raw signal scale with `expm1`, and clipped at zero.
+- Verification: `python -m py_compile scripts/alphagenome_rna_seq11_export_bigwig.py` passed. `pyBigWig` read-back opened all 22 files as valid bigWigs. Valid files cover chromosome `V` length `20,924,180`; test files cover chromosome `X` length `17,718,942`. Manifest line counts are `12` for valid and `12` for test. No `.tmp` files remained. Post-run `nvidia-smi` showed no active project GPU process on GPU 2.
+- Failures or warnings: The held-out test split was read and exported at user request for visualization. These test bigWigs must not be used for further model selection or hyperparameter tuning. The exported values are model predictions in raw-signal scale, not observed RNA-seq signal.
+- Next actions: Share `valid/`, `test/`, `bigwig_manifest.tsv`, and `export_summary.json` with collaborators along with the warning that test output is for inspection/reporting only.
+- Claim status: verified
+
 ## 2026-05-30 - RNA-seq11 All-Candidate Representation Utility Benchmark
 
 - Run type: evaluation and analysis
