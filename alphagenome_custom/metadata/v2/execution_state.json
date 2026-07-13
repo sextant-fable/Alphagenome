@@ -1,0 +1,124 @@
+{
+  "approvals": {
+    "G1_large_source_download_or_realignment": false,
+    "G2_v2_manifest_scientific_review": false,
+    "G3_dataset_or_cache_generation": false,
+    "G4_gpu_experiments": false,
+    "G5_final_test": false
+  },
+  "current_phase": "P3",
+  "history": [
+    {
+      "detail": "Phase command started.",
+      "phase": "P0",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T13:57:58+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P0",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-13T13:58:04+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P0",
+      "status": "PASS",
+      "timestamp": "2026-07-13T13:58:04+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P0 PASS.",
+      "phase": "P1",
+      "status": "PENDING",
+      "timestamp": "2026-07-13T13:58:04+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P1",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T14:06:27+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P1",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-13T14:07:48+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P1",
+      "status": "PASS",
+      "timestamp": "2026-07-13T14:07:48+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P1 PASS.",
+      "phase": "P2",
+      "status": "PENDING",
+      "timestamp": "2026-07-13T14:07:48+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P2",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T14:17:03+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P2",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-13T14:17:47+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P2",
+      "status": "PASS",
+      "timestamp": "2026-07-13T14:17:47+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P2 PASS.",
+      "phase": "P3",
+      "status": "PENDING",
+      "timestamp": "2026-07-13T14:17:47+00:00"
+    },
+    {
+      "detail": "Scientific pre-G2 audit found 45 extra runs sharing ENA experiments and 267 source-title replicate labels; rebuild experiment/biological replicate hierarchy before approval.",
+      "phase": "P2",
+      "status": "REOPENED",
+      "timestamp": "2026-07-13T14:23:48+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P2",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T14:23:58+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P2",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-13T14:30:00+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P2",
+      "status": "PASS",
+      "timestamp": "2026-07-13T14:30:00+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P2 PASS.",
+      "phase": "P3",
+      "status": "PENDING",
+      "timestamp": "2026-07-13T14:30:00+00:00"
+    },
+    {
+      "detail": "Missing approvals: G1,G2,G3.",
+      "phase": "P3",
+      "status": "APPROVAL_REQUIRED",
+      "timestamp": "2026-07-13T14:35:10+00:00"
+    }
+  ],
+  "schema_version": 1,
+  "status": "APPROVAL_REQUIRED",
+  "updated_at": "2026-07-13T14:35:10+00:00",
+  "workflow": "c_elegans_rna_seq_v2"
+}

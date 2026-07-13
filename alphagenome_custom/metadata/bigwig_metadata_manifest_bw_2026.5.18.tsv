@@ -1,0 +1,27 @@
+sample_id	drive_id	drive_path	filename	excel_sheet	output_type	assay	strand	track_name	stage	sex	tissue	condition	data_source	note	matched_excel	normalization_status
+SRR941632		bw_2026.5.18/SRR941632.bw	SRR941632.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:0hr RNA-seq	0hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_0		unknown_from_metadata
+SRR941633		bw_2026.5.18/SRR941633.bw	SRR941633.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:2hr RNA-seq	2hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_2		unknown_from_metadata
+SRR941634		bw_2026.5.18/SRR941634.bw	SRR941634.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:4hr RNA-seq	4hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_4		unknown_from_metadata
+SRR941635		bw_2026.5.18/SRR941635.bw	SRR941635.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:6hr RNA-seq	6hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_6		unknown_from_metadata
+SRR941636		bw_2026.5.18/SRR941636.bw	SRR941636.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:8hr RNA-seq	8hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_8		unknown_from_metadata
+SRR941637		bw_2026.5.18/SRR941637.bw	SRR941637.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:10hr RNA-seq	10hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_10		unknown_from_metadata
+SRR941638		bw_2026.5.18/SRR941638.bw	SRR941638.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:12hr RNA-seq	12hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_12		unknown_from_metadata
+SRR941639		bw_2026.5.18/SRR941639.bw	SRR941639.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:14hr RNA-seq	14hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_14		unknown_from_metadata
+SRR941640		bw_2026.5.18/SRR941640.bw	SRR941640.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:16hr RNA-seq	16hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_16		unknown_from_metadata
+SRR941641		bw_2026.5.18/SRR941641.bw	SRR941641.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:18hr RNA-seq	18hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_18		unknown_from_metadata
+SRR941642		bw_2026.5.18/SRR941642.bw	SRR941642.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:20hr RNA-seq	20hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_20		unknown_from_metadata
+SRR941643		bw_2026.5.18/SRR941643.bw	SRR941643.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:22hr RNA-seq	22hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_22		unknown_from_metadata
+SRR941644		bw_2026.5.18/SRR941644.bw	SRR941644.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:24hr RNA-seq	24hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_24		unknown_from_metadata
+SRR941645		bw_2026.5.18/SRR941645.bw	SRR941645.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:26hr RNA-seq	26hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_26		unknown_from_metadata
+SRR941646		bw_2026.5.18/SRR941646.bw	SRR941646.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:28hr RNA-seq	28hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_28		unknown_from_metadata
+SRR941647		bw_2026.5.18/SRR941647.bw	SRR941647.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:30hr RNA-seq	30hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_30		unknown_from_metadata
+SRR941648		bw_2026.5.18/SRR941648.bw	SRR941648.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:32hr RNA-seq	32hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_32		unknown_from_metadata
+SRR941649		bw_2026.5.18/SRR941649.bw	SRR941649.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:34hr RNA-seq	34hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_34		unknown_from_metadata
+SRR941650		bw_2026.5.18/SRR941650.bw	SRR941650.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:36hr RNA-seq	36hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_36		unknown_from_metadata
+SRR941651		bw_2026.5.18/SRR941651.bw	SRR941651.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:38hr RNA-seq	38hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH2_N2_38		unknown_from_metadata
+SRR941697		bw_2026.5.18/SRR941697.bw	SRR941697.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:38hr RNA-seq	38hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH5_N2_38		unknown_from_metadata
+SRR941698		bw_2026.5.18/SRR941698.bw	SRR941698.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:40hr RNA-seq	40hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH5_N2_40		unknown_from_metadata
+SRR941699		bw_2026.5.18/SRR941699.bw	SRR941699.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:42hr RNA-seq	42hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH5_N2_42		unknown_from_metadata
+SRR941700		bw_2026.5.18/SRR941700.bw	SRR941700.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:44hr RNA-seq	44hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH5_N2_44		unknown_from_metadata
+SRR941701		bw_2026.5.18/SRR941701.bw	SRR941701.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:46hr RNA-seq	46hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH5_N2_46		unknown_from_metadata
+SRR941702		bw_2026.5.18/SRR941702.bw	SRR941702.bw		RNA_SEQ	RNA-seq	.	CUSTOM:N2_wildtype:48hr RNA-seq	48hr	Hermaphrodite	Whole worm (N2)		Grün et al. 2013 (GSE49043)	DH5_N2_48		unknown_from_metadata

@@ -1,0 +1,17 @@
+{
+  "all_intervals": 188,
+  "candidate_checkpoint_count": 171,
+  "candidate_source": "runs/rna_seq11_all_representation_inventory_20260530/top15_models.tsv",
+  "candidate_source_sha256": "3e4a46d1c6bf2efea49c0f9a863cde519686dd3d14f2f1d5dbaa658a7f7c7448",
+  "git_commit": "8b67b775c88002434d952d4ba0ebb86b0fbd3642",
+  "grouped_bigwig_count": 11,
+  "hostname": "hy8",
+  "protected_files_changed_during_freeze": [],
+  "raw_bigwig_count": 20,
+  "raw_hashes_unchanged": true,
+  "schema_version": 1,
+  "snapshot_created_utc": "2026-07-13T14:39:57+00:00",
+  "test_intervals": 33,
+  "train_intervals": 116,
+  "valid_intervals": 39
+}

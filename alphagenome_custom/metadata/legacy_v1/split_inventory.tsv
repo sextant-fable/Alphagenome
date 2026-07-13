@@ -1,0 +1,5 @@
+split	path	exists	size_bytes	sha256	interval_count	chromosomes
+train	alphagenome_custom/intervals/train.bed	True	2254	9e13724a2001b9f786bb746137cdf2ddecab754d49628fb34aa23b6910857e3c	116	I,II,III,IV
+valid	alphagenome_custom/intervals/valid.bed	True	735	98a16982ce6d85c0704eb9e79f85d8b508a98ff70a3934ae7b2c980d151b5829	39	V
+test	alphagenome_custom/intervals/test.bed	True	615	322d44bcc500652abf77d1dc91cecf0b2c153a27c49e46295aab00174e59fac1	33	X
+all	alphagenome_custom/intervals/all_intervals.bed	True	4699	2be4de695506aae19c7e6295dff1e26ee6ae5ea9b9726be9150792caf78888d7	188	I,II,III,IV,V,X

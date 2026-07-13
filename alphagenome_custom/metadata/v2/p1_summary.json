@@ -1,0 +1,26 @@
+{
+  "bam_total_bytes_available": 0,
+  "batch_counts": {
+    "2026.4.20": 20,
+    "2026.5.18": 26,
+    "sharepoint_2026-07-13_new439": 439
+  },
+  "conflict_flagged_count": 61,
+  "created_at": "2026-07-13T14:07:48+00:00",
+  "ena_failure_accessions": [],
+  "ena_success_count": 485,
+  "fastq_total_bytes": 1020357970574,
+  "formal_v2_included_count": 0,
+  "normalization_class_counts": {
+    "A": 0,
+    "B": 0,
+    "C": 485,
+    "D": 0
+  },
+  "raw_hashes_unchanged_during_p1": true,
+  "sample_count": 485,
+  "schema_version": 1,
+  "total_base_count": 1950829520132,
+  "total_read_count": 14015109297,
+  "unique_run_accessions": 485
+}

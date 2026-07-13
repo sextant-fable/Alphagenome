@@ -1,0 +1,23 @@
+{
+  "candidate_groups": 240,
+  "candidate_signal_members": 479,
+  "created_at": "2026-07-13T14:38:12+00:00",
+  "deterministic_manifest_hash_match": true,
+  "duplicate_current_signals_excluded": 3,
+  "formal_groups": 0,
+  "input_samples": 485,
+  "multi_biological_unit_groups": 82,
+  "multi_sample_groups": 82,
+  "non_rna_excluded": 3,
+  "ontology_source_sha256": {
+    "WBbt": "4037264444d21d6d463d58bb3cee5bdd76ab5e0f17f2ed7e948f0cb443c22b28",
+    "WBls": "e969ae09c292339212116087260fc9c7ae12bda1c727e1dbc48b11a6605b92b4"
+  },
+  "replicate_groups_flagged": 17,
+  "replicate_pair_qc_rows": 645,
+  "rna_seq_samples": 482,
+  "sample_manifest_sha256": "e7e0fbfc290c04957759ff5a59030410eb5bf2051341d0a376aa246ab8d7c0c5",
+  "schema_version": 1,
+  "singleton_groups": 158,
+  "technical_multi_run_groups": 15
+}

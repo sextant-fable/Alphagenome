@@ -1,0 +1,69 @@
+{
+  "checks": [
+    {
+      "check_id": "R1.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.02_sample_scope",
+      "evidence": "rows=485 unique_runs=485",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.03_batch_counts",
+      "evidence": "counts={'sharepoint_2026-07-13_new439': 439, '2026.4.20': 20, '2026.5.18': 26}",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.04_local_integrity",
+      "evidence": "all local paths match prior SHA-256 and WBcel235 evidence; P1 before/after hashes agree",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.05_accession_provenance",
+      "evidence": "ena_success=485 failures=0",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.06_query_failures_explicit",
+      "evidence": "statuses=['success']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.07_normalization_classification",
+      "evidence": "classes={'A': 0, 'B': 0, 'C': 485, 'D': 0}",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.08_no_unjustified_formal_inclusion",
+      "evidence": "formal_included=0",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.09_evidence_coverage",
+      "evidence": "evidence_rows=4265 samples=485",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.10_bigwig_provenance_explicit",
+      "evidence": "unknown provenance is explicit rather than inferred from bigWig statistics",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.11_conflicts_preserved",
+      "evidence": "conflict_flagged=61",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R1.12_g1_packet",
+      "evidence": "fastq_bytes=1020357970574 approval_not_granted",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P1",
+  "review": "R1",
+  "reviewed_at": "2026-07-13T14:38:24+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

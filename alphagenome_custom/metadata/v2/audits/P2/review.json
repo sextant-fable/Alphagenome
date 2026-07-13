@@ -1,0 +1,84 @@
+{
+  "checks": [
+    {
+      "check_id": "R2.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.02_scope_and_decisions",
+      "evidence": "samples=485 contexts=485 decisions=485",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.03_wrong_assay_excluded",
+      "evidence": "chip_ids=['rna_seq:SRR3535777', 'rna_seq:SRR3535778', 'rna_seq:SRR3535779']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.04_duplicate_signals",
+      "evidence": "three secondary byte-identical signals excluded while provenance remains",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.05_single_membership",
+      "evidence": "members=479 max_memberships=1",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.06_group_member_counts",
+      "evidence": "groups=240",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.07_context_consistency",
+      "evidence": "all members equal their group across the locked grouping fields",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.08_t38_split",
+      "evidence": "groups={'SRR941651': 'RNA_V2_G0101', 'SRR941697': 'RNA_V2_G0105'} stages={'SRR941651': 'L1-L3(38H)', 'SRR941697': 'L4(38H)'}",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.09_ontology",
+      "evidence": "mapping_rows=52 ontology_ids=13",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.10_replicate_relationship",
+      "evidence": "biological_multi_groups=82 technical_multi_groups=15",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.11_replicate_qc",
+      "evidence": "pairs=645 expected=645 groups=82",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.12_no_automatic_qc_exclusion",
+      "evidence": "flagged_pairs=108",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.13_conflict_resolutions",
+      "evidence": "resolution_rows=8 statuses=['resolved', 'resolved_current_signal_raw_reads_require_G1_review']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.14_formal_fail_closed",
+      "evidence": "formal_groups=0 candidate_reviews=240",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R2.15_determinism",
+      "evidence": "group construction repeated in memory with identical stable digest",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P2",
+  "review": "R2",
+  "reviewed_at": "2026-07-13T14:38:24+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

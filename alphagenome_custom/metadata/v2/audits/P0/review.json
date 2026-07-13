@@ -1,0 +1,74 @@
+{
+  "checks": [
+    {
+      "check_id": "R0.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.02_raw_bigwigs",
+      "evidence": "count=20",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.03_grouped_bigwigs",
+      "evidence": "count=11",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.04_normalization_and_ontology_recorded",
+      "evidence": "normalization status and ontology columns are present",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.05_reference_assets",
+      "evidence": "types=['FASTA', 'FASTA_INDEX', 'GTF']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.06_split_counts",
+      "evidence": "counts={'train': 116, 'valid': 39, 'test': 33, 'all': 188}",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.07_dataset_counts",
+      "evidence": "counts={'train': 116, 'valid': 39, 'test': 33}; NPZ content not hashed by policy",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.08_candidate_inventory",
+      "evidence": "count=171 unique=171",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.09_selected_models",
+      "evidence": "roles=['base_weights', 'legacy_tested_adapter', 'representation_utility_winner', 'validation_mse_winner']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.10_test_exposure",
+      "evidence": "legacy test exposure and latest validation-only status are explicit",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.11_raw_immutability",
+      "evidence": "raw hashes agree before/after and protected paths were unchanged",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.12_source_evidence",
+      "evidence": "source_files=10",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R0.13_freeze_document",
+      "evidence": "docs/legacy_v1_freeze.md",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P0",
+  "review": "R0",
+  "reviewed_at": "2026-07-13T14:40:02+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}
