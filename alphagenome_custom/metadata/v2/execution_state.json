@@ -176,10 +176,22 @@
       "phase": "P3A",
       "status": "G4_APPROVED",
       "timestamp": "2026-07-13T16:35:12+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3A",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T16:43:08+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P3A",
+      "status": "FAIL",
+      "timestamp": "2026-07-13T16:45:56+00:00"
     }
   ],
   "schema_version": 2,
-  "status": "PENDING",
-  "updated_at": "2026-07-13T16:35:12+00:00",
+  "status": "FAIL",
+  "updated_at": "2026-07-13T16:45:56+00:00",
   "workflow": "c_elegans_rna_seq_v2"
 }

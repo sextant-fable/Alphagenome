@@ -34,6 +34,31 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-14 - RNA-seq v2 P3A Download Failure
+
+- Run type: preprocessing
+- Purpose: Run the five-sample R3A technical checkpoint before automatically starting the authorized 482-run RNA-seq reprocessing scope.
+- Git commit: `38271ca`
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU` (`hy8`)
+- Slurm job ID: Not applicable; HY-GPU is a non-Slurm server.
+- Slurm request: Not applicable.
+- Environment: Existing Conda environment `alphagenome`; STAR `2.7.11b`; samtools `1.23.1`; bedtools `2.31.1`; UCSC bedGraphToBigWig `482`; 16 CPU threads; no GPU used.
+- Command:
+
+```bash
+/home/zelinli6/miniconda3/envs/alphagenome/bin/python \
+  scripts/v2_phase_controller.py run --phase P3A
+```
+
+- Input data: `alphagenome_custom/metadata/v2/p3_pilot_sources.tsv`; five ENA RNA-seq runs totaling 6,221,459,671 compressed FASTQ bytes; WBcel235 reference and Ensembl release 115 GTF.
+- Output path: `shared/source_reads/v2/pilot_20260713/`; intended normalized output directory `alphagenome_custom/tracks/rna_seq_v2_normalized_pilot/`.
+- Result summary: Failed during the first FASTQ download before alignment. The STAR WBcel235 index completed successfully. No normalized bigWig was produced.
+- Verification: The controller recorded `P3A / FAIL` at `2026-07-13T16:45:56+00:00`. curl exit code `18` showed repeated premature remote connection closure. The downloader discarded partial content on each internal retry because resume mode was absent.
+- Failures or warnings: This is a transfer-resilience defect, not an RNA-seq, STAR, environment, CPU, or GPU failure. A 175,746-byte `.part` file remains for controlled resume.
+- Next actions: Add and test curl continuation with a larger retry budget, reopen P3A with the failure reason retained, and resume the same source file.
+- Claim status: verified
+
 ## 2026-07-08 - Latest RNA-seq11 Valid/Test Prediction bigWig Export
 
 - Run type: evaluation and generated-artifact export

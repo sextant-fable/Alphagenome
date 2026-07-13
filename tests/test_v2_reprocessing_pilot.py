@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest import mock
 import tempfile
 import unittest
 
@@ -57,6 +58,28 @@ class V2ReprocessingPilotTest(unittest.TestCase):
             summary = pilot.validate_output_bigwig(path, {"I": 10})
             self.assertEqual(summary["sumData"], 100_000_000.0)
             self.assertEqual(summary["relative_total_error"], 0.0)
+
+    def test_download_resumes_existing_partial_file(self) -> None:
+        payload = b"complete-fastq"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.fastq.gz"
+            partial = Path(str(path) + ".part")
+            partial.write_bytes(payload[:5])
+
+            def complete_download(command: list[str]) -> None:
+                self.assertEqual(command[command.index("--continue-at") + 1], "-")
+                self.assertEqual(command[command.index("--retry") + 1], "20")
+                partial.write_bytes(payload)
+
+            with mock.patch.object(pilot, "run", side_effect=complete_download):
+                pilot.download_fastq(
+                    "example.invalid/sample.fastq.gz",
+                    pilot.hashlib.md5(payload).hexdigest(),
+                    len(payload),
+                    path,
+                )
+            self.assertEqual(path.read_bytes(), payload)
+            self.assertFalse(partial.exists())
 
 
 if __name__ == "__main__":

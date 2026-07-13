@@ -164,19 +164,30 @@ def download_fastq(url: str, expected_md5: str, expected_bytes: int, path: Path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.is_file() or path.stat().st_size != expected_bytes:
         tmp_path = path.with_suffix(path.suffix + ".part")
-        run(
-            [
-                "curl",
-                "-fL",
-                "--retry",
-                "4",
-                "--retry-all-errors",
-                *DOH_ARGS,
-                f"https://{url}",
-                "-o",
-                str(tmp_path),
-            ]
-        )
+        if not (
+            tmp_path.is_file()
+            and tmp_path.stat().st_size == expected_bytes
+            and md5(tmp_path) == expected_md5
+        ):
+            run(
+                [
+                    "curl",
+                    "-fL",
+                    "--retry",
+                    "20",
+                    "--retry-delay",
+                    "2",
+                    "--retry-all-errors",
+                    "--continue-at",
+                    "-",
+                    *DOH_ARGS,
+                    f"https://{url}",
+                    "-o",
+                    str(tmp_path),
+                ]
+            )
+        if tmp_path.stat().st_size != expected_bytes or md5(tmp_path) != expected_md5:
+            raise RuntimeError(f"Partial FASTQ integrity failure: {tmp_path}")
         tmp_path.replace(path)
     if path.stat().st_size != expected_bytes or md5(path) != expected_md5:
         raise RuntimeError(f"FASTQ integrity failure: {path}")

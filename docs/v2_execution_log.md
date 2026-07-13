@@ -51,3 +51,11 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - G5: remains unapproved until a single checkpoint is locked after R6B.
 - Storage design: use four 16-thread streaming workers and remove verified per-run FASTQ/BAM/bedGraph intermediates instead of retaining the approximately 3.8 TiB planning envelope.
 - Metadata correction: added ENA per-file FASTQ MD5 and byte lists; R1 now passes 13 checks for an exact 482-run source manifest.
+
+## 2026-07-14 - P3A First Attempt and Resume Correction
+
+- Environment result: the existing `alphagenome` environment retained Python `3.12.13`, AlphaGenome importability, PyTorch `2.11.0+cu128`, and CUDA availability after installing STAR `2.7.11b`, samtools `1.23.1`, bedtools `2.31.1`, and UCSC bedGraphToBigWig `482`.
+- Index result: the WBcel235 STAR index completed at `shared/reference_indexes/WBcel235_STAR_2.7.11b`.
+- Attempt result: FAIL before alignment because ENA closed the first HTTPS FASTQ transfer repeatedly and the pilot curl command discarded prior partial bytes on retry.
+- Correction: both pilot and full download paths now use `--continue-at -`, 20 transfer retries, and a two-second retry delay; a regression test confirms continuation from an existing `.part` file.
+- Data integrity: no normalized output was produced, raw bigWigs were not modified, and the retained partial FASTQ is validated against the expected byte count and MD5 before promotion.
