@@ -31,3 +31,12 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Exclusions: three ChIP-seq accessions and three secondary byte-identical current signals.
 - Replicate QC: 645 pairs evaluated; 108 review-only flags in 17 groups; no automatic removal.
 - Transition: advanced to P3, which remains behind G1/G2/G3 approvals.
+
+## 2026-07-13 - Scoped Controller and P3A/R3A Preflight
+
+- State migration: schema v1 `P3` became bounded `P3A`; all ungranted Boolean gates became ungranted scoped approval records.
+- Phase separation: P3A pilot and P3B bulk processing are distinct; P6A pilot, P6B formal validation, and P6C one-time chromosome-X evaluation are distinct.
+- Automation: `run --auto` continues only across PASS phases and stops fail-closed at missing scopes, failed reviews, or unregistered phase implementations.
+- Defense in depth: the P3A wrapper independently verifies current phase and exact G1/G2/G3 scopes before environment installation, download, alignment, or output writes.
+- Preflight result: Python compilation, command-plan inspection, missing-approval refusal, scope-mismatch refusal, and approval-boundary auto-stop passed without installing tools or writing large data.
+- Current boundary: `P3A / APPROVAL_REQUIRED`; no P3A data action has run.

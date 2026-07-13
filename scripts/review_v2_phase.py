@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import csv
 from datetime import datetime, timezone
+import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +25,30 @@ def utc_now() -> str:
 def read_tsv(path: Path) -> list[dict[str, str]]:
     with path.open(newline="") as handle:
         return list(csv.DictReader(handle, delimiter="\t"))
+
+
+def write_tsv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(
+            handle, fieldnames=fields, delimiter="\t", lineterminator="\n"
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def file_hashes(path: Path, chunk_size: int = 8 * 1024 * 1024) -> tuple[str, str]:
+    sha_digest = hashlib.sha256()
+    md5_digest = hashlib.md5(usedforsecurity=False)
+    with path.open("rb") as handle:
+        while chunk := handle.read(chunk_size):
+            sha_digest.update(chunk)
+            md5_digest.update(chunk)
+    return sha_digest.hexdigest(), md5_digest.hexdigest()
+
+
+def sha256(path: Path) -> str:
+    return file_hashes(path)[0]
 
 
 def check(check_id: str, passed: bool, evidence: str) -> dict[str, Any]:
@@ -618,6 +644,370 @@ def review_p2() -> dict[str, Any]:
     }
 
 
+def bigwig_summary(path: Path, expected_chromosomes: dict[str, int]) -> dict[str, float]:
+    import pyBigWig
+
+    with pyBigWig.open(str(path)) as bigwig:
+        if not bigwig.isBigWig():
+            raise RuntimeError(f"Not a bigWig: {path}")
+        if bigwig.chroms() != expected_chromosomes:
+            raise RuntimeError(f"Chromosome mismatch: {path}")
+        header = bigwig.header()
+    summary = {
+        key: float(header[key]) for key in ("minVal", "maxVal", "sumData", "sumSquared")
+    }
+    if not all(math.isfinite(value) for value in summary.values()):
+        raise RuntimeError(f"Non-finite bigWig header: {path}")
+    if summary["minVal"] < 0 or summary["maxVal"] < 0:
+        raise RuntimeError(f"Negative bigWig signal: {path}")
+    return summary
+
+
+def bigwig_1kb_profile(path: Path, chromosomes: dict[str, int]):
+    import numpy as np
+    import pyBigWig
+
+    profiles = []
+    with pyBigWig.open(str(path)) as bigwig:
+        for chromosome in ("I", "II", "III", "IV", "V", "X"):
+            length = chromosomes[chromosome]
+            bins = math.ceil(length / 1000)
+            values = bigwig.stats(
+                chromosome,
+                0,
+                length,
+                nBins=bins,
+                type="mean",
+                exact=True,
+            )
+            array = np.asarray(
+                [0.0 if value is None else value for value in values],
+                dtype=np.float64,
+            )
+            if not np.isfinite(array).all() or (array < 0).any():
+                raise RuntimeError(f"Invalid 1 kb profile: {path}")
+            profiles.append(array)
+    return np.concatenate(profiles)
+
+
+def pearson(first, second) -> float:
+    import numpy as np
+
+    if first.shape != second.shape or first.size == 0:
+        return float("nan")
+    if float(first.std()) == 0.0 or float(second.std()) == 0.0:
+        return float("nan")
+    return float(np.corrcoef(first, second)[0, 1])
+
+
+def review_p3a() -> dict[str, Any]:
+    import numpy as np
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    expected_work_rel = "shared/source_reads/v2/pilot_20260713"
+    expected_output_rel = "alphagenome_custom/tracks/rna_seq_v2_normalized_pilot"
+    expected_index_rel = "shared/reference_indexes/WBcel235_STAR_2.7.11b"
+    approved_runs = {
+        "SRR7443583",
+        "SRR941632",
+        "SRR10882545",
+        "SRR23049895",
+        "SRR36719198",
+    }
+    output_dir = REPO_ROOT / expected_output_rel
+    pilot_manifest_path = metadata_dir / "p3_pilot_sources.tsv"
+    sample_manifest_path = metadata_dir / "rna_seq_samples_v2.tsv"
+    outputs_path = output_dir / "pilot_outputs.tsv"
+    run_path = output_dir / "pilot_run.json"
+    required = [pilot_manifest_path, sample_manifest_path, outputs_path, run_path]
+    missing = [str(path.relative_to(REPO_ROOT)) for path in required if not path.is_file()]
+    checks = [check("R3A.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P3A",
+            "review": "R3A",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+
+    pilot_manifest = read_tsv(pilot_manifest_path)
+    samples = read_tsv(sample_manifest_path)
+    outputs = read_tsv(outputs_path)
+    run_metadata = json.loads(run_path.read_text())
+    sample_by_run = {row["run_accession"]: row for row in samples}
+    pilot_by_run = {row["run_accession"]: row for row in pilot_manifest}
+    output_by_run = {row["run_accession"]: row for row in outputs}
+    expected_runs = {row["run_accession"] for row in pilot_manifest}
+
+    expected_chromosomes = {}
+    with (REPO_ROOT / "alphagenome_custom/reference/genome.fa.fai").open() as handle:
+        for line in handle:
+            fields = line.rstrip("\n").split("\t")
+            expected_chromosomes[fields[0]] = int(fields[1])
+
+    fastq_errors = []
+    raw_errors = []
+    output_errors = []
+    mapping_errors = []
+    bam_errors = []
+    path_errors = []
+    approved_work_dir = (REPO_ROOT / expected_work_rel).resolve()
+    approved_output_dir = (REPO_ROOT / expected_output_rel).resolve()
+    for accession in sorted(expected_runs):
+        if accession not in output_by_run or accession not in sample_by_run:
+            continue
+        row = output_by_run[accession]
+        sample = sample_by_run[accession]
+        fastq_paths = [REPO_ROOT / value for value in row["source_fastq_paths"].split(";")]
+        expected_md5 = row["source_fastq_md5"].split(";")
+        expected_sha = row["source_fastq_sha256"].split(";")
+        pilot_row = pilot_by_run[accession]
+        expected_names = [Path(value).name for value in pilot_row["fastq_ftp"].split(";")]
+        if (
+            row["source_fastq_md5"] != pilot_row["fastq_md5"]
+            or int(row["source_fastq_bytes"])
+            != sum(int(value) for value in pilot_row["fastq_bytes"].split(";"))
+            or [path.name for path in fastq_paths] != expected_names
+        ):
+            fastq_errors.append(f"{accession}:does not match pilot manifest")
+        if not (len(fastq_paths) == len(expected_md5) == len(expected_sha)):
+            fastq_errors.append(f"{accession}:FASTQ field length mismatch")
+        else:
+            for path, md5_value, sha_value in zip(
+                fastq_paths, expected_md5, expected_sha, strict=True
+            ):
+                if not path.is_file():
+                    fastq_errors.append(f"{accession}:missing {path}")
+                    continue
+                actual_sha, actual_md5 = file_hashes(path)
+                if actual_sha != sha_value or actual_md5 != md5_value:
+                    fastq_errors.append(f"{accession}:checksum {path.name}")
+                if not path.resolve().is_relative_to(approved_work_dir):
+                    path_errors.append(f"FASTQ outside work dir: {path}")
+
+        provided_path = REPO_ROOT / sample["local_path"]
+        actual_provided_sha = sha256(provided_path)
+        raw_values = {
+            sample["sha256"],
+            row["provided_bigwig_expected_sha256"],
+            row["provided_bigwig_sha256_before"],
+            row["provided_bigwig_sha256_after"],
+            actual_provided_sha,
+        }
+        if len(raw_values) != 1 or row["provided_bigwig_unchanged"] != "True":
+            raw_errors.append(accession)
+
+        output_path = REPO_ROOT / row["output_path"]
+        if not output_path.resolve().is_relative_to(approved_output_dir):
+            path_errors.append(f"output outside output dir: {output_path}")
+        try:
+            summary = bigwig_summary(output_path, expected_chromosomes)
+            if output_path.stat().st_size != int(row["output_size_bytes"]):
+                output_errors.append(f"{accession}:size")
+            if sha256(output_path) != row["output_sha256"]:
+                output_errors.append(f"{accession}:sha256")
+            relative_error = abs(summary["sumData"] - 100_000_000.0) / 100_000_000.0
+            if relative_error > 1e-5:
+                output_errors.append(f"{accession}:total={summary['sumData']}")
+            if not math.isclose(
+                summary["sumData"],
+                float(row["output_total_signal"]),
+                rel_tol=1e-12,
+                abs_tol=1e-6,
+            ):
+                output_errors.append(f"{accession}:recorded total")
+            if not math.isclose(
+                summary["minVal"], float(row["output_min"]), rel_tol=1e-9, abs_tol=1e-9
+            ) or not math.isclose(
+                summary["maxVal"], float(row["output_max"]), rel_tol=1e-9, abs_tol=1e-9
+            ):
+                output_errors.append(f"{accession}:recorded extrema")
+        except Exception as error:
+            output_errors.append(f"{accession}:{error}")
+
+        try:
+            mapped_percent = float(row["star_uniquely_mapped_percent"].rstrip("%"))
+            if not 0 <= mapped_percent <= 100:
+                raise ValueError(mapped_percent)
+            if int(row["star_input_reads"]) <= 0 or int(row["star_uniquely_mapped_reads"]) < 0:
+                raise ValueError("invalid read counts")
+        except (KeyError, ValueError) as error:
+            mapping_errors.append(f"{accession}:{error}")
+
+        try:
+            primary_bam = REPO_ROOT / row["primary_bam_path"]
+            if not primary_bam.resolve().is_relative_to(approved_work_dir):
+                raise ValueError("BAM outside approved work directory")
+            if primary_bam.stat().st_size != int(row["primary_bam_size_bytes"]):
+                raise ValueError("BAM size mismatch")
+            if sha256(primary_bam) != row["primary_bam_sha256"]:
+                raise ValueError("BAM SHA-256 mismatch")
+        except (KeyError, OSError, ValueError) as error:
+            bam_errors.append(f"{accession}:{error}")
+
+    commands_path = REPO_ROOT / run_metadata.get("commands_path", "missing")
+    command_integrity = (
+        commands_path.is_file()
+        and sha256(commands_path) == run_metadata.get("commands_sha256")
+        and len(json.loads(commands_path.read_text())) == run_metadata.get("command_count")
+        and run_metadata.get("command_count", 0) > 0
+    )
+    tool_versions = run_metadata.get("tool_versions", {})
+    expected_tool_versions = (
+        "2.7.11b" in tool_versions.get("STAR", "")
+        and "1.24" in tool_versions.get("samtools", "")
+        and "2.31.1" in tool_versions.get("bedtools", "")
+        and bool(tool_versions.get("bedGraphToBigWig"))
+    )
+    partial_files = [
+        str(path.relative_to(REPO_ROOT))
+        for root in (
+            REPO_ROOT / run_metadata["work_dir"],
+            REPO_ROOT / run_metadata["output_dir"],
+            REPO_ROOT / run_metadata["star_index"],
+        )
+        for pattern in ("*.part", "*.tmp")
+        for path in root.rglob(pattern)
+    ]
+
+    comparisons = []
+    comparison_errors = []
+    for accession in sorted(expected_runs.intersection(output_by_run, sample_by_run)):
+        output_path = REPO_ROOT / output_by_run[accession]["output_path"]
+        provided_path = REPO_ROOT / sample_by_run[accession]["local_path"]
+        try:
+            output_profile = bigwig_1kb_profile(output_path, expected_chromosomes)
+            provided_profile = bigwig_1kb_profile(provided_path, expected_chromosomes)
+            raw_pearson = pearson(output_profile, provided_profile)
+            log1p_pearson = pearson(
+                np.log1p(output_profile), np.log1p(provided_profile)
+            )
+            comparisons.append(
+                {
+                    "run_accession": accession,
+                    "bin_count": output_profile.size,
+                    "raw_1kb_pearson": f"{raw_pearson:.12g}",
+                    "log1p_1kb_pearson": f"{log1p_pearson:.12g}",
+                    "output_zero_bin_fraction": f"{np.mean(output_profile == 0):.12g}",
+                    "provided_zero_bin_fraction": f"{np.mean(provided_profile == 0):.12g}",
+                    "interpretation": "diagnostic_only_unknown_provided_bigwig_unit",
+                }
+            )
+            if not math.isfinite(raw_pearson) or not math.isfinite(log1p_pearson):
+                comparison_errors.append(f"{accession}:non-finite correlation")
+        except Exception as error:
+            comparison_errors.append(f"{accession}:{error}")
+    if comparisons:
+        write_tsv(
+            AUDIT_ROOT / "P3A/pilot_bigwig_comparison.tsv",
+            comparisons,
+            list(comparisons[0]),
+        )
+
+    formula_valid = all(
+        row.get("normalization_formula")
+        == "100000000/sum((end-start)*raw_coverage)"
+        and float(row.get("bedgraph_scale_to_1e8", "nan")) > 0
+        and float(row.get("raw_bedgraph_total", "nan")) > 0
+        for row in outputs
+    )
+    checks.extend(
+        [
+            check(
+                "R3A.02_bounded_scope",
+                len(pilot_manifest) == 5
+                and expected_runs == approved_runs
+                and run_metadata.get("scope") == "five_run_reprocessing_pilot_only"
+                and run_metadata.get("formal_v2_outputs") is False
+                and run_metadata.get("source_fastq_bytes") == 6_221_459_671,
+                f"runs={sorted(expected_runs)} formal={run_metadata.get('formal_v2_outputs')}",
+            ),
+            check(
+                "R3A.03_manifest_integrity",
+                run_metadata.get("manifest_sha256") == sha256(pilot_manifest_path)
+                and run_metadata.get("sample_manifest_sha256")
+                == sha256(sample_manifest_path),
+                "pilot and 485-sample manifest SHA-256 match the executed record",
+            ),
+            check(
+                "R3A.04_output_membership",
+                set(output_by_run) == expected_runs
+                and len(list(output_dir.glob("*.bw"))) == 5,
+                f"outputs={sorted(output_by_run)}",
+            ),
+            check(
+                "R3A.05_fastq_integrity",
+                not fastq_errors,
+                f"errors={fastq_errors}",
+            ),
+            check(
+                "R3A.06_raw_bigwig_immutability",
+                not raw_errors and run_metadata.get("raw_bigwigs_unchanged") is True,
+                f"errors={raw_errors}",
+            ),
+            check(
+                "R3A.07_tool_and_command_provenance",
+                command_integrity
+                and expected_tool_versions,
+                f"commands={run_metadata.get('command_count')} versions={tool_versions}",
+            ),
+            check(
+                "R3A.08_mapping_metrics",
+                not mapping_errors and not bam_errors,
+                f"mapping_errors={mapping_errors} bam_errors={bam_errors}",
+            ),
+            check(
+                "R3A.09_normalization_formula",
+                formula_valid
+                and run_metadata.get("normalization_target_total") == 100_000_000,
+                "explicit 1e6 x 100 bp total-signal scale",
+            ),
+            check(
+                "R3A.10_bigwig_integrity",
+                not output_errors,
+                f"errors={output_errors}",
+            ),
+            check(
+                "R3A.11_path_and_partial_file_safety",
+                not path_errors
+                and not partial_files
+                and run_metadata.get("partial_files") == []
+                and run_metadata.get("work_dir") == expected_work_rel
+                and run_metadata.get("output_dir") == expected_output_rel
+                and run_metadata.get("star_index") == expected_index_rel
+                and run_metadata.get("threads") == 16,
+                f"path_errors={path_errors} partial_files={partial_files}",
+            ),
+            check(
+                "R3A.12_resource_measurement",
+                float(run_metadata.get("elapsed_seconds", 0)) > 0
+                and int(run_metadata.get("observed_managed_peak_bytes", 0)) > 0
+                and all(float(row.get("sample_elapsed_seconds", 0)) > 0 for row in outputs),
+                "elapsed="
+                f"{run_metadata.get('elapsed_seconds')} observed_bytes="
+                f"{run_metadata.get('observed_managed_peak_bytes')}",
+            ),
+            check(
+                "R3A.13_provided_signal_comparison",
+                len(comparisons) == 5 and not comparison_errors,
+                f"comparisons={len(comparisons)} errors={comparison_errors}",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P3A",
+        "review": "R3A",
+        "reviewed_at": utc_now(),
+        "status": "PASS"
+        if all(item["status"] == "PASS" for item in checks)
+        else "FAIL",
+        "checks": checks,
+    }
+
+
 def write_report(report: dict[str, Any]) -> None:
     audit_dir = AUDIT_ROOT / report["phase"]
     audit_dir.mkdir(parents=True, exist_ok=True)
@@ -642,7 +1032,9 @@ def write_report(report: dict[str, Any]) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--phase", required=True, choices=["P0", "P1", "P2"])
+    parser.add_argument(
+        "--phase", required=True, choices=["P0", "P1", "P2", "P3A"]
+    )
     return parser.parse_args()
 
 
@@ -652,8 +1044,10 @@ def main() -> None:
         report = review_p0()
     elif args.phase == "P1":
         report = review_p1()
-    else:
+    elif args.phase == "P2":
         report = review_p2()
+    else:
+        report = review_p3a()
     assert report is not None
     write_report(report)
     print(json.dumps(report, indent=2, sort_keys=True))

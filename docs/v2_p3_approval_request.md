@@ -1,4 +1,4 @@
-# P3 Pilot Approval Request
+# P3A Pilot Approval Request
 
 Status: **G1/G2/G3 APPROVAL REQUIRED - NOT EXECUTED**
 
@@ -32,7 +32,7 @@ Required isolated environment command:
 conda create -y -n alphagenome-rnaseq-v2 \
   -c conda-forge -c bioconda \
   python=3.12 star=2.7.11b samtools=1.24 bedtools=2.31.1 \
-  ucsc-bedgraphtobigwig pybigwig=0.3.25 numpy
+  ucsc-bedgraphtobigwig pybigwig=0.3.25 numpy curl
 ```
 
 The environment is not installed until G1 approval.
@@ -42,7 +42,7 @@ The environment is not installed until G1 approval.
 Approved command after the environment is available:
 
 ```bash
-conda run -n alphagenome-rnaseq-v2 \
+conda run --no-capture-output -n alphagenome-rnaseq-v2 \
   python scripts/run_v2_reprocessing_pilot.py \
   --manifest alphagenome_custom/metadata/v2/p3_pilot_sources.tsv \
   --threads 16 \
@@ -53,4 +53,12 @@ conda run -n alphagenome-rnaseq-v2 \
 
 The pilot uses STAR unique primary alignments, spliced coverage, and an explicit final scaling to total per-base signal `100,000,000`. Output tracks are deliberately unstranded (`.`), so strand behavior is defined even when library strandedness is absent.
 
-Expected temporary use is well below the available `2.1 TiB`, but the bulk 485-run workflow is not approved by this packet. Pilot R3a must measure runtime, disk peaks, mapping rate, output signal, and agreement with the provided bigWigs before a streaming bulk command and cleanup policy are proposed.
+Expected temporary use is well below the available `2.1 TiB`, but the bulk 485-run workflow is not approved by this packet. R3A measures runtime, observed managed-disk peak, mapping rate, output signal, tool/command provenance, raw-file immutability, and agreement with the provided bigWigs before a streaming bulk command and cleanup policy are proposed.
+
+## Exact Approval Scopes
+
+- `G1:p3a_five_run_pilot`: isolated environment installation plus the five-run FASTQ download and CPU realignment.
+- `G2:v2_manifest_candidate_hierarchy`: accept the corrected candidate hierarchy for the pilot without promoting unknown-unit bigWigs to formal labels.
+- `G3:p3a_five_run_pilot_outputs`: write only the ignored P3A work, index, BAM, bedGraph, and normalized pilot bigWig paths shown above.
+
+After all three scopes are recorded, `scripts/v2_phase_controller.py run --auto` may execute P3A and R3A. A PASS advances to P3B, which immediately requires the separately scoped `G1:p3b_full_reprocessing` and `G3:p3b_full_normalized_outputs`; no five-run approval can authorize the 485-run bulk operation.

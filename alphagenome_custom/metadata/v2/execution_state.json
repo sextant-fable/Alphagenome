@@ -1,12 +1,37 @@
 {
   "approvals": {
-    "G1_large_source_download_or_realignment": false,
-    "G2_v2_manifest_scientific_review": false,
-    "G3_dataset_or_cache_generation": false,
-    "G4_gpu_experiments": false,
-    "G5_final_test": false
+    "G1_large_source_download_or_realignment": {
+      "approved": false,
+      "note": null,
+      "scope": null,
+      "updated_at": null
+    },
+    "G2_v2_manifest_scientific_review": {
+      "approved": false,
+      "note": null,
+      "scope": null,
+      "updated_at": null
+    },
+    "G3_dataset_or_cache_generation": {
+      "approved": false,
+      "note": null,
+      "scope": null,
+      "updated_at": null
+    },
+    "G4_gpu_experiments": {
+      "approved": false,
+      "note": null,
+      "scope": null,
+      "updated_at": null
+    },
+    "G5_final_test": {
+      "approved": false,
+      "note": null,
+      "scope": null,
+      "updated_at": null
+    }
   },
-  "current_phase": "P3",
+  "current_phase": "P3A",
   "history": [
     {
       "detail": "Phase command started.",
@@ -115,10 +140,22 @@
       "phase": "P3",
       "status": "APPROVAL_REQUIRED",
       "timestamp": "2026-07-13T14:35:10+00:00"
+    },
+    {
+      "detail": "Schema v1 P3 migrated to the bounded five-run P3A pilot.",
+      "phase": "P3A",
+      "status": "MIGRATED",
+      "timestamp": "2026-07-13T14:54:52+00:00"
+    },
+    {
+      "detail": "Missing scoped approvals: G1:p3a_five_run_pilot,G2:v2_manifest_candidate_hierarchy,G3:p3a_five_run_pilot_outputs.",
+      "phase": "P3A",
+      "status": "APPROVAL_REQUIRED",
+      "timestamp": "2026-07-13T14:55:09+00:00"
     }
   ],
-  "schema_version": 1,
+  "schema_version": 2,
   "status": "APPROVAL_REQUIRED",
-  "updated_at": "2026-07-13T14:35:10+00:00",
+  "updated_at": "2026-07-13T14:55:09+00:00",
   "workflow": "c_elegans_rna_seq_v2"
 }
