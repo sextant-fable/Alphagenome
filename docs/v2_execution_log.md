@@ -69,6 +69,13 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Post-reprocessing review: R3 verifies all normalized and grouped bigWigs, raw-data immutability, exact group context, ontology CURIEs, replicate QC, source-reuse resolution, cleanup, manifest hashes, and the long-run execution record.
 - Status: implementation and 18-test suite pass; P3B has not started and remains conditional on R3A PASS.
 
+## 2026-07-14 - P3B NCBI SRA Transport Validation
+
+- Reason: repeated ENA HTTPS range transfers retained bytes correctly but were too slow for the 944.56 GiB full scope. A 50 MiB read-only benchmark delivered the official NCBI SRA object at 7.84 MB/s while the corresponding ENA FASTQ endpoint delivered 2,359,691 bytes in 60 seconds.
+- Tooling: installed the standalone NCBI SRA Toolkit `3.4.1` under ignored `shared/tools/`; the 89,143,120-byte official toolkit archive has SHA-256 `b950362c054765a4184af41947f022f040e94e964862017c0ecb0b0273db3596`. The project Python environment was not replaced.
+- End-to-end check: downloaded the official full-quality `SRR941632` SRA object, matched SDL MD5 `57120e81e8e8b183e4fb78014d1237d9`, passed `vdb-validate`, and extracted 20,763,724 reads, exactly matching the ENA manifest. The independent validation copy was then removed.
+- Full-run policy: P3B uses `ncbi_sra` transport by default and retains `ena_fastq` as an explicit fallback. Every run must match the SDL archive MD5, pass archive validation, and reproduce the manifest read count before STAR. Transport provenance and extracted FASTQ SHA-256 values are recorded per run.
+
 ## 2026-07-14 - Transfer Retry Semantics Correction
 
 - Observation: curl continuation worked when P3A was restarted, but curl's internal retry logic truncated bytes received by the current curl process after a remote exit 18.

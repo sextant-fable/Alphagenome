@@ -66,6 +66,8 @@ def main() -> None:
             "alphagenome_custom/tracks/rna_seq_v2_normalized",
             "--star-index",
             "shared/reference_indexes/WBcel235_STAR_2.7.11b",
+            "--download-backend",
+            "ncbi_sra",
         ],
         [
             conda,
@@ -89,6 +91,9 @@ def main() -> None:
         "log_path": str(log_path.relative_to(REPO_ROOT)),
         "workers": 4,
         "threads_per_sample": 16,
+        "download_backend": "ncbi_sra",
+        "sra_toolkit_version": "3.4.1",
+        "sra_toolkit_archive_sha256": "b950362c054765a4184af41947f022f040e94e964862017c0ecb0b0273db3596",
         "free_bytes_at_start": free_bytes,
     }
     RUN_RECORD.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")

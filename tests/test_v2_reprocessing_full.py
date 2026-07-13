@@ -9,6 +9,62 @@ from scripts import run_v2_reprocessing_full as full
 
 
 class V2ReprocessingFullTest(unittest.TestCase):
+    def test_ncbi_sdl_selects_full_sra_not_noqual_lite(self) -> None:
+        payload = {
+            "result": [
+                {
+                    "status": 200,
+                    "files": [
+                        {
+                            "type": "sra",
+                            "name": "SRR1",
+                            "size": 123,
+                            "md5": "a" * 32,
+                            "locations": [
+                                {
+                                    "service": "s3",
+                                    "link": "https://sra-pub-run-odp.s3.amazonaws.com/sra/SRR1/SRR1",
+                                }
+                            ],
+                        },
+                        {
+                            "type": "sra",
+                            "name": "SRR1.lite",
+                            "size": 12,
+                            "md5": "b" * 32,
+                            "noqual": True,
+                            "locations": [],
+                        },
+                    ],
+                }
+            ]
+        }
+        self.assertEqual(
+            full.select_sra_archive(payload, "SRR1"),
+            {
+                "url": "https://sra-pub-run-odp.s3.amazonaws.com/sra/SRR1/SRR1",
+                "md5": "a" * 32,
+                "size": 123,
+            },
+        )
+
+    def test_fastq_stats_hashes_and_counts_reads(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            first = Path(directory) / "first.fastq"
+            second = Path(directory) / "second.fastq"
+            first.write_bytes(b"@r1\nA\n+\n!\n")
+            second.write_bytes(b"@r2\nT\n+\n!\n")
+            hashes, reads, total_bytes = full.fastq_stats([first, second])
+            self.assertEqual(reads, 2)
+            self.assertEqual(total_bytes, first.stat().st_size + second.stat().st_size)
+            self.assertEqual(
+                hashes,
+                [
+                    hashlib.sha256(first.read_bytes()).hexdigest(),
+                    hashlib.sha256(second.read_bytes()).hexdigest(),
+                ],
+            )
+
     def test_full_source_manifest_is_exactly_the_rna_scope(self) -> None:
         sources = full.read_tsv(full.SOURCE_MANIFEST)
         samples = full.read_tsv(full.SAMPLE_MANIFEST)

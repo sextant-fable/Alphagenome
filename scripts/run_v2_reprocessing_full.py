@@ -36,6 +36,7 @@ EXPECTED_RUN_COUNT = 482
 EXPECTED_FASTQ_BYTES = 1_014_217_532_067
 MIN_FREE_BYTES = 200 * 1024**3
 LEDGER_LOCK = threading.Lock()
+SRA_TOOLKIT_GLOB = "shared/tools/sratoolkit.*-ubuntu64/bin"
 
 
 def utc_now() -> str:
@@ -54,6 +55,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--star-index", default="shared/reference_indexes/WBcel235_STAR_2.7.11b"
+    )
+    parser.add_argument(
+        "--download-backend",
+        choices=("ncbi_sra", "ena_fastq"),
+        default="ncbi_sra",
     )
     return parser.parse_args()
 
@@ -146,11 +152,27 @@ class SampleRunner:
             raise subprocess.CalledProcessError(return_code, command)
 
 
-def require_tools() -> None:
+def find_sra_toolkit() -> Path:
+    matches = sorted(REPO_ROOT.glob(SRA_TOOLKIT_GLOB))
+    valid = [
+        path
+        for path in matches
+        if (path / "fasterq-dump").is_file() and (path / "vdb-validate").is_file()
+    ]
+    if len(valid) != 1:
+        raise RuntimeError(
+            f"Expected exactly one standalone SRA Toolkit at {SRA_TOOLKIT_GLOB}; "
+            f"found={valid}"
+        )
+    return valid[0]
+
+
+def require_tools(download_backend: str) -> Path | None:
     names = ["STAR", "samtools", "bedtools", "bedGraphToBigWig", "curl"]
     missing = [name for name in names if shutil.which(name) is None]
     if missing:
         raise RuntimeError("Missing required tools: " + ",".join(missing))
+    return find_sra_toolkit() if download_backend == "ncbi_sra" else None
 
 
 def read_reference_chromosomes() -> dict[str, int]:
@@ -255,6 +277,146 @@ def download_fastq(
     return actual_sha, actual_md5
 
 
+def select_sra_archive(payload: dict[str, Any], accession: str) -> dict[str, Any]:
+    results = payload.get("result", [])
+    if len(results) != 1 or results[0].get("status") != 200:
+        raise RuntimeError(f"NCBI SDL lookup failed for {accession}: {payload}")
+    candidates = [
+        item
+        for item in results[0].get("files", [])
+        if item.get("type") == "sra" and item.get("name") == accession
+    ]
+    if len(candidates) != 1:
+        raise RuntimeError(f"Expected one full SRA archive for {accession}")
+    candidate = candidates[0]
+    links = [
+        location.get("link")
+        for location in candidate.get("locations", [])
+        if location.get("service") == "s3"
+        and str(location.get("link", "")).startswith(
+            "https://sra-pub-run-odp.s3.amazonaws.com/sra/"
+        )
+    ]
+    if len(links) != 1:
+        raise RuntimeError(f"Expected one public S3 SRA location for {accession}")
+    md5 = str(candidate.get("md5", ""))
+    size = int(candidate.get("size", 0))
+    if len(md5) != 32 or size <= 0:
+        raise RuntimeError(f"Invalid SRA integrity metadata for {accession}")
+    return {"url": links[0], "md5": md5, "size": size}
+
+
+def locate_sra_archive(
+    runner: SampleRunner, accession: str, response_path: Path
+) -> dict[str, Any]:
+    temporary = response_path.with_suffix(response_path.suffix + ".tmp")
+    runner.run(
+        [
+            "curl",
+            "-fL",
+            "--connect-timeout",
+            "30",
+            *DOH_ARGS,
+            (
+                "https://locate.ncbi.nlm.nih.gov/sdl/2/retrieve"
+                f"?acc={accession}&accept-alternate-locations=yes"
+            ),
+            "-o",
+            str(temporary),
+        ]
+    )
+    payload = json.loads(temporary.read_text())
+    archive = select_sra_archive(payload, accession)
+    temporary.replace(response_path)
+    return archive
+
+
+def download_sra_archive(
+    runner: SampleRunner,
+    archive: dict[str, Any],
+    path: Path,
+) -> tuple[str, str]:
+    url = str(archive["url"])
+    if not url.startswith("https://sra-pub-run-odp.s3.amazonaws.com/sra/"):
+        raise RuntimeError(f"Unexpected SRA archive host: {url}")
+    expected_md5 = str(archive["md5"])
+    expected_bytes = int(archive["size"])
+    return download_fastq(
+        runner,
+        url.removeprefix("https://"),
+        expected_md5,
+        expected_bytes,
+        path,
+    )
+
+
+def fastq_stats(paths: list[Path]) -> tuple[list[str], int, int]:
+    hashes = []
+    total_reads = 0
+    total_bytes = 0
+    for path in paths:
+        digest = hashlib.sha256()
+        line_count = 0
+        with path.open("rb") as handle:
+            while chunk := handle.read(8 * 1024 * 1024):
+                digest.update(chunk)
+                line_count += chunk.count(b"\n")
+        if line_count % 4:
+            raise RuntimeError(f"FASTQ line count is not divisible by four: {path}")
+        hashes.append(digest.hexdigest())
+        total_reads += line_count // 4
+        total_bytes += path.stat().st_size
+    return hashes, total_reads, total_bytes
+
+
+def extract_sra_fastq(
+    runner: SampleRunner,
+    toolkit_bin: Path,
+    archive_path: Path,
+    accession: str,
+    library_layout: str,
+    expected_reads: int,
+    threads: int,
+) -> tuple[list[Path], list[str], int]:
+    if library_layout == "PAIRED":
+        paths = [
+            runner.sample_dir / f"{accession}_1.fastq",
+            runner.sample_dir / f"{accession}_2.fastq",
+        ]
+    else:
+        paths = [runner.sample_dir / f"{accession}.fastq"]
+    if not all(path.is_file() for path in paths):
+        for path in runner.sample_dir.glob(f"{accession}*.fastq"):
+            path.unlink()
+        temporary = runner.sample_dir / "fasterq_tmp"
+        if temporary.exists():
+            shutil.rmtree(temporary)
+        temporary.mkdir()
+        runner.run(
+            [
+                str(toolkit_bin / "fasterq-dump"),
+                "--threads",
+                str(threads),
+                "--split-files",
+                "--outdir",
+                str(runner.sample_dir),
+                "--temp",
+                str(temporary),
+                str(archive_path),
+            ]
+        )
+        shutil.rmtree(temporary)
+    if not all(path.is_file() for path in paths):
+        raise RuntimeError(f"Missing extracted FASTQ for {accession}: {paths}")
+    hashes, read_count, total_bytes = fastq_stats(paths)
+    if read_count != expected_reads:
+        raise RuntimeError(
+            f"Extracted read count mismatch for {accession}: "
+            f"{read_count} != {expected_reads}"
+        )
+    return paths, hashes, total_bytes
+
+
 def normalize_bedgraph(input_path: Path, output_path: Path) -> tuple[float, float]:
     total = 0.0
     with input_path.open() as handle:
@@ -355,6 +517,8 @@ def process_sample(
     chrom_sizes: Path,
     chromosomes: dict[str, int],
     threads: int,
+    download_backend: str,
+    toolkit_bin: Path | None,
 ) -> dict[str, Any]:
     accession = source["run_accession"]
     sample_dir = work_dir / accession
@@ -381,6 +545,9 @@ def process_sample(
             if item.is_file() and (
                 item.name.endswith(".fastq.gz")
                 or item.name.endswith(".fastq.gz.part")
+                or item.name.endswith(".fastq")
+                or item.name.endswith(".sra")
+                or item.name.endswith(".sra.part")
             ):
                 continue
             if item.is_dir():
@@ -401,17 +568,62 @@ def process_sample(
         urls = source["fastq_ftp"].split(";")
         expected_md5 = source["fastq_md5"].split(";")
         expected_bytes = [int(value) for value in source["fastq_bytes"].split(";")]
-        fastq_paths = []
-        fastq_sha = []
-        for url, md5_value, byte_count in zip(
-            urls, expected_md5, expected_bytes, strict=True
-        ):
-            path = sample_dir / Path(url).name
-            sha_value, _ = download_fastq(
-                runner, url, md5_value, byte_count, path
+        source_transport: dict[str, Any]
+        read_files_command: list[str]
+        if download_backend == "ncbi_sra":
+            if toolkit_bin is None:
+                raise RuntimeError("SRA Toolkit was not configured")
+            archive = locate_sra_archive(
+                runner, accession, sample_dir / "ncbi_sdl.json"
             )
-            fastq_paths.append(path)
-            fastq_sha.append(sha_value)
+            archive_path = sample_dir / f"{accession}.sra"
+            archive_sha, archive_md5 = download_sra_archive(
+                runner, archive, archive_path
+            )
+            runner.run([str(toolkit_bin / "vdb-validate"), str(archive_path)])
+            fastq_paths, fastq_sha, extracted_bytes = extract_sra_fastq(
+                runner,
+                toolkit_bin,
+                archive_path,
+                accession,
+                source["library_layout"],
+                int(source["read_count"]),
+                threads,
+            )
+            source_transport = {
+                "source_transport_backend": "ncbi_sra",
+                "source_archive_url": archive["url"],
+                "source_archive_md5": archive_md5,
+                "source_archive_sha256": archive_sha,
+                "source_archive_bytes": archive["size"],
+                "extracted_fastq_sha256": ";".join(fastq_sha),
+                "extracted_fastq_bytes": extracted_bytes,
+                "extracted_read_count": int(source["read_count"]),
+            }
+            read_files_command = []
+        else:
+            fastq_paths = []
+            fastq_sha = []
+            for url, md5_value, byte_count in zip(
+                urls, expected_md5, expected_bytes, strict=True
+            ):
+                path = sample_dir / Path(url).name
+                sha_value, _ = download_fastq(
+                    runner, url, md5_value, byte_count, path
+                )
+                fastq_paths.append(path)
+                fastq_sha.append(sha_value)
+            source_transport = {
+                "source_transport_backend": "ena_fastq",
+                "source_archive_url": "",
+                "source_archive_md5": "",
+                "source_archive_sha256": "",
+                "source_archive_bytes": "",
+                "extracted_fastq_sha256": ";".join(fastq_sha),
+                "extracted_fastq_bytes": sum(expected_bytes),
+                "extracted_read_count": int(source["read_count"]),
+            }
+            read_files_command = ["--readFilesCommand", "zcat"]
 
         star_prefix = sample_dir / "star_"
         runner.run(
@@ -423,8 +635,7 @@ def process_sample(
                 str(index_dir),
                 "--readFilesIn",
                 *map(str, fastq_paths),
-                "--readFilesCommand",
-                "zcat",
+                *read_files_command,
                 "--outFileNamePrefix",
                 str(star_prefix),
                 "--outSAMtype",
@@ -503,6 +714,7 @@ def process_sample(
             "source_fastq_md5": ";".join(expected_md5),
             "source_fastq_sha256": ";".join(fastq_sha),
             "source_fastq_bytes": sum(expected_bytes),
+            **source_transport,
             "source_files_cleaned_after_verification": True,
             "primary_bam_sha256_before_cleanup": primary_bam_sha,
             "primary_bam_bytes_before_cleanup": primary_bam_bytes,
@@ -586,7 +798,7 @@ def main() -> None:
         raise ValueError("workers and threads-per-sample must be positive")
     if args.workers * args.threads_per_sample > (os.cpu_count() or 1):
         raise ValueError("Requested worker threads exceed available logical CPUs")
-    require_tools()
+    toolkit_bin = require_tools(args.download_backend)
     sources = read_tsv(SOURCE_MANIFEST)
     samples = read_tsv(SAMPLE_MANIFEST)
     sample_by_run = validate_manifests(sources, samples)
@@ -626,6 +838,8 @@ def main() -> None:
                 chrom_sizes,
                 chromosomes,
                 args.threads_per_sample,
+                args.download_backend,
+                toolkit_bin,
             )
             futures[future] = accession
 
@@ -668,6 +882,10 @@ def main() -> None:
         "expected_runs": EXPECTED_RUN_COUNT,
         "completed_runs": len(rows),
         "source_fastq_bytes": EXPECTED_FASTQ_BYTES,
+        "download_backend": args.download_backend,
+        "sra_toolkit_bin": (
+            str(toolkit_bin.relative_to(REPO_ROOT)) if toolkit_bin else None
+        ),
         "workers": args.workers,
         "threads_per_sample": args.threads_per_sample,
         "work_dir": args.work_dir,
