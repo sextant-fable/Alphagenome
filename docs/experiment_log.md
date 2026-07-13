@@ -140,6 +140,22 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 - Next actions: Reopen P3B, reuse the 73 completed audited outputs, verify the first ENA fallback end to end, and continue the remaining full scope.
 - Claim status: verified
 
+## 2026-07-14 - RNA-seq v2 P3B SINGLE SRA Layout Compatibility Failure
+
+- Run type: preprocessing failure analysis
+- Purpose: Record and correct an SRA naming mismatch for nominally SINGLE runs whose archive schema contains one biological read plus an empty second read.
+- Git commit: `9d2b328` at failed-run start; compatibility fix committed before restart.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU` (`hy8`); non-Slurm CPU preprocessing; no GPU requested.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python scripts/v2_phase_controller.py run --phase P3B`.
+- Input data: Locked NCBI SRA objects and ENA metadata for `SRR13757760` and `SRR13757761` within the same 482-run scope.
+- Output path: Retained SRA and extracted FASTQ work under `shared/source_reads/v2/full_streaming/`; no normalized output was accepted for either failed sample.
+- Result summary: The phase stopped admitting new work after `SRR13757760` failed path recognition at 83 completed runs. `SRR13757761`, already active, reproduced the same condition. Both archives passed MD5 and `vdb-validate`; `fasterq-dump` completed with one output named `<accession>_1.fastq` because the second encoded read was zero length.
+- Verification: `SRR13757760` reported 20,538,032 spots, 41,076,064 encoded reads, 20,538,032 written reads, and 20,538,032 zero-length reads. The retained non-empty FASTQ is 3,775,629,540 bytes. `SRR13757761` reported 20,527,615 spots, 41,055,230 encoded reads, 20,527,615 written reads, and 20,527,615 zero-length reads.
+- Failures or warnings: The previous extractor expected `<accession>.fastq` for every SINGLE manifest row. The correction accepts either that standard name or `<accession>_1.fastq`, but only when the non-empty FASTQ record count exactly equals the locked manifest spot count; the actual input filename is added to the audit.
+- Next actions: Let already-active jobs finish, reopen P3B, reuse the retained verified FASTQs, and continue all 482 accessions.
+- Claim status: verified
+
 ## 2026-07-08 - Latest RNA-seq11 Valid/Test Prediction bigWig Export
 
 - Run type: evaluation and generated-artifact export

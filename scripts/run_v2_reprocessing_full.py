@@ -392,50 +392,60 @@ def extract_sra_fastq(
     threads: int,
 ) -> tuple[list[Path], list[str], int]:
     if library_layout == "PAIRED":
-        paths = [
-            runner.sample_dir / f"{accession}_1.fastq",
-            runner.sample_dir / f"{accession}_2.fastq",
+        path_candidates = [
+            [
+                runner.sample_dir / f"{accession}_1.fastq",
+                runner.sample_dir / f"{accession}_2.fastq",
+            ]
         ]
     else:
-        paths = [runner.sample_dir / f"{accession}.fastq"]
+        # Some SRA SINGLE runs encode an empty second read and --split-files
+        # consequently names the only non-empty output *_1.fastq.
+        path_candidates = [
+            [runner.sample_dir / f"{accession}.fastq"],
+            [runner.sample_dir / f"{accession}_1.fastq"],
+        ]
     expected_records = expected_fastq_records(library_layout, expected_spots)
-    if all(path.is_file() for path in paths):
-        try:
-            hashes, read_count, total_bytes = fastq_stats(paths)
-            if read_count == expected_records:
-                return paths, hashes, total_bytes
-        except (OSError, RuntimeError):
-            pass
+    for paths in path_candidates:
+        if all(path.is_file() for path in paths):
+            try:
+                hashes, read_count, total_bytes = fastq_stats(paths)
+                if read_count == expected_records:
+                    return paths, hashes, total_bytes
+            except (OSError, RuntimeError):
+                pass
     for path in runner.sample_dir.glob(f"{accession}*.fastq"):
         path.unlink()
-    if not all(path.is_file() for path in paths):
-        temporary = runner.sample_dir / "fasterq_tmp"
-        if temporary.exists():
-            shutil.rmtree(temporary)
-        temporary.mkdir()
-        runner.run(
-            [
-                str(toolkit_bin / "fasterq-dump"),
-                "--threads",
-                str(threads),
-                "--split-files",
-                "--outdir",
-                str(runner.sample_dir),
-                "--temp",
-                str(temporary),
-                str(archive_path),
-            ]
-        )
+    temporary = runner.sample_dir / "fasterq_tmp"
+    if temporary.exists():
         shutil.rmtree(temporary)
-    if not all(path.is_file() for path in paths):
-        raise RuntimeError(f"Missing extracted FASTQ for {accession}: {paths}")
-    hashes, read_count, total_bytes = fastq_stats(paths)
-    if read_count != expected_records:
-        raise RuntimeError(
-            f"Extracted read count mismatch for {accession}: "
-            f"{read_count} != {expected_records}"
-        )
-    return paths, hashes, total_bytes
+    temporary.mkdir()
+    runner.run(
+        [
+            str(toolkit_bin / "fasterq-dump"),
+            "--threads",
+            str(threads),
+            "--split-files",
+            "--outdir",
+            str(runner.sample_dir),
+            "--temp",
+            str(temporary),
+            str(archive_path),
+        ]
+    )
+    shutil.rmtree(temporary)
+    observed_counts = []
+    for paths in path_candidates:
+        if not all(path.is_file() for path in paths):
+            continue
+        hashes, read_count, total_bytes = fastq_stats(paths)
+        observed_counts.append((";".join(path.name for path in paths), read_count))
+        if read_count == expected_records:
+            return paths, hashes, total_bytes
+    raise RuntimeError(
+        f"No extracted FASTQ layout matched {expected_records} records for "
+        f"{accession}: observed={observed_counts}"
+    )
 
 
 def discard_partial_sra_extraction(sample_dir: Path, accession: str) -> None:
@@ -718,6 +728,9 @@ def process_sample(
                     "sra_extraction_return_code": "",
                     "extracted_fastq_sha256": ";".join(fastq_sha),
                     "extracted_fastq_bytes": extracted_bytes,
+                    "extracted_fastq_files": ";".join(
+                        path.name for path in fastq_paths
+                    ),
                     "extracted_fastq_record_count": expected_fastq_records(
                         source["library_layout"], int(source["read_count"])
                     ),

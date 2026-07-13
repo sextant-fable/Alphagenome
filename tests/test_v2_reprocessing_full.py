@@ -102,6 +102,33 @@ class V2ReprocessingFullTest(unittest.TestCase):
             self.assertEqual(paths, [fastq])
             self.assertEqual(total_bytes, len(b"@r1\nA\n+\n!\n"))
 
+    def test_single_sra_accepts_split_one_name_for_empty_second_read(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            sample_dir = Path(directory)
+            archive = sample_dir / "SRR1.sra"
+            archive.write_bytes(b"archive")
+            split_one = sample_dir / "SRR1_1.fastq"
+            split_one.write_bytes(b"@r1\nA\n+\n!\n")
+
+            class ReuseRunner:
+                def __init__(self) -> None:
+                    self.sample_dir = sample_dir
+
+                def run(self, command: list[str], *, stdout=None) -> None:
+                    raise AssertionError(command)
+
+            paths, _, total_bytes = full.extract_sra_fastq(
+                ReuseRunner(),
+                Path("/fake/toolkit"),
+                archive,
+                "SRR1",
+                "SINGLE",
+                1,
+                2,
+            )
+            self.assertEqual(paths, [split_one])
+            self.assertEqual(total_bytes, len(b"@r1\nA\n+\n!\n"))
+
     def test_failed_sra_extraction_cleanup_preserves_archive(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             sample_dir = Path(directory)
