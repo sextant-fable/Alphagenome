@@ -2057,6 +2057,24 @@ def review_p6b() -> dict[str, Any]:
                 )
             ):
                 raise ValueError("validation contract mismatch")
+            if (
+                not math.isclose(
+                    float(job["paper_loss"]),
+                    float(mean_metrics["paper_loss"]),
+                    rel_tol=1e-12,
+                )
+                or not math.isclose(
+                    float(job["log1p_mse"]),
+                    float(mean_metrics["log1p_mse"]),
+                    rel_tol=1e-12,
+                )
+                or not math.isclose(
+                    float(job["mean_per_track_pearson_128bp"]),
+                    float(validation["mean_per_track_pearson_128bp"]),
+                    rel_tol=1e-12,
+                )
+            ):
+                raise ValueError("job summary does not match validation record")
         except Exception as error:
             job_errors.append(
                 f"{job.get('model')}/{job.get('loss')}/fold{job.get('fold')}:{error}"
@@ -2074,6 +2092,35 @@ def review_p6b() -> dict[str, Any]:
         (model, loss) for model in ("A", "B", "C")
         for loss in ("paper", "log1p_mse")
     }
+    aggregation_errors = []
+    jobs_by_config: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for job in execution.get("jobs", []):
+        jobs_by_config.setdefault((job["model"], job["loss"]), []).append(job)
+    for row in results:
+        members = jobs_by_config.get((row["model"], row["loss"]), [])
+        if len(members) != 5:
+            aggregation_errors.append(f"{row['model']}/{row['loss']}:members={len(members)}")
+            continue
+        expected_values = {
+            "mean_five_fold_paper_loss": sum(
+                float(member["paper_loss"]) for member in members
+            )
+            / 5,
+            "mean_five_fold_log1p_mse": sum(
+                float(member["log1p_mse"]) for member in members
+            )
+            / 5,
+            "mean_five_fold_per_track_pearson_128bp": sum(
+                float(member["mean_per_track_pearson_128bp"])
+                for member in members
+            )
+            / 5,
+        }
+        for key, expected_value in expected_values.items():
+            if not math.isclose(
+                float(row[key]), expected_value, rel_tol=1e-12, abs_tol=1e-12
+            ):
+                aggregation_errors.append(f"{row['model']}/{row['loss']}:{key}")
     selected_row = min(
         results,
         key=lambda row: (
@@ -2172,8 +2219,9 @@ def review_p6b() -> dict[str, Any]:
                 "R6B.05_cv_aggregation",
                 len(results) == 6
                 and result_keys == expected_configs
-                and result_numeric,
-                f"configs={sorted(result_keys)}",
+                and result_numeric
+                and not aggregation_errors,
+                f"configs={sorted(result_keys)} errors={aggregation_errors}",
             ),
             check(
                 "R6B.06_locked_selection_rule",
