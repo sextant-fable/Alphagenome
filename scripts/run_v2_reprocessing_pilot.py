@@ -169,23 +169,46 @@ def download_fastq(url: str, expected_md5: str, expected_bytes: int, path: Path)
             and tmp_path.stat().st_size == expected_bytes
             and md5(tmp_path) == expected_md5
         ):
-            run(
-                [
-                    "curl",
-                    "-fL",
-                    "--retry",
-                    "20",
-                    "--retry-delay",
-                    "2",
-                    "--retry-all-errors",
-                    "--continue-at",
-                    "-",
-                    *DOH_ARGS,
-                    f"https://{url}",
-                    "-o",
-                    str(tmp_path),
-                ]
-            )
+            stagnant_attempts = 0
+            previous_size = tmp_path.stat().st_size if tmp_path.exists() else 0
+            for attempt in range(1, 201):
+                try:
+                    run(
+                        [
+                            "curl",
+                            "-fL",
+                            "--connect-timeout",
+                            "30",
+                            "--continue-at",
+                            "-",
+                            *DOH_ARGS,
+                            f"https://{url}",
+                            "-o",
+                            str(tmp_path),
+                        ]
+                    )
+                except subprocess.CalledProcessError:
+                    pass
+                current_size = tmp_path.stat().st_size if tmp_path.exists() else 0
+                if current_size == expected_bytes:
+                    break
+                if current_size > expected_bytes:
+                    raise RuntimeError(f"Partial FASTQ exceeds expected size: {tmp_path}")
+                stagnant_attempts = (
+                    stagnant_attempts + 1 if current_size <= previous_size else 0
+                )
+                if stagnant_attempts >= 10:
+                    raise RuntimeError(
+                        f"FASTQ transfer made no progress for 10 attempts: {tmp_path}"
+                    )
+                print(
+                    f"download_resume\t{path.name}\tattempt={attempt}\t"
+                    f"bytes={current_size}/{expected_bytes}",
+                    flush=True,
+                )
+                previous_size = current_size
+            else:
+                raise RuntimeError(f"FASTQ transfer attempt limit reached: {tmp_path}")
         if tmp_path.stat().st_size != expected_bytes or md5(tmp_path) != expected_md5:
             raise RuntimeError(f"Partial FASTQ integrity failure: {tmp_path}")
         tmp_path.replace(path)

@@ -88,6 +88,7 @@ PHASE_COMMANDS = {
     "P2": [sys.executable, "scripts/build_rna_seq_groups_v2.py"],
     "P3A": [sys.executable, "scripts/run_v2_p3a.py"],
     "P3B": [sys.executable, "scripts/run_v2_p3b.py"],
+    "P4": [sys.executable, "scripts/run_v2_p4.py"],
 }
 REVIEW_COMMANDS = {
     "P0": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P0"],
@@ -95,6 +96,7 @@ REVIEW_COMMANDS = {
     "P2": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P2"],
     "P3A": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P3A"],
     "P3B": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P3B"],
+    "P4": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P4"],
 }
 
 

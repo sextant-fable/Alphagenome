@@ -206,23 +206,46 @@ def download_fastq(
         _, partial_md5 = file_hashes(temporary)
         partial_complete = partial_md5 == expected_md5
     if not partial_complete:
-        runner.run(
-            [
-                "curl",
-                "-fL",
-                "--retry",
-                "20",
-                "--retry-delay",
-                "2",
-                "--retry-all-errors",
-                "--continue-at",
-                "-",
-                *DOH_ARGS,
-                f"https://{url}",
-                "-o",
-                str(temporary),
-            ]
-        )
+        stagnant_attempts = 0
+        previous_size = temporary.stat().st_size if temporary.exists() else 0
+        for attempt in range(1, 201):
+            try:
+                runner.run(
+                    [
+                        "curl",
+                        "-fL",
+                        "--connect-timeout",
+                        "30",
+                        "--continue-at",
+                        "-",
+                        *DOH_ARGS,
+                        f"https://{url}",
+                        "-o",
+                        str(temporary),
+                    ]
+                )
+            except subprocess.CalledProcessError:
+                pass
+            current_size = temporary.stat().st_size if temporary.exists() else 0
+            if current_size == expected_bytes:
+                break
+            if current_size > expected_bytes:
+                raise RuntimeError(f"Partial FASTQ exceeds expected size: {temporary}")
+            stagnant_attempts = (
+                stagnant_attempts + 1 if current_size <= previous_size else 0
+            )
+            if stagnant_attempts >= 10:
+                raise RuntimeError(
+                    f"FASTQ transfer made no progress for 10 attempts: {temporary}"
+                )
+            print(
+                f"download_resume\t{path.name}\tattempt={attempt}\t"
+                f"bytes={current_size}/{expected_bytes}",
+                flush=True,
+            )
+            previous_size = current_size
+        else:
+            raise RuntimeError(f"FASTQ transfer attempt limit reached: {temporary}")
     if temporary.stat().st_size != expected_bytes:
         raise RuntimeError(f"FASTQ byte mismatch: {temporary}")
     actual_sha, actual_md5 = file_hashes(temporary)

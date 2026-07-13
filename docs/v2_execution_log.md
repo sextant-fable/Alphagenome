@@ -68,3 +68,18 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Aggregation: technical runs within a biological unit are weighted by pre-normalization coverage mass, then biological units are averaged equally. Singleton group paths are audited relative symlinks to avoid duplicate large files.
 - Post-reprocessing review: R3 verifies all normalized and grouped bigWigs, raw-data immutability, exact group context, ontology CURIEs, replicate QC, source-reuse resolution, cleanup, manifest hashes, and the long-run execution record.
 - Status: implementation and 18-test suite pass; P3B has not started and remains conditional on R3A PASS.
+
+## 2026-07-14 - Transfer Retry Semantics Correction
+
+- Observation: curl continuation worked when P3A was restarted, but curl's internal retry logic truncated bytes received by the current curl process after a remote exit 18.
+- Controlled action: the project P3A process was interrupted after one completed sample; the current `.part` and all completed intermediates were retained.
+- Correction: each curl process now performs one resumable transfer attempt. Python restarts curl after a nonzero exit, so every new process resumes the retained `.part`; 200 attempts are allowed, and ten consecutive no-progress attempts fail closed.
+- Regression coverage: tests verify both complete-file reuse and an exit-18 transfer that succeeds on the next process without `--retry`.
+
+## 2026-07-14 - P4 Dynamic Loader Implementation
+
+- Split design: five leave-one-chromosome-out folds across chromosomes I-V, with chromosome X in a separately locked manifest and non-overlapping nearest-window-center evaluation cores.
+- Loader interface: lazy per-process bigWig handles return 1 bp signal, 128 bp sum-pooled signal, track mask/strand, plus/minus gene masks, DNA, and evaluation core mask.
+- Test embargo: chromosome X requires P6C state, scoped G5 approval, a locked checkpoint SHA-256, and an unused one-time test record.
+- Benchmark design: one full 241-track CPU window plus direct pyBigWig, 128 bp pooling, single/multi-worker determinism, file descriptor, RAM, and I/O timing checks. No v2 NPZ is generated.
+- Status: implementation tests pass; real R4 benchmark remains conditional on R3 PASS.

@@ -59,6 +59,23 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 - Next actions: Add and test curl continuation with a larger retry budget, reopen P3A with the failure reason retained, and resume the same source file.
 - Claim status: verified
 
+## 2026-07-14 - RNA-seq v2 P3A Controlled Transfer Restart
+
+- Run type: preprocessing
+- Purpose: Resume P3A after adding curl continuation, then verify that continuation also survives curl's own retry behavior before applying it to the 482-run scope.
+- Git commit: `ec40470` at run start; P3B implementation commit `1095393` was created while the process ran.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU` (`hy8`)
+- Environment: Existing Conda environment `alphagenome`; 16 CPU threads; no GPU used.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python scripts/v2_phase_controller.py run --phase P3A`
+- Input data: Five-run P3A source manifest; retained partial ENA FASTQ from the first attempt.
+- Output path: `shared/source_reads/v2/pilot_20260713/` and `alphagenome_custom/tracks/rna_seq_v2_normalized_pilot/`.
+- Result summary: Controlled interruption after one of five samples completed alignment, BAM validation, coverage generation, and normalized bigWig output. The second FASTQ was incomplete; no R3A review ran.
+- Verification: `SRR7443583.bw` was generated and its intermediates remain available for deterministic reuse. The second source remained a `.part` file. No raw provided bigWig was modified.
+- Failures or warnings: curl `--continue-at -` resumed across separate invocations, but curl's internal `--retry` discarded 473,239,552 bytes and later 582,287,746 bytes from its current invocation. The process was interrupted intentionally because this behavior cannot safely handle the largest 11.77 GiB run.
+- Next actions: Remove curl internal retry, restart curl from Python after each nonzero exit, verify byte growth across process boundaries, and resume P3A from the retained partial file.
+- Claim status: verified
+
 ## 2026-07-08 - Latest RNA-seq11 Valid/Test Prediction bigWig Export
 
 - Run type: evaluation and generated-artifact export

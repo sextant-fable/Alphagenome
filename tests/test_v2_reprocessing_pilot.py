@@ -68,7 +68,7 @@ class V2ReprocessingPilotTest(unittest.TestCase):
 
             def complete_download(command: list[str]) -> None:
                 self.assertEqual(command[command.index("--continue-at") + 1], "-")
-                self.assertEqual(command[command.index("--retry") + 1], "20")
+                self.assertNotIn("--retry", command)
                 partial.write_bytes(payload)
 
             with mock.patch.object(pilot, "run", side_effect=complete_download):

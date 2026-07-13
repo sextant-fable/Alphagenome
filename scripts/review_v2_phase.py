@@ -1345,6 +1345,221 @@ def review_p3b() -> dict[str, Any]:
     }
 
 
+def review_p4() -> dict[str, Any]:
+    from scripts.v2_bigwig_dataset import V2BigWigDataset
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    interval_dir = REPO_ROOT / "alphagenome_custom/intervals/v2"
+    registry_path = metadata_dir / "split_registry_v2.json"
+    benchmark_path = metadata_dir / "p4_loader_benchmark.json"
+    expected_paths = [
+        interval_dir / f"fold_{fold}/{role}.tsv"
+        for fold in range(1, 6)
+        for role in ("train", "valid")
+    ] + [interval_dir / "test_locked.tsv", registry_path, benchmark_path]
+    missing = [
+        str(path.relative_to(REPO_ROOT)) for path in expected_paths if not path.is_file()
+    ]
+    checks = [check("R4.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P4",
+            "review": "R4",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+
+    registry = json.loads(registry_path.read_text())
+    benchmark = json.loads(benchmark_path.read_text())
+    chromosome_lengths = {}
+    with (REPO_ROOT / "alphagenome_custom/reference/genome.fa.fai").open() as handle:
+        for line in handle:
+            name, length, *_ = line.rstrip("\n").split("\t")
+            chromosome_lengths[name] = int(length)
+    cv_chromosomes = ("I", "II", "III", "IV", "V")
+    split_errors = []
+    core_errors = []
+    all_train_valid_chromosomes = set()
+    for fold, valid_chromosome in enumerate(cv_chromosomes, start=1):
+        train = read_tsv(interval_dir / f"fold_{fold}/train.tsv")
+        valid = read_tsv(interval_dir / f"fold_{fold}/valid.tsv")
+        train_chromosomes = {row["chromosome"] for row in train}
+        valid_chromosomes = {row["chromosome"] for row in valid}
+        expected_train = set(cv_chromosomes) - {valid_chromosome}
+        if train_chromosomes != expected_train or valid_chromosomes != {valid_chromosome}:
+            split_errors.append(
+                f"fold{fold}:train={sorted(train_chromosomes)} valid={sorted(valid_chromosomes)}"
+            )
+        if any(
+            int(row["end"]) - int(row["start"]) != 2**20
+            or row["role"] != "train"
+            for row in train
+        ):
+            split_errors.append(f"fold{fold}:invalid train window")
+        valid_sorted = sorted(valid, key=lambda row: int(row["core_start"]))
+        if any(
+            int(row["end"]) - int(row["start"]) != 2**20
+            or row["role"] != "valid"
+            or not (
+                int(row["start"])
+                <= int(row["core_start"])
+                < int(row["core_end"])
+                <= int(row["end"])
+            )
+            for row in valid_sorted
+        ):
+            core_errors.append(f"fold{fold}:invalid core bounds")
+        if (
+            not valid_sorted
+            or int(valid_sorted[0]["core_start"]) != 0
+            or int(valid_sorted[-1]["core_end"])
+            != chromosome_lengths[valid_chromosome]
+            or any(
+                int(first["core_end"]) != int(second["core_start"])
+                for first, second in zip(valid_sorted, valid_sorted[1:])
+            )
+        ):
+            core_errors.append(f"fold{fold}:core partition gap/overlap")
+        all_train_valid_chromosomes.update(train_chromosomes | valid_chromosomes)
+
+    test_rows = read_tsv(interval_dir / "test_locked.tsv")
+    test_core_sorted = sorted(test_rows, key=lambda row: int(row["core_start"]))
+    test_valid = (
+        {row["chromosome"] for row in test_rows} == {"X"}
+        and all(row["role"] == "test_locked" for row in test_rows)
+        and int(test_core_sorted[0]["core_start"]) == 0
+        and int(test_core_sorted[-1]["core_end"]) == chromosome_lengths["X"]
+        and all(
+            int(first["core_end"]) == int(second["core_start"])
+            for first, second in zip(test_core_sorted, test_core_sorted[1:])
+        )
+    )
+    registry_hash_errors = [
+        relative
+        for relative, expected_hash in registry["files"].items()
+        if not (REPO_ROOT / relative).is_file()
+        or sha256(REPO_ROOT / relative) != expected_hash
+    ]
+    try:
+        V2BigWigDataset(interval_dir / "test_locked.tsv")
+    except PermissionError:
+        test_refused = True
+    else:
+        test_refused = False
+
+    expected_shapes = {
+        "dna_sequence": [4, 2**20],
+        "target_1bp": [241, 2**20],
+        "target_128bp": [241, 8192],
+        "track_mask": [241, 1],
+        "track_strand": [241],
+        "gene_mask": [2, 2**20],
+        "core_mask": [2**20],
+    }
+    expected_dtypes = {
+        "dna_sequence": "torch.float32",
+        "target_1bp": "torch.float32",
+        "target_128bp": "torch.float32",
+        "track_mask": "torch.bool",
+        "track_strand": "torch.int8",
+        "gene_mask": "torch.bool",
+        "core_mask": "torch.bool",
+    }
+    forbidden_npz = list(
+        (REPO_ROOT / "alphagenome_custom/datasets").glob("rna_seq_v2*.npz")
+    ) + list(
+        (REPO_ROOT / "alphagenome_custom/datasets").glob("rna_seq_v2_npz*")
+    )
+    checks.extend(
+        [
+            check(
+                "R4.02_five_fold_split",
+                not split_errors
+                and all_train_valid_chromosomes == set(cv_chromosomes)
+                and "X" not in all_train_valid_chromosomes,
+                f"errors={split_errors} chromosomes={sorted(all_train_valid_chromosomes)}",
+            ),
+            check(
+                "R4.03_nonoverlapping_eval_cores",
+                not core_errors and test_valid,
+                f"core_errors={core_errors} test_valid={test_valid}",
+            ),
+            check(
+                "R4.04_split_lock_integrity",
+                not registry_hash_errors
+                and registry.get("window_size") == 2**20
+                and registry.get("stride") == 2**19
+                and registry.get("test_status")
+                == "embargoed_prior_exposure_disclosed",
+                f"hash_errors={registry_hash_errors}",
+            ),
+            check(
+                "R4.05_loader_shapes_and_dtypes",
+                benchmark.get("full_window_tracks") == 241
+                and benchmark.get("full_window_shapes") == expected_shapes
+                and benchmark.get("full_window_dtypes") == expected_dtypes,
+                f"shapes={benchmark.get('full_window_shapes')} dtypes={benchmark.get('full_window_dtypes')}",
+            ),
+            check(
+                "R4.06_direct_bigwig_and_pooling",
+                benchmark.get("direct_bigwig_errors") == []
+                and benchmark.get("pooling_128bp")
+                == "sum_of_128_consecutive_1bp_values",
+                f"errors={benchmark.get('direct_bigwig_errors')}",
+            ),
+            check(
+                "R4.07_worker_determinism_and_handles",
+                benchmark.get("worker_deterministic") is True
+                and benchmark.get("single_worker_digests")
+                == benchmark.get("multi_worker_digests")
+                and int(benchmark.get("open_file_descriptors_after", 10**9))
+                <= int(benchmark.get("open_file_descriptors_before", 0)) + 4,
+                "worker digests agree and parent file descriptors returned near baseline",
+            ),
+            check(
+                "R4.08_test_embargo",
+                test_refused and test_valid,
+                f"default_loader_refused={test_refused} test_windows={len(test_rows)}",
+            ),
+            check(
+                "R4.09_io_benchmark",
+                benchmark.get("device") == "cpu"
+                and float(benchmark.get("full_window_seconds", 0)) > 0
+                and int(benchmark.get("full_target_bytes", 0)) > 0
+                and float(benchmark.get("full_fold_epoch_seconds_linear_io_estimate", 0)) > 0
+                and int(benchmark.get("peak_rss_kib_after", 0)) > 0,
+                f"window_seconds={benchmark.get('full_window_seconds')} target_bytes={benchmark.get('full_target_bytes')}",
+            ),
+            check(
+                "R4.10_no_monolithic_npz",
+                benchmark.get("monolithic_npz_generated") is False and not forbidden_npz,
+                f"forbidden_paths={[str(path) for path in forbidden_npz]}",
+            ),
+            check(
+                "R4.11_data_manifest_provenance",
+                benchmark.get("split_registry_sha256") == sha256(registry_path)
+                and benchmark.get("group_manifest_sha256")
+                == sha256(metadata_dir / "rna_seq_groups_v2_final.tsv")
+                and benchmark.get("group_outputs_sha256")
+                == sha256(metadata_dir / "p3_group_outputs.tsv"),
+                "benchmark digests bind loader results to splits and P3 tracks",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P4",
+        "review": "R4",
+        "reviewed_at": utc_now(),
+        "status": "PASS"
+        if all(item["status"] == "PASS" for item in checks)
+        else "FAIL",
+        "checks": checks,
+    }
+
+
 def write_report(report: dict[str, Any]) -> None:
     audit_dir = AUDIT_ROOT / report["phase"]
     audit_dir.mkdir(parents=True, exist_ok=True)
@@ -1370,7 +1585,7 @@ def write_report(report: dict[str, Any]) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--phase", required=True, choices=["P0", "P1", "P2", "P3A", "P3B"]
+        "--phase", required=True, choices=["P0", "P1", "P2", "P3A", "P3B", "P4"]
     )
     return parser.parse_args()
 
@@ -1385,8 +1600,10 @@ def main() -> None:
         report = review_p2()
     elif args.phase == "P3A":
         report = review_p3a()
-    else:
+    elif args.phase == "P3B":
         report = review_p3b()
+    else:
+        report = review_p4()
     assert report is not None
     write_report(report)
     print(json.dumps(report, indent=2, sort_keys=True))

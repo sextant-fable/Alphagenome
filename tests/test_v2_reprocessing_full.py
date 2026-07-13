@@ -53,6 +53,41 @@ class V2ReprocessingFullTest(unittest.TestCase):
             self.assertEqual(actual_sha, hashlib.sha256(payload).hexdigest())
             self.assertEqual(actual_md5, hashlib.md5(payload).hexdigest())
 
+    def test_interrupted_curl_is_restarted_as_a_resuming_process(self) -> None:
+        payload = b"resume-across-processes"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.fastq.gz"
+            partial = Path(str(path) + ".part")
+
+            class InterruptedRunner:
+                def __init__(self) -> None:
+                    self.calls = 0
+
+                def run(self, command: list[str], *, stdout=None) -> None:
+                    self.calls += 1
+                    self_command = command
+                    if self_command[self_command.index("--continue-at") + 1] != "-":
+                        raise AssertionError(self_command)
+                    if "--retry" in self_command:
+                        raise AssertionError(self_command)
+                    if self.calls == 1:
+                        partial.write_bytes(payload[:8])
+                        raise full.subprocess.CalledProcessError(18, command)
+                    partial.write_bytes(payload)
+
+            runner = InterruptedRunner()
+            actual_sha, actual_md5 = full.download_fastq(
+                runner,
+                "example.invalid/sample.fastq.gz",
+                hashlib.md5(payload).hexdigest(),
+                len(payload),
+                path,
+            )
+            self.assertEqual(runner.calls, 2)
+            self.assertEqual(path.read_bytes(), payload)
+            self.assertEqual(actual_sha, hashlib.sha256(payload).hexdigest())
+            self.assertEqual(actual_md5, hashlib.md5(payload).hexdigest())
+
 
 if __name__ == "__main__":
     unittest.main()
