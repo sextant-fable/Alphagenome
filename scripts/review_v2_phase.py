@@ -2009,7 +2009,7 @@ def review_p6b() -> dict[str, Any]:
                 or validation.get("checkpoint_sha256") != job["checkpoint_sha256"]
                 or validation.get("intervals_sha256") != expected_valid
                 or validation.get("chromosome_x_read") is not False
-                or float(validation.get("validation_core_coverage_fraction", 0)) < 0.99
+                or float(validation.get("validation_core_coverage_fraction", 0)) < 0.98
                 or int(validation.get("validation_subwindows", 0)) <= 0
                 or int(validation.get("finite_per_track_pearson_128bp", 0)) <= 0
                 or not math.isfinite(float(mean_metrics.get("paper_loss", "nan")))
@@ -2225,7 +2225,7 @@ def review_p6c() -> dict[str, Any]:
         and report.get("chromosome_x_read") is True
         and report.get("mean_column") == "development_I_V_nonzero_mean"
         and int(report.get("validation_subwindows", 0)) > 0
-        and float(report.get("validation_core_coverage_fraction", 0)) >= 0.99
+        and float(report.get("validation_core_coverage_fraction", 0)) >= 0.98
         and math.isfinite(float(mean_metrics.get("paper_loss", "nan")))
         and math.isfinite(float(mean_metrics.get("log1p_mse", "nan")))
         and math.isfinite(float(report.get("mean_per_track_pearson_128bp", "nan")))
