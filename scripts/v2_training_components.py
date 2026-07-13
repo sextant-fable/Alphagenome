@@ -345,6 +345,12 @@ class AlphaGenomeRnaModel(torch.nn.Module):
         self.base_organism_index = int(base_organism_index)
         self.encode_requires_grad = bool(encode_requires_grad)
 
+    def train(self, mode: bool = True) -> "AlphaGenomeRnaModel":
+        super().train(mode)
+        if not self.encode_requires_grad:
+            self.base_model.eval()
+        return self
+
     def forward(self, dna: torch.Tensor) -> dict[int, torch.Tensor]:
         organism = torch.full(
             (dna.shape[0],),

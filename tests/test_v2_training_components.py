@@ -302,6 +302,35 @@ class V2TrainingComponentsTest(unittest.TestCase):
         self.assertEqual(outputs[1].shape, (1, 3, 256))
         self.assertEqual(outputs[128].shape, (1, 3, 2))
 
+    def test_frozen_trunk_stays_in_eval_mode_while_head_trains(self) -> None:
+        class FakeBase(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.dropout = torch.nn.Dropout(0.5)
+
+        frozen_base = FakeBase()
+        frozen = components.AlphaGenomeRnaModel(
+            frozen_base,
+            n_tracks=2,
+            track_means=torch.ones(2),
+            base_organism_index=0,
+            encode_requires_grad=False,
+        )
+        frozen.train()
+        self.assertFalse(frozen.base_model.training)
+        self.assertTrue(frozen.rna_head.training)
+
+        adaptable_base = FakeBase()
+        adaptable = components.AlphaGenomeRnaModel(
+            adaptable_base,
+            n_tracks=2,
+            track_means=torch.ones(2),
+            base_organism_index=2,
+            encode_requires_grad=True,
+        )
+        adaptable.train()
+        self.assertTrue(adaptable.base_model.training)
+
     def test_random_shift_is_seeded_bounded_and_epoch_dependent(self) -> None:
         class FakeDataset(torch.utils.data.Dataset):
             intervals = [
