@@ -76,6 +76,22 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 - Next actions: Remove curl internal retry, restart curl from Python after each nonzero exit, verify byte growth across process boundaries, and resume P3A from the retained partial file.
 - Claim status: verified
 
+## 2026-07-14 - RNA-seq v2 P3A Controlled SRA Transport Switch
+
+- Run type: preprocessing
+- Purpose: Stop spending unbounded time on the fifth pilot accession's unstable ENA endpoint and resume the same biological run from a locked, full-quality NCBI SRA object.
+- Git commit: `78c681b` for the fallback implementation and review contract.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU` (`hy8`); 16 CPU threads; no GPU used.
+- Command: controlled interrupt of the project-owned P3A controller, followed by `python scripts/v2_phase_controller.py reopen --phase P3A ...` and the registered P3A command.
+- Input data: Four completed ENA FASTQ pilot accessions; `SRR36719198` locked NCBI SRA URL, size, and MD5 from `p3_ncbi_sra_sources.tsv`; WBcel235 reference.
+- Output path: unchanged pilot work and output directories under `shared/source_reads/v2/pilot_20260713/` and `alphagenome_custom/tracks/rna_seq_v2_normalized_pilot/`.
+- Result summary: The interrupted ENA attempt had retained 140,038,604 bytes for `SRR36719198` but continued to close after short ranges. The partial file is an incomplete transport artifact, not a valid source input. Four normalized pilot bigWigs were already complete and retained.
+- Verification: The alternate full-quality SRA object was pre-resolved for the same run accession, and an independent `SRR941632` end-to-end transport validation matched the official archive MD5, passed `vdb-validate`, and reproduced the exact manifest spot/read count.
+- Failures or warnings: P3A will use mixed transport packaging for this technical checkpoint: four ENA FASTQs and one NCBI SRA. R3A explicitly permits only `SRR36719198` as the SRA fallback and independently verifies archive and extracted FASTQ hashes. This does not make the provided unknown-unit bigWigs formal labels.
+- Next actions: Reopen P3A, complete the fifth alignment/coverage, run R3A, then start the locked 482-run P3B SRA workflow on PASS.
+- Claim status: verified
+
 ## 2026-07-08 - Latest RNA-seq11 Valid/Test Prediction bigWig Export
 
 - Run type: evaluation and generated-artifact export
