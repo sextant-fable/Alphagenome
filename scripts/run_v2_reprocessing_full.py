@@ -196,24 +196,33 @@ def download_fastq(
     expected_bytes: int,
     path: Path,
 ) -> tuple[str, str]:
+    if path.is_file() and path.stat().st_size == expected_bytes:
+        actual_sha, actual_md5 = file_hashes(path)
+        if actual_md5 == expected_md5:
+            return actual_sha, actual_md5
     temporary = path.with_suffix(path.suffix + ".part")
-    runner.run(
-        [
-            "curl",
-            "-fL",
-            "--retry",
-            "20",
-            "--retry-delay",
-            "2",
-            "--retry-all-errors",
-            "--continue-at",
-            "-",
-            *DOH_ARGS,
-            f"https://{url}",
-            "-o",
-            str(temporary),
-        ]
-    )
+    partial_complete = False
+    if temporary.is_file() and temporary.stat().st_size == expected_bytes:
+        _, partial_md5 = file_hashes(temporary)
+        partial_complete = partial_md5 == expected_md5
+    if not partial_complete:
+        runner.run(
+            [
+                "curl",
+                "-fL",
+                "--retry",
+                "20",
+                "--retry-delay",
+                "2",
+                "--retry-all-errors",
+                "--continue-at",
+                "-",
+                *DOH_ARGS,
+                f"https://{url}",
+                "-o",
+                str(temporary),
+            ]
+        )
     if temporary.stat().st_size != expected_bytes:
         raise RuntimeError(f"FASTQ byte mismatch: {temporary}")
     actual_sha, actual_md5 = file_hashes(temporary)
@@ -346,7 +355,10 @@ def process_sample(
 
     if sample_dir.exists():
         for item in sample_dir.iterdir():
-            if item.is_file() and item.name.endswith(".fastq.gz.part"):
+            if item.is_file() and (
+                item.name.endswith(".fastq.gz")
+                or item.name.endswith(".fastq.gz.part")
+            ):
                 continue
             if item.is_dir():
                 shutil.rmtree(item)

@@ -1036,6 +1036,315 @@ def review_p3a() -> dict[str, Any]:
     }
 
 
+def review_p3b() -> dict[str, Any]:
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    normalized_dir = REPO_ROOT / "alphagenome_custom/tracks/rna_seq_v2_normalized"
+    grouped_dir = REPO_ROOT / "alphagenome_custom/tracks/rna_seq_v2_grouped"
+    paths = {
+        "samples": metadata_dir / "rna_seq_samples_v2.tsv",
+        "contexts": metadata_dir / "rna_seq_sample_context_v2.tsv",
+        "ledger": metadata_dir / "p3_full_outputs.tsv",
+        "full_summary": metadata_dir / "p3_full_summary.json",
+        "groups": metadata_dir / "rna_seq_groups_v2_final.tsv",
+        "members": metadata_dir / "rna_seq_group_members_v2_final.tsv",
+        "group_outputs": metadata_dir / "p3_group_outputs.tsv",
+        "pair_qc": metadata_dir / "replicate_pair_qc_v2_post_reprocessing.tsv",
+        "group_qc": metadata_dir / "replicate_group_qc_v2_post_reprocessing.tsv",
+        "duplicate_review": metadata_dir / "duplicate_source_reuse_review_v2.tsv",
+        "group_summary": metadata_dir / "p3_group_summary.json",
+        "execution": metadata_dir / "p3b_execution.json",
+    }
+    missing = [
+        str(path.relative_to(REPO_ROOT))
+        for path in paths.values()
+        if not path.is_file()
+    ]
+    checks = [check("R3.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P3B",
+            "review": "R3",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+
+    samples = read_tsv(paths["samples"])
+    contexts = read_tsv(paths["contexts"])
+    ledger = read_tsv(paths["ledger"])
+    groups = read_tsv(paths["groups"])
+    members = read_tsv(paths["members"])
+    group_outputs = read_tsv(paths["group_outputs"])
+    pair_qc = read_tsv(paths["pair_qc"])
+    group_qc = read_tsv(paths["group_qc"])
+    duplicate_review = read_tsv(paths["duplicate_review"])
+    full_summary = json.loads(paths["full_summary"].read_text())
+    group_summary = json.loads(paths["group_summary"].read_text())
+    execution = json.loads(paths["execution"].read_text())
+    rna_runs = {row["run_accession"] for row in samples if row["assay"] == "RNA-Seq"}
+    sample_by_run = {row["run_accession"]: row for row in samples}
+    context_by_run = {row["run_accession"]: row for row in contexts}
+    group_by_id = {row["group_id"]: row for row in groups}
+    members_by_group: dict[str, list[dict[str, str]]] = {}
+    for row in members:
+        members_by_group.setdefault(row["group_id"], []).append(row)
+
+    expected_chromosomes = {}
+    with (REPO_ROOT / "alphagenome_custom/reference/genome.fa.fai").open() as handle:
+        for line in handle:
+            fields = line.rstrip("\n").split("\t")
+            expected_chromosomes[fields[0]] = int(fields[1])
+
+    normalized_errors = []
+    for row in ledger:
+        accession = row["run_accession"]
+        path = REPO_ROOT / row["output_path"]
+        try:
+            if path.parent.resolve() != normalized_dir.resolve():
+                raise ValueError("outside normalized output directory")
+            stats = bigwig_summary(path, expected_chromosomes)
+            if sha256(path) != row["output_sha256"]:
+                raise ValueError("SHA-256 mismatch")
+            if path.stat().st_size != int(row["output_size_bytes"]):
+                raise ValueError("size mismatch")
+            if abs(stats["sumData"] - 100_000_000.0) / 100_000_000.0 > 1e-5:
+                raise ValueError(f"total={stats['sumData']}")
+            if row["cleanup_status"] != "completed":
+                raise ValueError("cleanup incomplete")
+            if row["coverage_policy"] != "primary_unique_spliced_unstranded":
+                raise ValueError("coverage policy mismatch")
+            if row["output_strand"] != ".":
+                raise ValueError("output strand mismatch")
+        except Exception as error:
+            normalized_errors.append(f"{accession}:{error}")
+
+    raw_errors = []
+    for row in samples:
+        path = REPO_ROOT / row["local_path"]
+        if not path.is_file() or sha256(path) != row["sha256"]:
+            raw_errors.append(row["run_accession"])
+
+    membership_counts: dict[str, int] = {}
+    for row in members:
+        membership_counts[row["run_accession"]] = (
+            membership_counts.get(row["run_accession"], 0) + 1
+        )
+    context_errors = []
+    context_fields = (
+        "sra_study_accession",
+        "bioproject_accession",
+        "geo_accession",
+        "assay",
+        "tissue_or_cell_type",
+        "development_stage",
+        "sex",
+        "strain",
+        "genotype",
+        "condition",
+    )
+    for member in members:
+        group = group_by_id.get(member["group_id"])
+        context = context_by_run.get(member["run_accession"])
+        if group is None or context is None:
+            context_errors.append(f"{member['run_accession']}:missing group/context")
+            continue
+        differences = [field for field in context_fields if group[field] != context[field]]
+        if differences:
+            context_errors.append(f"{member['run_accession']}:{','.join(differences)}")
+
+    group_output_errors = []
+    output_by_group = {row["group_id"]: row for row in group_outputs}
+    for group in groups:
+        group_id = group["group_id"]
+        row = output_by_group.get(group_id)
+        if row is None:
+            group_output_errors.append(f"{group_id}:missing ledger row")
+            continue
+        path = REPO_ROOT / row["output_path"]
+        try:
+            if path.parent.resolve() != grouped_dir.resolve():
+                raise ValueError("outside grouped output directory")
+            stats = bigwig_summary(path, expected_chromosomes)
+            if sha256(path) != row["output_sha256"]:
+                raise ValueError("SHA-256 mismatch")
+            if abs(stats["sumData"] - 100_000_000.0) / 100_000_000.0 > 1e-5:
+                raise ValueError(f"total={stats['sumData']}")
+            expected_members = members_by_group.get(group_id, [])
+            if int(row["n_runs"]) != len(expected_members):
+                raise ValueError("run count mismatch")
+            singleton = len(expected_members) == 1
+            expected_policy = (
+                "identity_symlink_singleton"
+                if singleton
+                else "raw_coverage_weighted_within_biological_unit_then_equal_mean_across_units"
+            )
+            if row["aggregation_policy"] != expected_policy:
+                raise ValueError("aggregation policy mismatch")
+            if (row["output_is_symlink"] == "True") != singleton:
+                raise ValueError("singleton symlink status mismatch")
+        except Exception as error:
+            group_output_errors.append(f"{group_id}:{error}")
+
+    expected_pairs = sum(
+        len(group_members) * (len(group_members) - 1) // 2
+        for group_members in members_by_group.values()
+    )
+    multi_groups = {
+        group_id for group_id, group_members in members_by_group.items()
+        if len(group_members) > 1
+    }
+    pair_group_errors = []
+    member_group = {row["run_accession"]: row["group_id"] for row in members}
+    for row in pair_qc:
+        if not (
+            member_group.get(row["sample_a"]) == row["group_id"]
+            and member_group.get(row["sample_b"]) == row["group_id"]
+        ):
+            pair_group_errors.append(f"{row['sample_a']}:{row['sample_b']}")
+
+    duplicate_pairs = {
+        (row["canonical_run"], row["secondary_run"]) for row in duplicate_review
+    }
+    expected_duplicate_pairs = {
+        ("SRR12483327", "SRR13964554"),
+        ("SRR12483328", "SRR13964555"),
+        ("SRR12483329", "SRR13964556"),
+    }
+    duplicate_valid = (
+        duplicate_pairs == expected_duplicate_pairs
+        and all(row["same_source_study"] == "False" for row in duplicate_review)
+        and all(
+            row["canonical_group_id"] != row["secondary_group_id"]
+            and row["decision"]
+            == "retain_distinct_study_tracks_no_cross_source_averaging"
+            for row in duplicate_review
+        )
+    )
+
+    failures_dir = normalized_dir / "failures"
+    partial_files = [
+        str(path.relative_to(REPO_ROOT))
+        for root in (
+            normalized_dir,
+            grouped_dir,
+            REPO_ROOT / "shared/source_reads/v2/full_streaming",
+        )
+        if root.exists()
+        for pattern in ("*.part", "*.tmp")
+        for path in root.rglob(pattern)
+    ]
+    checks.extend(
+        [
+            check(
+                "R3.02_full_scope",
+                len(rna_runs) == 482
+                and set(row["run_accession"] for row in ledger) == rna_runs
+                and full_summary.get("expected_runs") == 482
+                and full_summary.get("completed_runs") == 482
+                and full_summary.get("failures") == [],
+                f"rna_runs={len(rna_runs)} ledger={len(ledger)} failures={full_summary.get('failures')}",
+            ),
+            check(
+                "R3.03_normalized_bigwig_integrity",
+                not normalized_errors and len(list(normalized_dir.glob("*.bw"))) == 482,
+                f"errors={normalized_errors[:10]} count={len(list(normalized_dir.glob('*.bw')))}",
+            ),
+            check(
+                "R3.04_raw_immutability",
+                not raw_errors,
+                f"changed_or_missing={raw_errors}",
+            ),
+            check(
+                "R3.05_final_membership",
+                len(groups) == 241
+                and len(members) == 482
+                and set(membership_counts) == rna_runs
+                and all(count == 1 for count in membership_counts.values())
+                and all(
+                    int(group["n_members"])
+                    == len(members_by_group.get(group["group_id"], []))
+                    for group in groups
+                ),
+                f"groups={len(groups)} members={len(members)}",
+            ),
+            check(
+                "R3.06_context_and_formal_status",
+                not context_errors
+                and all(
+                    row["group_status"] == "formal_v2_uniform_reprocessed"
+                    and row["strand"] == "."
+                    and row["include_formal_v2"] == "True"
+                    and row["signal_unit"] == "1e6_x_100bp_unstranded_coverage"
+                    and row["anatomy_curie"]
+                    and row["life_stage_curie"]
+                    for row in groups
+                ),
+                f"context_errors={context_errors[:10]}",
+            ),
+            check(
+                "R3.07_group_output_integrity",
+                len(group_outputs) == 241 and not group_output_errors,
+                f"outputs={len(group_outputs)} errors={group_output_errors[:10]}",
+            ),
+            check(
+                "R3.08_replicate_qc",
+                len(pair_qc) == expected_pairs
+                and len(group_qc) == len(multi_groups)
+                and {row["group_id"] for row in group_qc} == multi_groups
+                and not pair_group_errors
+                and all(
+                    row["review_action"]
+                    in {"none", "manual_review_no_automatic_exclusion"}
+                    for row in pair_qc
+                ),
+                f"pairs={len(pair_qc)}/{expected_pairs} groups={len(group_qc)}/{len(multi_groups)} errors={pair_group_errors[:10]}",
+            ),
+            check(
+                "R3.09_duplicate_source_reuse_resolution",
+                duplicate_valid,
+                f"pairs={sorted(duplicate_pairs)}",
+            ),
+            check(
+                "R3.10_cleanup_and_partial_safety",
+                not partial_files
+                and (not failures_dir.exists() or not list(failures_dir.glob("*.json")))
+                and all(row["cleanup_status"] == "completed" for row in ledger),
+                f"partial_files={partial_files} failures={len(list(failures_dir.glob('*.json'))) if failures_dir.exists() else 0}",
+            ),
+            check(
+                "R3.11_manifest_provenance",
+                group_summary.get("normalized_runs") == 482
+                and group_summary.get("formal_groups") == 241
+                and group_summary.get("group_outputs") == 241
+                and group_summary.get("sample_manifest_sha256") == sha256(paths["samples"])
+                and group_summary.get("full_ledger_sha256") == sha256(paths["ledger"])
+                and group_summary.get("final_group_manifest_sha256") == sha256(paths["groups"])
+                and group_summary.get("final_member_manifest_sha256") == sha256(paths["members"]),
+                "tracked manifest digests agree with the P3 group summary",
+            ),
+            check(
+                "R3.12_execution_record",
+                execution.get("status") == "completed"
+                and execution.get("workers") == 4
+                and execution.get("threads_per_sample") == 16
+                and bool(execution.get("log_path")),
+                f"status={execution.get('status')} log={execution.get('log_path')}",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P3B",
+        "review": "R3",
+        "reviewed_at": utc_now(),
+        "status": "PASS"
+        if all(item["status"] == "PASS" for item in checks)
+        else "FAIL",
+        "checks": checks,
+    }
+
+
 def write_report(report: dict[str, Any]) -> None:
     audit_dir = AUDIT_ROOT / report["phase"]
     audit_dir.mkdir(parents=True, exist_ok=True)
@@ -1061,7 +1370,7 @@ def write_report(report: dict[str, Any]) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--phase", required=True, choices=["P0", "P1", "P2", "P3A"]
+        "--phase", required=True, choices=["P0", "P1", "P2", "P3A", "P3B"]
     )
     return parser.parse_args()
 
@@ -1074,8 +1383,10 @@ def main() -> None:
         report = review_p1()
     elif args.phase == "P2":
         report = review_p2()
-    else:
+    elif args.phase == "P3A":
         report = review_p3a()
+    else:
+        report = review_p3b()
     assert report is not None
     write_report(report)
     print(json.dumps(report, indent=2, sort_keys=True))

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
+import tempfile
 import unittest
 
 from scripts import run_v2_reprocessing_full as full
@@ -29,6 +32,26 @@ class V2ReprocessingFullTest(unittest.TestCase):
                 accessions
             )
         )
+
+    def test_complete_fastq_is_reused_without_network_call(self) -> None:
+        payload = b"verified-fastq"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.fastq.gz"
+            path.write_bytes(payload)
+
+            class NoNetworkRunner:
+                def run(self, command: list[str], *, stdout=None) -> None:
+                    raise AssertionError(command)
+
+            actual_sha, actual_md5 = full.download_fastq(
+                NoNetworkRunner(),
+                "example.invalid/sample.fastq.gz",
+                hashlib.md5(payload).hexdigest(),
+                len(payload),
+                path,
+            )
+            self.assertEqual(actual_sha, hashlib.sha256(payload).hexdigest())
+            self.assertEqual(actual_md5, hashlib.md5(payload).hexdigest())
 
 
 if __name__ == "__main__":

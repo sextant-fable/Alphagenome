@@ -47,6 +47,16 @@ class V2PhaseControllerTest(unittest.TestCase):
             controller.approval_satisfies(state, "G1", "p3_full_rna_streaming_482")
         )
 
+    def test_p3b_full_processing_and_review_are_registered(self) -> None:
+        self.assertIn("P3B", controller.PHASE_COMMANDS)
+        self.assertIn("P3B", controller.REVIEW_COMMANDS)
+        self.assertTrue(
+            any(value.endswith("run_v2_p3b.py") for value in controller.PHASE_COMMANDS["P3B"])
+        )
+        self.assertTrue(
+            any(value == "P3B" for value in controller.REVIEW_COMMANDS["P3B"])
+        )
+
     def test_final_test_scope_cannot_be_approved_early(self) -> None:
         with self.assertRaisesRegex(ValueError, "only in P6C"):
             controller.validate_approval_scope(

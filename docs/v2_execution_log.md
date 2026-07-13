@@ -59,3 +59,12 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Attempt result: FAIL before alignment because ENA closed the first HTTPS FASTQ transfer repeatedly and the pilot curl command discarded prior partial bytes on retry.
 - Correction: both pilot and full download paths now use `--continue-at -`, 20 transfer retries, and a two-second retry delay; a regression test confirms continuation from an existing `.part` file.
 - Data integrity: no normalized output was produced, raw bigWigs were not modified, and the retained partial FASTQ is validated against the expected byte count and MD5 before promotion.
+
+## 2026-07-14 - P3B Full-Processing Implementation
+
+- Full scope: the controller now registers P3B execution and R3 review for all 482 RNA-seq runs; the three ChIP-seq runs remain excluded.
+- Recovery: both partial and fully downloaded FASTQs survive a failed sample attempt and are checksum-validated before reuse.
+- Final hierarchy: uniform reprocessing restores the three held source-reuse accessions as a distinct SRP310676 group, producing 482 one-to-one run memberships in 241 biological groups. They are not averaged with the canonical SRP278203 group because the source studies differ.
+- Aggregation: technical runs within a biological unit are weighted by pre-normalization coverage mass, then biological units are averaged equally. Singleton group paths are audited relative symlinks to avoid duplicate large files.
+- Post-reprocessing review: R3 verifies all normalized and grouped bigWigs, raw-data immutability, exact group context, ontology CURIEs, replicate QC, source-reuse resolution, cleanup, manifest hashes, and the long-run execution record.
+- Status: implementation and 18-test suite pass; P3B has not started and remains conditional on R3A PASS.

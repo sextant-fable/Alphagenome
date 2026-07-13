@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 import shutil
 import subprocess
@@ -13,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = REPO_ROOT / "alphagenome_custom/metadata/v2/execution_state.json"
 ENV_NAME = "alphagenome"
 MIN_FREE_BYTES = 200 * 1024**3
+RUN_RECORD = REPO_ROOT / "alphagenome_custom/metadata/v2/p3b_execution.json"
 REQUIRED_APPROVALS = {
     "G1_large_source_download_or_realignment": "p3_full_rna_streaming_482",
     "G2_v2_manifest_scientific_review": "v2_manifest_candidate_hierarchy",
@@ -45,27 +47,74 @@ def main() -> None:
         raise RuntimeError(
             f"P3B requires at least {MIN_FREE_BYTES} free bytes; found {free_bytes}"
         )
-    command = [
-        conda,
-        "run",
-        "--no-capture-output",
-        "-n",
-        ENV_NAME,
-        "python",
-        "scripts/run_v2_reprocessing_full.py",
-        "--threads-per-sample",
-        "16",
-        "--workers",
-        "4",
-        "--work-dir",
-        "shared/source_reads/v2/full_streaming",
-        "--output-dir",
-        "alphagenome_custom/tracks/rna_seq_v2_normalized",
-        "--star-index",
-        "shared/reference_indexes/WBcel235_STAR_2.7.11b",
+    commands = [
+        [
+            conda,
+            "run",
+            "--no-capture-output",
+            "-n",
+            ENV_NAME,
+            "python",
+            "scripts/run_v2_reprocessing_full.py",
+            "--threads-per-sample",
+            "16",
+            "--workers",
+            "4",
+            "--work-dir",
+            "shared/source_reads/v2/full_streaming",
+            "--output-dir",
+            "alphagenome_custom/tracks/rna_seq_v2_normalized",
+            "--star-index",
+            "shared/reference_indexes/WBcel235_STAR_2.7.11b",
+        ],
+        [
+            conda,
+            "run",
+            "--no-capture-output",
+            "-n",
+            ENV_NAME,
+            "python",
+            "scripts/finalize_v2_reprocessed_groups.py",
+        ],
     ]
-    print("command\t" + " ".join(command), flush=True)
-    subprocess.run(command, cwd=REPO_ROOT, check=True)
+    log_path = REPO_ROOT / "logs/v2_p3b_20260714/p3b_full.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    started_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    record = {
+        "phase": "P3B",
+        "status": "running",
+        "started_at": started_at,
+        "completed_at": None,
+        "commands": commands,
+        "log_path": str(log_path.relative_to(REPO_ROOT)),
+        "workers": 4,
+        "threads_per_sample": 16,
+        "free_bytes_at_start": free_bytes,
+    }
+    RUN_RECORD.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    try:
+        with log_path.open("a") as log:
+            for command in commands:
+                print("command\t" + " ".join(command), flush=True)
+                log.write("command\t" + " ".join(command) + "\n")
+                log.flush()
+                subprocess.run(
+                    command,
+                    cwd=REPO_ROOT,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    check=True,
+                )
+    except Exception:
+        record["status"] = "failed"
+        raise
+    else:
+        record["status"] = "completed"
+    finally:
+        record["completed_at"] = (
+            datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        )
+        RUN_RECORD.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
 
 
 if __name__ == "__main__":

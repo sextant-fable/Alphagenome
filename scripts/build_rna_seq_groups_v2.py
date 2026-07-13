@@ -406,6 +406,8 @@ def build_groups(
     samples: list[dict[str, str]],
     sample_contexts: list[dict[str, str]],
     ontology_rows: list[dict[str, str]],
+    *,
+    exclude_duplicate_current_signals: bool = True,
 ) -> tuple[
     list[dict[str, Any]],
     list[dict[str, Any]],
@@ -436,7 +438,7 @@ def build_groups(
                     "review_status": "resolved",
                 }
             )
-        if accession in DUPLICATE_CANONICAL:
+        if exclude_duplicate_current_signals and accession in DUPLICATE_CANONICAL:
             current_signal_eligible = False
             canonical = DUPLICATE_CANONICAL[accession]
             reasons.append(f"duplicate_current_bigwig_of_{canonical}")

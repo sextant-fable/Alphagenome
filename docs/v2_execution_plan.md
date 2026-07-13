@@ -14,7 +14,7 @@ The canonical state is `alphagenome_custom/metadata/v2/execution_state.json`. Ph
 2. `P1/R1`: build a 485-accession provenance manifest with evidence and A/B/C/D normalization classification.
 3. `P2/R2`: resolve duplicate content, the invalid T38 grouping, ontology, replicate context, inclusion, and exclusion decisions.
 4. `P3A/R3A`: run five representative accessions as an automatic checkpoint and measure integrity, mapping, scale, I/O, runtime, disk use, and agreement with the provided signals.
-5. `P3B/R3`: on R3A PASS, stream all 482 verified RNA-seq runs under the same full-processing approval, retaining normalized/grouped bigWigs while cleaning per-run FASTQ/BAM/bedGraph intermediates.
+5. `P3B/R3`: on R3A PASS, stream all 482 verified RNA-seq runs under the same full-processing approval, retaining normalized/grouped bigWigs while cleaning per-run FASTQ/BAM/bedGraph intermediates. Technical runs are pooled by raw coverage mass within biological units; true biological units are then averaged equally. The three reused provided signals are regenerated and retained as a separate source-study group rather than merged across studies.
 6. `P4/R4`: implement manifest-driven BigWig loading, five autosomal validation folds, and a locked chromosome-X test embargo.
 7. `P5/R5`: implement model-space two-resolution count loss, gene loss, augmentation, and genuine C. elegans organism adaptation.
 8. `P6A/R6A`: run the approved GPU smoke/pilot and validate environment, numerics, resource use, logging, and checkpoint reload.

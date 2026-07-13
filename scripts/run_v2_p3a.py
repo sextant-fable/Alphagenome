@@ -266,10 +266,12 @@ print('alphagenome_import_ok')
 
 def prepare_environment(conda: str, plan: dict[str, Any]) -> None:
     ENV_AUDIT_DIR.mkdir(parents=True, exist_ok=True)
-    before = environment_snapshot(conda)
-    (ENV_AUDIT_DIR / "p3_before.json").write_text(
-        json.dumps(before, indent=2, sort_keys=True) + "\n"
-    )
+    before_path = ENV_AUDIT_DIR / "p3_before.json"
+    if before_path.is_file():
+        before = json.loads(before_path.read_text())
+    else:
+        before = environment_snapshot(conda)
+        before_path.write_text(json.dumps(before, indent=2, sort_keys=True) + "\n")
     if not tools_available(conda):
         with local_doh_proxy() as proxy:
             environment = proxy_environment(proxy)
