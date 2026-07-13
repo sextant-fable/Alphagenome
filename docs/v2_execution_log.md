@@ -124,3 +124,12 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - GPU policy: wait for at least one idle allowed physical GPU and use up to GPUs 2 and 3 concurrently, with one job per GPU and no cancellation or oversubscription. Completed CV jobs are hash-validated and reusable after interruption.
 - Controller: P6B/R6B is registered. R6B requires all 30 jobs, six five-fold aggregates, the exact locked selection rule, development retraining, checkpoint integrity, and continued chromosome-X embargo.
 - Status: implementation and 45-test suite pass; no P6B GPU job has run because P3-P6A reviews have not yet completed.
+
+## 2026-07-14 - P6C One-Time Final-Test Implementation
+
+- Boundary: P6C requires both the standing GPU scope and a separate `r6c_single_chr_x_test` G5 approval that can be granted only after P6B locks one development checkpoint. G5 remains unapproved.
+- Concurrency: create one exclusive final-test claim bound to the checkpoint SHA-256 and an idle physical GPU 2/3. A pre-existing claim or consumed lock refuses another entry.
+- Consumption semantics: the loader first verifies P6C state, G5 scope, checkpoint hash, and `test_consumed=false`. The evaluator then atomically sets `test_consumed=true` before the first chromosome-X BigWig read. A later evaluation failure remains consumed and is recorded as `failed_after_consumption`.
+- Evaluation: use all complete core-only 131,072 bp chromosome-X subwindows and report paper loss, log1p-MSE, and 128 bp per-track Pearson for the locked checkpoint only.
+- Review: R6C verifies the single claim, GPU policy, exact locked checkpoint, chromosome-X interval hash, finite metrics, permanent consumption, final report hash, G5 scope, and disclosure that chr X had prior legacy-project exposure.
+- Status: implementation and 46-test suite pass; no chromosome-X data was read by this implementation work.
