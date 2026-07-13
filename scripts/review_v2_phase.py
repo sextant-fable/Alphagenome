@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import csv
 from datetime import datetime, timezone
 import hashlib
@@ -1152,6 +1153,10 @@ def review_p3b() -> dict[str, Any]:
             expected_chromosomes[fields[0]] = int(fields[1])
 
     normalized_errors = []
+    accepted_transports = {
+        "ncbi_sra",
+        "ena_fastq_fallback_after_sra_extraction_failure",
+    }
     for row in ledger:
         accession = row["run_accession"]
         path = REPO_ROOT / row["output_path"]
@@ -1171,17 +1176,29 @@ def review_p3b() -> dict[str, Any]:
                 raise ValueError("coverage policy mismatch")
             if row["output_strand"] != ".":
                 raise ValueError("output strand mismatch")
-            if (
-                row.get("audit_schema_version") != "2"
-                or row.get("source_transport_backend") != "ncbi_sra"
-                or len(row.get("source_archive_md5", "")) != 32
-                or len(row.get("source_archive_sha256", "")) != 64
-                or not row.get("source_reference_ena_fastq_urls")
-                or not row.get("source_reference_ena_fastq_md5")
-                or int(row.get("source_reference_ena_fastq_bytes", 0)) <= 0
-                or not row.get("extracted_fastq_sha256")
-                or int(row.get("extracted_fastq_record_count", 0)) <= 0
-                or any(
+            backend = row.get("source_transport_backend")
+            reference_md5 = row.get("source_reference_ena_fastq_md5", "").split(";")
+            source_spots = int(row.get("source_manifest_spot_count", 0))
+            star_input_reads = int(row.get("star_input_reads", 0).replace(",", ""))
+            common_source_valid = (
+                row.get("audit_schema_version") == "2"
+                and backend in accepted_transports
+                and row.get("source_reference_ena_fastq_urls")
+                and all(len(value) == 32 for value in reference_md5)
+                and int(row.get("source_reference_ena_fastq_bytes", 0)) > 0
+                and source_spots > 0
+                and star_input_reads == source_spots
+                and len(row.get("source_archive_md5", "")) == 32
+                and len(row.get("source_archive_sha256", "")) == 64
+                and row.get("sra_archive_validated") == "True"
+                and any(
+                    command == "STAR"
+                    for command in (
+                        item["argv"][0].rsplit("/", 1)[-1]
+                        for item in json.loads(row["commands_json"])
+                    )
+                )
+                and not any(
                     ambiguous in row
                     for ambiguous in (
                         "source_fastq_urls",
@@ -1190,7 +1207,29 @@ def review_p3b() -> dict[str, Any]:
                         "source_fastq_bytes",
                     )
                 )
-            ):
+            )
+            if backend == "ncbi_sra":
+                transport_valid = (
+                    bool(row.get("extracted_fastq_sha256"))
+                    and int(row.get("extracted_fastq_bytes", 0)) > 0
+                    and int(row.get("extracted_fastq_record_count", 0)) > 0
+                    and row.get("extracted_fastq_integrity")
+                    == "local_SHA256_and_layout_aware_record_count"
+                )
+            else:
+                downloaded_sha = row.get("downloaded_ena_fastq_sha256", "").split(";")
+                transport_valid = (
+                    all(len(value) == 64 for value in downloaded_sha)
+                    and int(row.get("downloaded_ena_fastq_bytes", 0))
+                    == int(row.get("source_reference_ena_fastq_bytes", 0))
+                    and int(row.get("ena_fastq_expected_record_count", 0)) > 0
+                    and int(row.get("sra_extraction_return_code", 0)) != 0
+                    and row.get("sra_extraction_error_type")
+                    == "CalledProcessError"
+                    and row.get("downloaded_ena_fastq_integrity")
+                    == "ENA_MD5_and_local_SHA256_plus_STAR_spot_count"
+                )
+            if not common_source_valid or not transport_valid:
                 raise ValueError("source audit schema/provenance mismatch")
         except Exception as error:
             normalized_errors.append(f"{accession}:{error}")
@@ -1423,7 +1462,17 @@ def review_p3b() -> dict[str, Any]:
                 "R3.14_unambiguous_audit_schema",
                 audit_schema.get("schema_version") == 2
                 and audit_schema.get("sample_audits") == 482
-                and audit_schema.get("transport") == "ncbi_sra"
+                and sum(audit_schema.get("transport_counts", {}).values()) == 482
+                and set(audit_schema.get("transport_counts", {}))
+                <= accepted_transports
+                and audit_schema.get("transport_counts")
+                == dict(
+                    sorted(
+                        Counter(
+                            row["source_transport_backend"] for row in ledger
+                        ).items()
+                    )
+                )
                 and audit_schema.get("ledger_sha256") == sha256(paths["ledger"])
                 and set(audit_schema.get("ambiguous_legacy_fields_removed", []))
                 == {

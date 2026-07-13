@@ -102,6 +102,31 @@ class V2ReprocessingFullTest(unittest.TestCase):
             self.assertEqual(paths, [fastq])
             self.assertEqual(total_bytes, len(b"@r1\nA\n+\n!\n"))
 
+    def test_failed_sra_extraction_cleanup_preserves_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            sample_dir = Path(directory)
+            archive = sample_dir / "SRR1.sra"
+            extracted = sample_dir / "SRR1_1.fastq"
+            temporary = sample_dir / "fasterq_tmp"
+            archive.write_bytes(b"archive")
+            extracted.write_bytes(b"partial")
+            temporary.mkdir()
+            (temporary / "scratch").write_bytes(b"partial")
+
+            full.discard_partial_sra_extraction(sample_dir, "SRR1")
+
+            self.assertTrue(archive.is_file())
+            self.assertFalse(extracted.exists())
+            self.assertFalse(temporary.exists())
+
+    def test_heterogeneous_audit_rows_can_be_written(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "ledger.tsv"
+            full.write_tsv(path, [{"run": "A", "sra": "x"}, {"run": "B", "ena": "y"}])
+            rows = full.read_tsv(path)
+            self.assertEqual(rows[0], {"run": "A", "sra": "x", "ena": ""})
+            self.assertEqual(rows[1], {"run": "B", "sra": "", "ena": "y"})
+
     def test_full_source_manifest_is_exactly_the_rna_scope(self) -> None:
         sources = full.read_tsv(full.SOURCE_MANIFEST)
         samples = full.read_tsv(full.SAMPLE_MANIFEST)

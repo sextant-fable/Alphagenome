@@ -124,6 +124,22 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 - Next actions: Monitor progress, append the final result without removing failures, run R3, and advance to P4 only on PASS.
 - Claim status: unverified
 
+## 2026-07-14 - RNA-seq v2 P3B SRA Extraction Failure and Audited Fallback
+
+- Run type: preprocessing failure analysis
+- Purpose: Record the first fail-closed P3B attempt and correct the transport path for aligned SRA archives that require unavailable external reference objects.
+- Git commit: `6630e111609eb68f9876cd74767d1a731c6e5a4c` at failed-run start; fallback implementation committed before restart.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU` (`hy8`); non-Slurm CPU preprocessing; no GPU requested.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python scripts/v2_phase_controller.py run --phase P3B`.
+- Input data: The same locked 482-run SRA and ENA source manifests used by P3B.
+- Output path: Existing normalized outputs and audits under `alphagenome_custom/tracks/rna_seq_v2_normalized/`; retained failed work under `shared/source_reads/v2/full_streaming/`; log under `logs/v2_p3b_20260714/p3b_full.log`.
+- Result summary: Failed closed after 73/482 runs completed. `SRR7443600` and `SRR7443602` returned `fasterq-dump` exit code 3 because their aligned archives referenced unavailable `BX28460*.4/.5` RefSeq objects. No completed output was invalidated.
+- Verification: Both SRA archives matched locked NCBI SDL MD5 values and passed `vdb-validate`; the failure occurred during read reconstruction. Completed outputs retained their output hashes, immutable input-bigWig checks, STAR metrics, normalization totals, and cleanup status.
+- Failures or warnings: An aligned SRA can be archive-valid yet not be self-contained for local FASTQ reconstruction. The correction falls back only after an observed SRA extraction failure to the same run accession's locked ENA FASTQ files, with exact ENA MD5/local SHA-256 and STAR spot-count verification. Transport fallback does not relax biological grouping or output QC.
+- Next actions: Reopen P3B, reuse the 73 completed audited outputs, verify the first ENA fallback end to end, and continue the remaining full scope.
+- Claim status: verified
+
 ## 2026-07-08 - Latest RNA-seq11 Valid/Test Prediction bigWig Export
 
 - Run type: evaluation and generated-artifact export

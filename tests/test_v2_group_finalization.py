@@ -29,6 +29,31 @@ class V2GroupFinalizationTest(unittest.TestCase):
         self.assertNotIn("source_fastq_md5", updated)
         self.assertNotIn("source_fastq_sha256", updated)
 
+    def test_full_audit_schema_records_ena_fallback_without_calling_it_extraction(self) -> None:
+        row = {
+            "run_accession": "SRR2",
+            "source_transport_backend": "ena_fastq_fallback_after_sra_extraction_failure",
+            "source_fastq_urls": "ena.example/SRR2_1.fastq.gz;ena.example/SRR2_2.fastq.gz",
+            "source_fastq_md5": f"{'a' * 32};{'b' * 32}",
+            "source_fastq_sha256": f"{'c' * 64};{'d' * 64}",
+            "source_fastq_bytes": 456,
+            "source_archive_md5": "e" * 32,
+            "source_archive_sha256": "f" * 64,
+            "downloaded_ena_fastq_sha256": f"{'c' * 64};{'d' * 64}",
+            "downloaded_ena_fastq_bytes": 456,
+            "ena_fastq_expected_record_count": 20,
+            "sra_extraction_return_code": 3,
+        }
+        updated = finalizer.audit_schema_v2(row)
+        self.assertEqual(updated["audit_schema_version"], 2)
+        self.assertEqual(updated["downloaded_ena_fastq_bytes"], 456)
+        self.assertEqual(updated["extracted_fastq_sha256"], "")
+        self.assertEqual(
+            updated["downloaded_ena_fastq_integrity"],
+            "ENA_MD5_and_local_SHA256_plus_STAR_spot_count",
+        )
+        self.assertNotIn("source_fastq_sha256", updated)
+
     def test_final_hierarchy_restores_three_distinct_study_runs(self) -> None:
         samples = p2.read_tsv(finalizer.SAMPLE_MANIFEST)
         contexts = p2.read_tsv(finalizer.CONTEXT_MANIFEST)

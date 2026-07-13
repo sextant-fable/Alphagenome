@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 import csv
 from datetime import datetime, timezone
 import hashlib
@@ -62,9 +62,13 @@ def write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
         raise RuntimeError(f"Refusing to write empty table: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
+    fieldnames = list(rows[0])
+    fieldnames.extend(
+        sorted({key for row in rows for key in row}.difference(fieldnames))
+    )
     with temporary.open("w", newline="") as handle:
         writer = csv.DictWriter(
-            handle, fieldnames=list(rows[0]), delimiter="\t", lineterminator="\n"
+            handle, fieldnames=fieldnames, delimiter="\t", lineterminator="\n"
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -89,23 +93,62 @@ def sha256(path: Path) -> str:
 def audit_schema_v2(row: dict[str, Any]) -> dict[str, Any]:
     if row.get("audit_schema_version") == 2:
         return dict(row)
-    if row.get("source_transport_backend") != "ncbi_sra":
+    backend = row.get("source_transport_backend")
+    accepted_backends = {
+        "ncbi_sra",
+        "ena_fastq",
+        "ena_fastq_fallback_after_sra_extraction_failure",
+    }
+    if backend not in accepted_backends:
         raise RuntimeError(
             f"Unexpected transport during audit migration: {row.get('run_accession')}"
-        )
-    extracted_sha = row.get("extracted_fastq_sha256")
-    if row.get("source_fastq_sha256") != extracted_sha:
-        raise RuntimeError(
-            f"Extracted FASTQ SHA mismatch during audit migration: {row.get('run_accession')}"
         )
     updated = dict(row)
     updated["audit_schema_version"] = 2
     updated["source_reference_ena_fastq_urls"] = updated.pop("source_fastq_urls")
     updated["source_reference_ena_fastq_md5"] = updated.pop("source_fastq_md5")
     updated["source_reference_ena_fastq_bytes"] = updated.pop("source_fastq_bytes")
-    updated.pop("source_fastq_sha256")
-    updated["source_archive_integrity"] = "NCBI_SDL_MD5_and_local_SHA256"
-    updated["extracted_fastq_integrity"] = "local_SHA256_and_layout_aware_record_count"
+    generic_sha = updated.pop("source_fastq_sha256")
+    if backend == "ncbi_sra":
+        if generic_sha != updated.get("extracted_fastq_sha256"):
+            raise RuntimeError(
+                "Extracted FASTQ SHA mismatch during audit migration: "
+                f"{row.get('run_accession')}"
+            )
+        updated["sra_archive_validated"] = True
+        updated["source_archive_integrity"] = "NCBI_SDL_MD5_and_local_SHA256"
+        updated["extracted_fastq_integrity"] = (
+            "local_SHA256_and_layout_aware_record_count"
+        )
+        updated["downloaded_ena_fastq_integrity"] = "not_used"
+    else:
+        downloaded_sha = updated.get("downloaded_ena_fastq_sha256") or generic_sha
+        if generic_sha != downloaded_sha:
+            raise RuntimeError(
+                "Downloaded ENA FASTQ SHA mismatch during audit migration: "
+                f"{row.get('run_accession')}"
+            )
+        updated["downloaded_ena_fastq_sha256"] = downloaded_sha
+        updated["downloaded_ena_fastq_bytes"] = int(
+            updated.get("downloaded_ena_fastq_bytes")
+            or updated["source_reference_ena_fastq_bytes"]
+        )
+        updated["ena_fastq_expected_record_count"] = int(
+            updated.get("ena_fastq_expected_record_count")
+            or updated.get("extracted_fastq_record_count")
+        )
+        updated["extracted_fastq_sha256"] = ""
+        updated["extracted_fastq_bytes"] = ""
+        updated["extracted_fastq_record_count"] = ""
+        updated["extracted_fastq_integrity"] = "not_used"
+        updated["downloaded_ena_fastq_integrity"] = (
+            "ENA_MD5_and_local_SHA256_plus_STAR_spot_count"
+        )
+        updated["source_archive_integrity"] = (
+            "NCBI_SDL_MD5_and_local_SHA256"
+            if backend == "ena_fastq_fallback_after_sra_extraction_failure"
+            else "not_applicable"
+        )
     return updated
 
 
@@ -122,10 +165,14 @@ def upgrade_full_audit_schema() -> list[dict[str, Any]]:
         atomic_json(path, updated)
         rows.append(updated)
     write_tsv(FULL_LEDGER, rows)
+    transport_counts = Counter(row["source_transport_backend"] for row in rows)
     summary = {
         "schema_version": 2,
         "sample_audits": len(rows),
-        "transport": "ncbi_sra",
+        "transport": (
+            next(iter(transport_counts)) if len(transport_counts) == 1 else "mixed"
+        ),
+        "transport_counts": dict(sorted(transport_counts.items())),
         "source_reference_fields": [
             "source_reference_ena_fastq_urls",
             "source_reference_ena_fastq_md5",
@@ -141,6 +188,11 @@ def upgrade_full_audit_schema() -> list[dict[str, Any]]:
             "extracted_fastq_sha256",
             "extracted_fastq_bytes",
             "extracted_fastq_record_count",
+        ],
+        "downloaded_ena_fastq_fields": [
+            "downloaded_ena_fastq_sha256",
+            "downloaded_ena_fastq_bytes",
+            "ena_fastq_expected_record_count",
         ],
         "ambiguous_legacy_fields_removed": [
             "source_fastq_urls",

@@ -82,10 +82,14 @@ def write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
         raise RuntimeError(f"Refusing to write an empty ledger: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
+    fieldnames = list(rows[0])
+    fieldnames.extend(
+        sorted({key for row in rows for key in row}.difference(fieldnames))
+    )
     with temporary.open("w", newline="") as handle:
         writer = csv.DictWriter(
             handle,
-            fieldnames=list(rows[0]),
+            fieldnames=fieldnames,
             delimiter="\t",
             lineterminator="\n",
         )
@@ -434,6 +438,35 @@ def extract_sra_fastq(
     return paths, hashes, total_bytes
 
 
+def discard_partial_sra_extraction(sample_dir: Path, accession: str) -> None:
+    """Remove only derived FASTQs/temp files after a failed SRA extraction."""
+    for path in sample_dir.glob(f"{accession}*.fastq"):
+        path.unlink(missing_ok=True)
+    temporary = sample_dir / "fasterq_tmp"
+    if temporary.exists():
+        shutil.rmtree(temporary)
+
+
+def download_ena_fastqs(
+    runner: SampleRunner,
+    urls: list[str],
+    expected_md5: list[str],
+    expected_bytes: list[int],
+) -> tuple[list[Path], list[str]]:
+    paths = []
+    hashes = []
+    for url, md5_value, byte_count in zip(
+        urls, expected_md5, expected_bytes, strict=True
+    ):
+        path = runner.sample_dir / Path(url).name
+        sha_value, _ = download_fastq(
+            runner, url, md5_value, byte_count, path
+        )
+        paths.append(path)
+        hashes.append(sha_value)
+    return paths, hashes
+
+
 def normalize_bedgraph(input_path: Path, output_path: Path) -> tuple[float, float]:
     total = 0.0
     with input_path.open() as handle:
@@ -631,53 +664,91 @@ def process_sample(
                 runner, archive, archive_path
             )
             runner.run([str(toolkit_bin / "vdb-validate"), str(archive_path)])
-            fastq_paths, fastq_sha, extracted_bytes = extract_sra_fastq(
-                runner,
-                toolkit_bin,
-                archive_path,
-                accession,
-                source["library_layout"],
-                int(source["read_count"]),
-                threads,
-            )
-            source_transport = {
-                "source_transport_backend": "ncbi_sra",
-                "source_archive_url": archive["url"],
-                "source_archive_md5": archive_md5,
-                "source_archive_sha256": archive_sha,
-                "source_archive_bytes": archive["size"],
-                "extracted_fastq_sha256": ";".join(fastq_sha),
-                "extracted_fastq_bytes": extracted_bytes,
-                "source_manifest_spot_count": int(source["read_count"]),
-                "extracted_fastq_record_count": expected_fastq_records(
-                    source["library_layout"], int(source["read_count"])
-                ),
-            }
-            read_files_command = []
-        else:
-            fastq_paths = []
-            fastq_sha = []
-            for url, md5_value, byte_count in zip(
-                urls, expected_md5, expected_bytes, strict=True
-            ):
-                path = sample_dir / Path(url).name
-                sha_value, _ = download_fastq(
-                    runner, url, md5_value, byte_count, path
+            try:
+                fastq_paths, fastq_sha, extracted_bytes = extract_sra_fastq(
+                    runner,
+                    toolkit_bin,
+                    archive_path,
+                    accession,
+                    source["library_layout"],
+                    int(source["read_count"]),
+                    threads,
                 )
-                fastq_paths.append(path)
-                fastq_sha.append(sha_value)
+            except subprocess.CalledProcessError as error:
+                discard_partial_sra_extraction(sample_dir, accession)
+                print(
+                    f"sra_extraction_fallback\t{accession}\t"
+                    f"return_code={error.returncode}\tbackend=ena_fastq",
+                    flush=True,
+                )
+                fastq_paths, fastq_sha = download_ena_fastqs(
+                    runner, urls, expected_md5, expected_bytes
+                )
+                source_transport = {
+                    "source_transport_backend": (
+                        "ena_fastq_fallback_after_sra_extraction_failure"
+                    ),
+                    "source_archive_url": archive["url"],
+                    "source_archive_md5": archive_md5,
+                    "source_archive_sha256": archive_sha,
+                    "source_archive_bytes": archive["size"],
+                    "sra_archive_validated": True,
+                    "sra_extraction_error_type": type(error).__name__,
+                    "sra_extraction_return_code": error.returncode,
+                    "extracted_fastq_sha256": "",
+                    "extracted_fastq_bytes": "",
+                    "extracted_fastq_record_count": "",
+                    "downloaded_ena_fastq_sha256": ";".join(fastq_sha),
+                    "downloaded_ena_fastq_bytes": sum(expected_bytes),
+                    "ena_fastq_expected_record_count": expected_fastq_records(
+                        source["library_layout"], int(source["read_count"])
+                    ),
+                    "source_manifest_spot_count": int(source["read_count"]),
+                }
+                read_files_command = ["--readFilesCommand", "zcat"]
+            else:
+                source_transport = {
+                    "source_transport_backend": "ncbi_sra",
+                    "source_archive_url": archive["url"],
+                    "source_archive_md5": archive_md5,
+                    "source_archive_sha256": archive_sha,
+                    "source_archive_bytes": archive["size"],
+                    "sra_archive_validated": True,
+                    "sra_extraction_error_type": "",
+                    "sra_extraction_return_code": "",
+                    "extracted_fastq_sha256": ";".join(fastq_sha),
+                    "extracted_fastq_bytes": extracted_bytes,
+                    "extracted_fastq_record_count": expected_fastq_records(
+                        source["library_layout"], int(source["read_count"])
+                    ),
+                    "downloaded_ena_fastq_sha256": "",
+                    "downloaded_ena_fastq_bytes": "",
+                    "ena_fastq_expected_record_count": "",
+                    "source_manifest_spot_count": int(source["read_count"]),
+                }
+                read_files_command = []
+        else:
+            fastq_paths, fastq_sha = download_ena_fastqs(
+                runner, urls, expected_md5, expected_bytes
+            )
             source_transport = {
                 "source_transport_backend": "ena_fastq",
                 "source_archive_url": "",
                 "source_archive_md5": "",
                 "source_archive_sha256": "",
                 "source_archive_bytes": "",
-                "extracted_fastq_sha256": ";".join(fastq_sha),
-                "extracted_fastq_bytes": sum(expected_bytes),
-                "source_manifest_spot_count": int(source["read_count"]),
-                "extracted_fastq_record_count": expected_fastq_records(
+                "sra_archive_validated": False,
+                "sra_extraction_error_type": "",
+                "sra_extraction_return_code": "",
+                "extracted_fastq_sha256": "",
+                "extracted_fastq_bytes": "",
+                "extracted_fastq_record_count": "",
+                "downloaded_ena_fastq_sha256": ";".join(fastq_sha),
+                "downloaded_ena_fastq_bytes": sum(expected_bytes),
+                "ena_fastq_expected_record_count": expected_fastq_records(
                     source["library_layout"], int(source["read_count"])
                 ),
+                "source_manifest_spot_count": int(source["read_count"]),
             }
             read_files_command = ["--readFilesCommand", "zcat"]
 
@@ -709,6 +780,12 @@ def process_sample(
         )
         aligned_bam = sample_dir / "star_Aligned.sortedByCoord.out.bam"
         star_metrics = parse_star_log(sample_dir / "star_Log.final.out")
+        star_input_reads = int(star_metrics["Number of input reads"].replace(",", ""))
+        if star_input_reads != int(source["read_count"]):
+            raise RuntimeError(
+                f"STAR input spot mismatch for {accession}: "
+                f"{star_input_reads} != {source['read_count']}"
+            )
         primary_bam = sample_dir / "primary_unique.bam"
         runner.run(
             [
