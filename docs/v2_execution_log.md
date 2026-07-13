@@ -114,3 +114,13 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Integrity: each smoke records finite loss and gradient norms, peak CUDA memory, augmentation coordinates, exact interval/mean hashes, compact trainable-only checkpoint hash, reload verification, and an ignored log.
 - Claim scope: P6A is environment and numerical validation only, not a model result.
 - Status: implementation and 36-test suite pass; no v2 GPU job has run because P3-P5 reviews have not yet completed.
+
+## 2026-07-14 - P6B Blocked-CV Matrix Registration
+
+- Pre-registration: lock 30 runs from models A/B/C, training losses paper/log1p-MSE, and chromosome folds 1-5. Every run uses seed `20260714`, 2,000 optimizer steps, 131,072 bp subwindows, learning rate `1e-4`, the same shift/reverse-complement policy, and fold-training-only target means.
+- Validation: evaluate both loss spaces for every checkpoint on all complete, non-overlapping 131,072 bp subwindows contained within each held-out chromosome's evaluation cores. Also record 128 bp per-track log-signal Pearson; chromosome X remains inaccessible.
+- Selection: minimize five-fold mean paper loss, then five-fold mean log1p-MSE, then maximize five-fold mean per-track Pearson. This compares the two training objectives on identical data, seeds, steps, and evaluation metrics.
+- Final development checkpoint: retrain only the selected model/loss configuration for 2,500 steps on chromosomes I-V with the development nonzero means, then bind its checkpoint SHA-256 into `final_test_lock.json` with `test_consumed=false`.
+- GPU policy: wait for at least one idle allowed physical GPU and use up to GPUs 2 and 3 concurrently, with one job per GPU and no cancellation or oversubscription. Completed CV jobs are hash-validated and reusable after interruption.
+- Controller: P6B/R6B is registered. R6B requires all 30 jobs, six five-fold aggregates, the exact locked selection rule, development retraining, checkpoint integrity, and continued chromosome-X embargo.
+- Status: implementation and 45-test suite pass; no P6B GPU job has run because P3-P6A reviews have not yet completed.
