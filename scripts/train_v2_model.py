@@ -67,6 +67,43 @@ def set_seed(seed: int) -> None:
     torch.use_deterministic_algorithms(True, warn_only=True)
 
 
+def build_optimizer(
+    model: torch.nn.Module,
+    *,
+    learning_rate: float,
+    weight_decay: float,
+) -> tuple[torch.optim.Optimizer, list[torch.nn.Parameter]]:
+    trainable_named = [
+        (name, parameter)
+        for name, parameter in model.named_parameters()
+        if parameter.requires_grad
+    ]
+    if not trainable_named:
+        raise RuntimeError("Model has no trainable parameters")
+    organism_embeddings = [
+        parameter
+        for name, parameter in trainable_named
+        if name.endswith("organism_embed.weight")
+    ]
+    organism_embedding_ids = {id(parameter) for parameter in organism_embeddings}
+    regular_parameters = [
+        parameter
+        for _, parameter in trainable_named
+        if id(parameter) not in organism_embedding_ids
+    ]
+    parameter_groups = []
+    if regular_parameters:
+        parameter_groups.append(
+            {"params": regular_parameters, "weight_decay": weight_decay}
+        )
+    if organism_embeddings:
+        # The gradient hook freezes rows 0/1; zero decay prevents AdamW from
+        # changing those rows despite their zero gradients.
+        parameter_groups.append({"params": organism_embeddings, "weight_decay": 0.0})
+    optimizer = torch.optim.AdamW(parameter_groups, lr=learning_rate)
+    return optimizer, [parameter for _, parameter in trainable_named]
+
+
 def build_model(
     model_id: str,
     fold_means: torch.Tensor,
@@ -148,73 +185,76 @@ def main() -> None:
     model = build_model(
         args.model, fold_means.detach().cpu(), device, args.hidden_channels
     )
-    trainable = [parameter for parameter in model.parameters() if parameter.requires_grad]
-    if not trainable:
-        raise RuntimeError("Model has no trainable parameters")
-    optimizer = torch.optim.AdamW(
-        trainable,
-        lr=args.learning_rate,
+    optimizer, trainable = build_optimizer(
+        model,
+        learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
     )
     scaler_enabled = False
     metrics_rows = []
     started = time.monotonic()
     model.train()
-    for step, batch in enumerate(dataloader, start=1):
-        dna = batch["dna_sequence"].to(device=device, dtype=torch.float32)
-        targets = {
-            1: batch["target_1bp"].to(device=device, dtype=torch.float32),
-            128: batch["target_128bp"].to(device=device, dtype=torch.float32),
-        }
-        track_mask = batch["track_mask"].to(device)
-        track_strand = batch["track_strand"].to(device)
-        gene_mask = batch["gene_mask"].to(device)
-        optimizer.zero_grad(set_to_none=True)
-        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-            predictions = model(dna)
-            if args.loss == "paper":
-                loss, loss_metrics = components.dual_resolution_paper_loss(
-                    predictions,
-                    targets,
-                    track_means=fold_means,
-                    track_mask=track_mask,
-                    track_strand=track_strand,
-                    gene_mask=gene_mask,
-                    gene_weight=args.gene_weight,
-                )
-            else:
-                loss, loss_metrics = components.log1p_mse_loss(
-                    predictions,
-                    targets,
-                    track_means=fold_means,
-                    track_mask=track_mask,
-                )
-        if not torch.isfinite(loss):
-            raise RuntimeError(f"Non-finite loss at step {step}: {loss}")
-        loss.backward()
-        gradient_norm = torch.nn.utils.clip_grad_norm_(trainable, max_norm=1.0)
-        if not torch.isfinite(gradient_norm):
-            raise RuntimeError(f"Non-finite gradient at step {step}")
-        optimizer.step()
-        metrics_rows.append(
-            {
-                "step": step,
-                "loss": float(loss.detach()),
-                "gradient_norm": float(gradient_norm.detach()),
-                "shift_bp": int(batch["shift_bp"].item()),
-                "crop_offset_bp": int(batch["crop_offset_bp"].item()),
-                "reverse_complemented": bool(batch["reverse_complemented"].item()),
-                "cuda_memory_allocated_bytes": torch.cuda.memory_allocated(),
-                "cuda_max_memory_allocated_bytes": torch.cuda.max_memory_allocated(),
-                **{
-                    key: float(value.detach())
-                    for key, value in loss_metrics.items()
-                },
+    epoch = 0
+    while len(metrics_rows) < args.max_steps:
+        dataset.set_epoch(epoch)
+        for batch in dataloader:
+            step = len(metrics_rows) + 1
+            dna = batch["dna_sequence"].to(device=device, dtype=torch.float32)
+            targets = {
+                1: batch["target_1bp"].to(device=device, dtype=torch.float32),
+                128: batch["target_128bp"].to(device=device, dtype=torch.float32),
             }
-        )
-        print(json.dumps(metrics_rows[-1], sort_keys=True), flush=True)
-        if step >= args.max_steps:
-            break
+            track_mask = batch["track_mask"].to(device)
+            track_strand = batch["track_strand"].to(device)
+            gene_mask = batch["gene_mask"].to(device)
+            optimizer.zero_grad(set_to_none=True)
+            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                predictions = model(dna)
+                if args.loss == "paper":
+                    loss, loss_metrics = components.dual_resolution_paper_loss(
+                        predictions,
+                        targets,
+                        track_means=fold_means,
+                        track_mask=track_mask,
+                        track_strand=track_strand,
+                        gene_mask=gene_mask,
+                        gene_weight=args.gene_weight,
+                    )
+                else:
+                    loss, loss_metrics = components.log1p_mse_loss(
+                        predictions,
+                        targets,
+                        track_means=fold_means,
+                        track_mask=track_mask,
+                    )
+            if not torch.isfinite(loss):
+                raise RuntimeError(f"Non-finite loss at step {step}: {loss}")
+            loss.backward()
+            gradient_norm = torch.nn.utils.clip_grad_norm_(trainable, max_norm=1.0)
+            if not torch.isfinite(gradient_norm):
+                raise RuntimeError(f"Non-finite gradient at step {step}")
+            optimizer.step()
+            metrics_rows.append(
+                {
+                    "step": step,
+                    "epoch": epoch,
+                    "loss": float(loss.detach()),
+                    "gradient_norm": float(gradient_norm.detach()),
+                    "shift_bp": int(batch["shift_bp"].item()),
+                    "crop_offset_bp": int(batch["crop_offset_bp"].item()),
+                    "reverse_complemented": bool(batch["reverse_complemented"].item()),
+                    "cuda_memory_allocated_bytes": torch.cuda.memory_allocated(),
+                    "cuda_max_memory_allocated_bytes": torch.cuda.max_memory_allocated(),
+                    **{
+                        key: float(value.detach())
+                        for key, value in loss_metrics.items()
+                    },
+                }
+            )
+            print(json.dumps(metrics_rows[-1], sort_keys=True), flush=True)
+            if step >= args.max_steps:
+                break
+        epoch += 1
     checkpoint_path = output_dir / "checkpoint.pt"
     trainable_names = {
         name for name, parameter in model.named_parameters() if parameter.requires_grad
@@ -251,6 +291,7 @@ def main() -> None:
         "seed": args.seed,
         "loss": args.loss,
         "steps": len(metrics_rows),
+        "epochs_started": epoch,
         "sequence_length": args.sequence_length,
         "n_tracks": len(means_rows),
         "prediction_shapes": {

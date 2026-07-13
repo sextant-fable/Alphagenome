@@ -12,6 +12,7 @@ from alphagenome_pytorch.losses import multinomial_loss
 from scripts import v2_training_components as components
 from scripts import compute_v2_track_means
 from scripts import v2_gpu_resources
+from scripts import train_v2_model
 
 
 class V2TrainingComponentsTest(unittest.TestCase):
@@ -205,6 +206,27 @@ class V2TrainingComponentsTest(unittest.TestCase):
         model.organism_embed(torch.tensor([2])).sum().backward()
         self.assertEqual(int(torch.count_nonzero(model.organism_embed.weight.grad[:2])), 0)
         self.assertGreater(int(torch.count_nonzero(model.organism_embed.weight.grad[2])), 0)
+
+    def test_optimizer_does_not_decay_frozen_organism_rows(self) -> None:
+        class EmbedderModel(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.organism_embed = torch.nn.Embedding(2, 4)
+                self.projection = torch.nn.Linear(4, 1)
+
+        model = EmbedderModel()
+        model.organism_embed = components._expand_embedding(model.organism_embed)
+        original_rows = model.organism_embed.weight[:2].detach().clone()
+        optimizer, _ = train_v2_model.build_optimizer(
+            model, learning_rate=0.1, weight_decay=0.2
+        )
+        loss = model.projection(model.organism_embed(torch.tensor([2]))).sum()
+        loss.backward()
+        optimizer.step()
+        torch.testing.assert_close(model.organism_embed.weight[:2], original_rows)
+        self.assertFalse(
+            torch.equal(model.organism_embed.weight[2], original_rows.mean(dim=0))
+        )
 
     def test_from_scratch_baseline_forward_backward_is_finite(self) -> None:
         torch.manual_seed(3)
