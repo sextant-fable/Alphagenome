@@ -75,6 +75,7 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Controlled action: the project P3A process was interrupted after one completed sample; the current `.part` and all completed intermediates were retained.
 - Correction: each curl process now performs one resumable transfer attempt. Python restarts curl after a nonzero exit, so every new process resumes the retained `.part`; 200 attempts are allowed, and ten consecutive no-progress attempts fail closed.
 - Regression coverage: tests verify both complete-file reuse and an exit-18 transfer that succeeds on the next process without `--retry`.
+- Long-run hardening: the per-file attempt budget is 1,000 with a fail-closed threshold of 20 consecutive no-progress attempts. P3A demonstrated cumulative byte growth across repeated ENA exit-18 responses and completed the 1,772,340,596-byte SRR10882545 FASTQ without treating any equal-sized file as reusable.
 
 ## 2026-07-14 - P4 Dynamic Loader Implementation
 
