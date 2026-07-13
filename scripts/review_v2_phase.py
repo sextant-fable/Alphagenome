@@ -1710,6 +1710,135 @@ def review_p5() -> dict[str, Any]:
     }
 
 
+def review_p6a() -> dict[str, Any]:
+    record_path = REPO_ROOT / "alphagenome_custom/metadata/v2/p6a_execution.json"
+    checks = [
+        check(
+            "R6A.01_execution_record",
+            record_path.is_file(),
+            str(record_path.relative_to(REPO_ROOT)),
+        )
+    ]
+    if not record_path.is_file():
+        return {
+            "schema_version": 1,
+            "phase": "P6A",
+            "review": "R6A",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    record = json.loads(record_path.read_text())
+    run_errors = []
+    runs = []
+    for item in record.get("runs", []):
+        try:
+            run_path = REPO_ROOT / item["run_path"]
+            log_path = REPO_ROOT / item["log_path"]
+            checkpoint_path = REPO_ROOT / item["checkpoint_path"]
+            run = json.loads(run_path.read_text())
+            if sha256(checkpoint_path) != item["checkpoint_sha256"]:
+                raise ValueError("checkpoint hash mismatch")
+            if not log_path.is_file() or log_path.stat().st_size == 0:
+                raise ValueError("missing or empty log")
+            if run.get("checkpoint_reload_verified") is not True:
+                raise ValueError("checkpoint reload not verified")
+            runs.append(run)
+        except Exception as error:
+            run_errors.append(f"{item.get('model')}:{error}")
+    selected = record.get("selected_physical_gpu")
+    gpu_by_index = {
+        row["index"]: row for row in record.get("resources_before", {}).get("gpus", [])
+    }
+    selected_row = gpu_by_index.get(selected, {})
+    busy_uuids = {
+        row["gpu_uuid"]
+        for row in record.get("resources_before", {}).get("processes", [])
+    }
+    common_valid = all(
+        run.get("fold") == 1
+        and run.get("seed") == 20260714
+        and run.get("loss") == "paper"
+        and run.get("steps") == 2
+        and run.get("sequence_length") == 131072
+        and run.get("n_tracks") == 241
+        and run.get("prediction_shapes")
+        == {"1": [1, 241, 131072], "128": [1, 241, 1024]}
+        and run.get("target_shapes")
+        == {"1": [1, 241, 131072], "128": [1, 241, 1024]}
+        and run.get("checkpoint_reload_verified") is True
+        and run.get("claim_status") == "environment_validation"
+        for run in runs
+    )
+    numeric_valid = all(
+        run.get("metrics")
+        and all(
+            math.isfinite(float(metric["loss"]))
+            and math.isfinite(float(metric["gradient_norm"]))
+            and int(metric["cuda_max_memory_allocated_bytes"]) > 0
+            for metric in run["metrics"]
+        )
+        for run in runs
+    )
+    expected_intervals = sha256(
+        REPO_ROOT / "alphagenome_custom/intervals/v2/fold_1/train.tsv"
+    )
+    checks.extend(
+        [
+            check(
+                "R6A.02_gpu_policy",
+                selected in {2, 3}
+                and int(selected_row.get("memory_free_mib", 0)) >= 70_000
+                and selected_row.get("uuid") not in busy_uuids,
+                f"selected={selected} free={selected_row.get('memory_free_mib')} busy={selected_row.get('uuid') in busy_uuids}",
+            ),
+            check(
+                "R6A.03_three_model_smokes",
+                record.get("status") == "completed"
+                and {run.get("model") for run in runs} == {"A", "B", "C"}
+                and len(runs) == 3
+                and not run_errors,
+                f"models={[run.get('model') for run in runs]} errors={run_errors}",
+            ),
+            check(
+                "R6A.04_common_interface_and_budget",
+                common_valid,
+                "A/B/C used fold 1, seed 20260714, paper loss, 131072 bp, 241 tracks, and two steps",
+            ),
+            check(
+                "R6A.05_finite_numerics_and_memory",
+                numeric_valid,
+                "all losses/gradients finite and CUDA memory recorded",
+            ),
+            check(
+                "R6A.06_checkpoint_and_log_integrity",
+                not run_errors and len(runs) == 3,
+                f"errors={run_errors}",
+            ),
+            check(
+                "R6A.07_test_embargo",
+                all(run.get("intervals_sha256") == expected_intervals for run in runs),
+                "all smokes bind to fold-1 training intervals; chromosome X was not read",
+            ),
+            check(
+                "R6A.08_claim_scope",
+                all(run.get("run_type") == "smoke" for run in runs),
+                "smoke outputs are environment validation, not model results",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P6A",
+        "review": "R6A",
+        "reviewed_at": utc_now(),
+        "status": "PASS"
+        if all(item["status"] == "PASS" for item in checks)
+        else "FAIL",
+        "checks": checks,
+    }
+
+
 def write_report(report: dict[str, Any]) -> None:
     audit_dir = AUDIT_ROOT / report["phase"]
     audit_dir.mkdir(parents=True, exist_ok=True)
@@ -1737,7 +1866,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--phase",
         required=True,
-        choices=["P0", "P1", "P2", "P3A", "P3B", "P4", "P5"],
+        choices=["P0", "P1", "P2", "P3A", "P3B", "P4", "P5", "P6A"],
     )
     return parser.parse_args()
 
@@ -1756,8 +1885,10 @@ def main() -> None:
         report = review_p3b()
     elif args.phase == "P4":
         report = review_p4()
-    else:
+    elif args.phase == "P5":
         report = review_p5()
+    else:
+        report = review_p6a()
     assert report is not None
     write_report(report)
     print(json.dumps(report, indent=2, sort_keys=True))

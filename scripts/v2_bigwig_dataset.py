@@ -238,8 +238,17 @@ class V2BigWigDataset(Dataset):
             values = [future.result() for future in futures]
         return np.stack(values, axis=0)
 
-    def _load_item(self, index: int, shift_bp: int = 0) -> dict[str, Any]:
-        if shift_bp == 0 and index in self._cache:
+    def _load_item(
+        self,
+        index: int,
+        shift_bp: int = 0,
+        crop_offset_bp: int = 0,
+        crop_length_bp: int | None = None,
+    ) -> dict[str, Any]:
+        full_width = int(self.intervals[index]["end"]) - int(self.intervals[index]["start"])
+        crop_length = full_width if crop_length_bp is None else int(crop_length_bp)
+        is_full_window = crop_offset_bp == 0 and crop_length == full_width
+        if shift_bp == 0 and is_full_window and index in self._cache:
             item = self._cache.pop(index)
             self._cache[index] = item
             return item
@@ -248,8 +257,10 @@ class V2BigWigDataset(Dataset):
         chromosome = row["chromosome"]
         if shift_bp and row["role"] != "train":
             raise ValueError("Random shifts are allowed only for training intervals")
-        start = int(row["start"]) + shift_bp
-        end = int(row["end"]) + shift_bp
+        if crop_offset_bp < 0 or crop_length <= 0 or crop_offset_bp + crop_length > full_width:
+            raise ValueError("Invalid subwindow crop")
+        start = int(row["start"]) + shift_bp + crop_offset_bp
+        end = start + crop_length
         chromosome_length = self.fai[chromosome][0]
         if start < 0 or end > chromosome_length:
             raise ValueError(
@@ -270,9 +281,12 @@ class V2BigWigDataset(Dataset):
             axis=0,
         )
         core_mask = np.zeros(width, dtype=bool)
-        core_start = int(row["core_start"]) + shift_bp - start
-        core_end = int(row["core_end"]) + shift_bp - start
-        core_mask[core_start:core_end] = True
+        if row["role"] == "train":
+            core_mask[:] = True
+        else:
+            core_start = max(0, int(row["core_start"]) + shift_bp - start)
+            core_end = min(width, int(row["core_end"]) + shift_bp - start)
+            core_mask[core_start:core_end] = True
         item = {
             "dna_sequence": torch.from_numpy(np.ascontiguousarray(dna)),
             "target_1bp": torch.from_numpy(np.ascontiguousarray(target_1bp)),
@@ -286,9 +300,10 @@ class V2BigWigDataset(Dataset):
             "interval_end": torch.tensor(end, dtype=torch.long),
             "group_ids": tuple(row["group_id"] for row in self.track_rows),
             "shift_bp": shift_bp,
+            "crop_offset_bp": crop_offset_bp,
             "reverse_complemented": False,
         }
-        if self.cache_size and shift_bp == 0:
+        if self.cache_size and shift_bp == 0 and is_full_window:
             self._cache[index] = item
             while len(self._cache) > self.cache_size:
                 self._cache.popitem(last=False)
@@ -299,6 +314,21 @@ class V2BigWigDataset(Dataset):
 
     def get_shifted_item(self, index: int, shift_bp: int) -> dict[str, Any]:
         return self._load_item(index, shift_bp=int(shift_bp))
+
+    def get_subwindow_item(
+        self,
+        index: int,
+        *,
+        shift_bp: int,
+        crop_offset_bp: int,
+        crop_length_bp: int,
+    ) -> dict[str, Any]:
+        return self._load_item(
+            index,
+            shift_bp=int(shift_bp),
+            crop_offset_bp=int(crop_offset_bp),
+            crop_length_bp=int(crop_length_bp),
+        )
 
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()

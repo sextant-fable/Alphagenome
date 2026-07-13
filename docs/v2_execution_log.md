@@ -95,3 +95,12 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Model C: a residual dilated sequence baseline produces matched positive 1 bp and 128 bp outputs from scratch.
 - Leakage control: per-track nonzero means are computed separately from each fold's four training chromosomes. An I-V development mean is retained only for the registered comparison; chromosome X is not read.
 - Status: synthetic formula, gradient, shift, reverse-complement, strand, pooling, embedding, and baseline tests pass. Actual checkpoint/LoRA CPU inspection remains conditional on P4 PASS.
+
+## 2026-07-14 - P6A Automatic GPU Smoke Implementation
+
+- Resource snapshot: `hy8` has four A100 80 GB GPUs. GPU 0 had two unrelated processes using approximately 80 GB; GPUs 1, 2, and 3 were idle at inspection time. Project policy continues to exclude GPU 0/1 and prefer GPU 2, then GPU 3.
+- Selection rule: query GPU UUIDs, memory, utilization, and active compute processes immediately before the phase; select only GPU 2/3 with at least 70,000 MiB free, utilization at most 10%, and no compute process. Never cancel or modify another process.
+- Pilot scope: run A, B, and C sequentially on the selected device, with the same fold-1 data, seed `20260714`, 241 tracks, scaled paper loss, 131,072 bp diagnostic crop, and two optimizer steps.
+- Integrity: each smoke records finite loss and gradient norms, peak CUDA memory, augmentation coordinates, exact interval/mean hashes, compact trainable-only checkpoint hash, reload verification, and an ignored log.
+- Claim scope: P6A is environment and numerical validation only, not a model result.
+- Status: implementation and 36-test suite pass; no v2 GPU job has run because P3-P5 reviews have not yet completed.

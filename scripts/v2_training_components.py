@@ -355,7 +355,7 @@ class AlphaGenomeRnaModel(torch.nn.Module):
         context = torch.enable_grad() if self.encode_requires_grad else torch.no_grad()
         with context:
             encoded = self.base_model.encode(
-                dna,
+                dna.transpose(1, 2).contiguous(),
                 organism,
                 resolutions=RESOLUTIONS,
                 channels_last=False,
@@ -439,19 +439,21 @@ class AugmentedV2Dataset(torch.utils.data.Dataset):
         reverse_complement_probability: float = 0.5,
         seed: int = 0,
         strand_pair_index: Sequence[int] | None = None,
+        sequence_length: int | None = None,
     ) -> None:
         if max_shift_bp < 0:
             raise ValueError("max_shift_bp must be non-negative")
         if not 0 <= reverse_complement_probability <= 1:
             raise ValueError("reverse_complement_probability must be in [0,1]")
-        if not hasattr(dataset, "get_shifted_item"):
-            raise TypeError("dataset must implement get_shifted_item")
+        if not hasattr(dataset, "get_subwindow_item"):
+            raise TypeError("dataset must implement get_subwindow_item")
         self.dataset = dataset
         self.max_shift_bp = int(max_shift_bp)
         self.reverse_complement_probability = float(reverse_complement_probability)
         self.seed = int(seed)
         self.epoch = 0
         self.strand_pair_index = strand_pair_index
+        self.sequence_length = sequence_length
 
     def set_epoch(self, epoch: int) -> None:
         self.epoch = int(epoch)
@@ -474,7 +476,20 @@ class AugmentedV2Dataset(torch.utils.data.Dataset):
         shift = int(
             torch.randint(minimum, maximum + 1, (1,), generator=generator).item()
         )
-        item = self.dataset.get_shifted_item(index, shift)
+        full_width = int(row["end"]) - int(row["start"])
+        sequence_length = full_width if self.sequence_length is None else int(self.sequence_length)
+        if sequence_length <= 0 or sequence_length > full_width or sequence_length % 128:
+            raise ValueError("sequence_length must divide into 128 bp bins within the window")
+        crop_choices = (full_width - sequence_length) // 128 + 1
+        crop_offset = 128 * int(
+            torch.randint(0, crop_choices, (1,), generator=generator).item()
+        )
+        item = self.dataset.get_subwindow_item(
+            index,
+            shift_bp=shift,
+            crop_offset_bp=crop_offset,
+            crop_length_bp=sequence_length,
+        )
         apply_reverse = bool(
             torch.rand((), generator=generator).item()
             < self.reverse_complement_probability
@@ -482,4 +497,5 @@ class AugmentedV2Dataset(torch.utils.data.Dataset):
         if apply_reverse:
             item = reverse_complement_item(item, self.strand_pair_index)
         item["shift_bp"] = shift
+        item["crop_offset_bp"] = crop_offset
         return item

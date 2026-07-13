@@ -11,9 +11,28 @@ from alphagenome_pytorch.heads import targets_scaling
 from alphagenome_pytorch.losses import multinomial_loss
 from scripts import v2_training_components as components
 from scripts import compute_v2_track_means
+from scripts import v2_gpu_resources
 
 
 class V2TrainingComponentsTest(unittest.TestCase):
+    def test_gpu_selector_uses_only_idle_gpu_2_then_3(self) -> None:
+        resources = {
+            "gpus": [
+                {"index": 0, "uuid": "u0", "memory_free_mib": 81000, "utilization_percent": 0},
+                {"index": 1, "uuid": "u1", "memory_free_mib": 81000, "utilization_percent": 0},
+                {"index": 2, "uuid": "u2", "memory_free_mib": 81000, "utilization_percent": 0},
+                {"index": 3, "uuid": "u3", "memory_free_mib": 81000, "utilization_percent": 0},
+            ],
+            "processes": [{"gpu_uuid": "u2", "pid": 1}],
+        }
+        self.assertEqual(
+            v2_gpu_resources.select_available(resources, count=1), [3]
+        )
+        resources["processes"] = []
+        self.assertEqual(
+            v2_gpu_resources.select_available(resources, count=2), [2, 3]
+        )
+
     def test_nonzero_mean_counts_only_covered_bases(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "signal.bw"
@@ -198,6 +217,34 @@ class V2TrainingComponentsTest(unittest.TestCase):
         loss.backward()
         self.assertTrue(all(torch.isfinite(parameter.grad).all() for parameter in model.parameters()))
 
+    def test_alphagenome_wrapper_transposes_dna_to_nlc(self) -> None:
+        class FakeBase(torch.nn.Module):
+            def encode(self, dna, organism, resolutions, channels_last):
+                self.observed_shape = tuple(dna.shape)
+                self.observed_organism = organism.detach().clone()
+                self.observed_resolutions = tuple(resolutions)
+                self.observed_channels_last = channels_last
+                return {
+                    "embeddings_1bp": torch.ones(dna.shape[0], 1536, dna.shape[1]),
+                    "embeddings_128bp": torch.ones(dna.shape[0], 3072, dna.shape[1] // 128),
+                }
+
+        base = FakeBase()
+        model = components.AlphaGenomeRnaModel(
+            base,
+            n_tracks=3,
+            track_means=torch.ones(3),
+            base_organism_index=2,
+            encode_requires_grad=False,
+        )
+        outputs = model(torch.ones(1, 4, 256))
+        self.assertEqual(base.observed_shape, (1, 256, 4))
+        self.assertEqual(base.observed_organism.tolist(), [2])
+        self.assertEqual(base.observed_resolutions, (1, 128))
+        self.assertFalse(base.observed_channels_last)
+        self.assertEqual(outputs[1].shape, (1, 3, 256))
+        self.assertEqual(outputs[128].shape, (1, 3, 2))
+
     def test_random_shift_is_seeded_bounded_and_epoch_dependent(self) -> None:
         class FakeDataset(torch.utils.data.Dataset):
             intervals = [
@@ -213,17 +260,26 @@ class V2TrainingComponentsTest(unittest.TestCase):
             def __len__(self) -> int:
                 return 1
 
-            def get_shifted_item(self, index: int, shift: int):
-                target = torch.ones(2, 256)
+            def get_subwindow_item(
+                self,
+                index: int,
+                *,
+                shift_bp: int,
+                crop_offset_bp: int,
+                crop_length_bp: int,
+            ):
+                target = torch.ones(2, crop_length_bp)
                 return {
-                    "dna_sequence": torch.ones(4, 256),
+                    "dna_sequence": torch.ones(4, crop_length_bp),
                     "target_1bp": target,
-                    "target_128bp": target.reshape(2, 2, 128).sum(dim=-1),
+                    "target_128bp": target.reshape(
+                        2, crop_length_bp // 128, 128
+                    ).sum(dim=-1),
                     "track_mask": torch.ones(2, 1, dtype=torch.bool),
                     "track_strand": torch.zeros(2, dtype=torch.int8),
-                    "gene_mask": torch.ones(2, 256, dtype=torch.bool),
-                    "core_mask": torch.ones(256, dtype=torch.bool),
-                    "shift_bp": shift,
+                    "gene_mask": torch.ones(2, crop_length_bp, dtype=torch.bool),
+                    "core_mask": torch.ones(crop_length_bp, dtype=torch.bool),
+                    "shift_bp": shift_bp,
                     "reverse_complemented": False,
                 }
 

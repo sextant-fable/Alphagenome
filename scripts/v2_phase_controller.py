@@ -90,6 +90,7 @@ PHASE_COMMANDS = {
     "P3B": [sys.executable, "scripts/run_v2_p3b.py"],
     "P4": [sys.executable, "scripts/run_v2_p4.py"],
     "P5": [sys.executable, "scripts/run_v2_p5.py"],
+    "P6A": [sys.executable, "scripts/run_v2_p6a.py"],
 }
 REVIEW_COMMANDS = {
     "P0": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P0"],
@@ -99,6 +100,7 @@ REVIEW_COMMANDS = {
     "P3B": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P3B"],
     "P4": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P4"],
     "P5": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P5"],
+    "P6A": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P6A"],
 }
 
 
