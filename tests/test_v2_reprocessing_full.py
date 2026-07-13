@@ -65,6 +65,12 @@ class V2ReprocessingFullTest(unittest.TestCase):
                 ],
             )
 
+    def test_expected_fastq_records_respects_layout(self) -> None:
+        self.assertEqual(full.expected_fastq_records("SINGLE", 11), 11)
+        self.assertEqual(full.expected_fastq_records("PAIRED", 11), 22)
+        with self.assertRaises(ValueError):
+            full.expected_fastq_records("UNKNOWN", 11)
+
     def test_full_source_manifest_is_exactly_the_rna_scope(self) -> None:
         sources = full.read_tsv(full.SOURCE_MANIFEST)
         samples = full.read_tsv(full.SAMPLE_MANIFEST)

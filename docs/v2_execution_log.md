@@ -75,6 +75,7 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Tooling: installed the standalone NCBI SRA Toolkit `3.4.1` under ignored `shared/tools/`; the 89,143,120-byte official toolkit archive has SHA-256 `b950362c054765a4184af41947f022f040e94e964862017c0ecb0b0273db3596`. The project Python environment was not replaced.
 - End-to-end check: downloaded the official full-quality `SRR941632` SRA object, matched SDL MD5 `57120e81e8e8b183e4fb78014d1237d9`, passed `vdb-validate`, and extracted 20,763,724 reads, exactly matching the ENA manifest. The independent validation copy was then removed.
 - Full-run policy: P3B uses `ncbi_sra` transport by default and retains `ena_fastq` as an explicit fallback. Every run must match the SDL archive MD5, pass archive validation, and reproduce the manifest read count before STAR. Transport provenance and extracted FASTQ SHA-256 values are recorded per run.
+- Count semantics: ENA `read_count` is treated as the SRA spot count. A single-end archive must extract one FASTQ record per spot and a paired-end archive must extract two; both the source spot count and extracted FASTQ record count are retained in each audit.
 - Locked source inventory: all 482 RNA-seq accessions resolved to one public full-quality SRA object. The tracked transport manifest contains 722,781,740,735 bytes (673.14 GiB) and has SHA-256 `c04c455ebdc4b7b0daf3382533b09bbd519aa43cadb7fd77109e99aa178c71f6`.
 
 ## 2026-07-14 - Transfer Retry Semantics Correction

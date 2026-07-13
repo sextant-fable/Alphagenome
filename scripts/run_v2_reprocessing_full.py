@@ -370,13 +370,21 @@ def fastq_stats(paths: list[Path]) -> tuple[list[str], int, int]:
     return hashes, total_reads, total_bytes
 
 
+def expected_fastq_records(library_layout: str, manifest_read_count: int) -> int:
+    if library_layout == "SINGLE":
+        return manifest_read_count
+    if library_layout == "PAIRED":
+        return 2 * manifest_read_count
+    raise ValueError(f"Unsupported library layout: {library_layout}")
+
+
 def extract_sra_fastq(
     runner: SampleRunner,
     toolkit_bin: Path,
     archive_path: Path,
     accession: str,
     library_layout: str,
-    expected_reads: int,
+    expected_spots: int,
     threads: int,
 ) -> tuple[list[Path], list[str], int]:
     if library_layout == "PAIRED":
@@ -410,10 +418,11 @@ def extract_sra_fastq(
     if not all(path.is_file() for path in paths):
         raise RuntimeError(f"Missing extracted FASTQ for {accession}: {paths}")
     hashes, read_count, total_bytes = fastq_stats(paths)
-    if read_count != expected_reads:
+    expected_records = expected_fastq_records(library_layout, expected_spots)
+    if read_count != expected_records:
         raise RuntimeError(
             f"Extracted read count mismatch for {accession}: "
-            f"{read_count} != {expected_reads}"
+            f"{read_count} != {expected_records}"
         )
     return paths, hashes, total_bytes
 
@@ -632,7 +641,10 @@ def process_sample(
                 "source_archive_bytes": archive["size"],
                 "extracted_fastq_sha256": ";".join(fastq_sha),
                 "extracted_fastq_bytes": extracted_bytes,
-                "extracted_read_count": int(source["read_count"]),
+                "source_manifest_spot_count": int(source["read_count"]),
+                "extracted_fastq_record_count": expected_fastq_records(
+                    source["library_layout"], int(source["read_count"])
+                ),
             }
             read_files_command = []
         else:
@@ -655,7 +667,10 @@ def process_sample(
                 "source_archive_bytes": "",
                 "extracted_fastq_sha256": ";".join(fastq_sha),
                 "extracted_fastq_bytes": sum(expected_bytes),
-                "extracted_read_count": int(source["read_count"]),
+                "source_manifest_spot_count": int(source["read_count"]),
+                "extracted_fastq_record_count": expected_fastq_records(
+                    source["library_layout"], int(source["read_count"])
+                ),
             }
             read_files_command = ["--readFilesCommand", "zcat"]
 
