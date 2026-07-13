@@ -30,7 +30,7 @@ WEIGHTS_PATH = REPO_ROOT / "weights/alphagenome_pytorch/model_all_folds.safetens
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", choices=["A", "B", "C"], required=True)
-    parser.add_argument("--fold", type=int, choices=range(1, 6), default=1)
+    parser.add_argument("--fold", type=int, choices=range(0, 6), default=1)
     parser.add_argument("--seed", type=int, default=20260714)
     parser.add_argument("--loss", choices=["paper", "log1p_mse"], default="paper")
     parser.add_argument("--max-steps", type=int, default=2)
@@ -160,12 +160,21 @@ def main() -> None:
 
     means_path = METADATA_DIR / "track_nonzero_means_v2.tsv"
     means_rows = read_tsv(means_path)
+    mean_column = (
+        "development_I_V_nonzero_mean"
+        if args.fold == 0
+        else f"fold_{args.fold}_train_nonzero_mean"
+    )
     fold_means = torch.tensor(
-        [float(row[f"fold_{args.fold}_train_nonzero_mean"]) for row in means_rows],
+        [float(row[mean_column]) for row in means_rows],
         dtype=torch.float32,
         device=device,
     )
-    intervals = REPO_ROOT / f"alphagenome_custom/intervals/v2/fold_{args.fold}/train.tsv"
+    intervals = (
+        REPO_ROOT / "alphagenome_custom/intervals/v2/development_train.tsv"
+        if args.fold == 0
+        else REPO_ROOT / f"alphagenome_custom/intervals/v2/fold_{args.fold}/train.tsv"
+    )
     base_dataset = V2BigWigDataset(intervals, max_io_workers=16)
     dataset = components.AugmentedV2Dataset(
         base_dataset,
@@ -274,6 +283,9 @@ def main() -> None:
             "seed": args.seed,
             "loss": args.loss,
             "step": len(metrics_rows),
+            "sequence_length": args.sequence_length,
+            "hidden_channels": args.hidden_channels,
+            "mean_column": mean_column,
         },
         checkpoint_path,
     )
@@ -288,6 +300,7 @@ def main() -> None:
         "run_type": "smoke" if args.max_steps <= 2 else "training",
         "model": args.model,
         "fold": args.fold,
+        "mean_column": mean_column,
         "seed": args.seed,
         "loss": args.loss,
         "steps": len(metrics_rows),
@@ -309,6 +322,7 @@ def main() -> None:
         "physical_cuda_visible_devices": visible,
         "cuda_device_name": torch.cuda.get_device_name(0),
         "trainable_parameters": sum(parameter.numel() for parameter in trainable),
+        "hidden_channels": args.hidden_channels,
         "metrics": metrics_rows,
         "checkpoint_path": str(checkpoint_path.relative_to(REPO_ROOT)),
         "checkpoint_sha256": sha256(checkpoint_path),

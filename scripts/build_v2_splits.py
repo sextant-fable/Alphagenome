@@ -138,6 +138,20 @@ def main() -> None:
             }
         )
 
+    development_rows = []
+    for chromosome in CV_CHROMOSOMES:
+        development_rows.extend(
+            interval_rows(
+                chromosome,
+                chromosomes[chromosome],
+                "development",
+                "train",
+            )
+        )
+    development_path = OUTPUT_DIR / "development_train.tsv"
+    write_tsv(development_path, development_rows)
+    files.append(development_path)
+
     test_rows = interval_rows(
         TEST_CHROMOSOME, chromosomes[TEST_CHROMOSOME], "final", "test_locked"
     )
@@ -153,6 +167,8 @@ def main() -> None:
         "test_status": "embargoed_prior_exposure_disclosed",
         "evaluation_core_policy": "nearest_window_center_partition_no_overlap",
         "folds": fold_summaries,
+        "development_train_chromosomes": list(CV_CHROMOSOMES),
+        "development_train_windows": len(development_rows),
         "test_windows": len(test_rows),
         "files": {
             str(path.relative_to(REPO_ROOT)): sha256(path) for path in files

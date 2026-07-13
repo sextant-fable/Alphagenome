@@ -1421,7 +1421,12 @@ def review_p4() -> dict[str, Any]:
         interval_dir / f"fold_{fold}/{role}.tsv"
         for fold in range(1, 6)
         for role in ("train", "valid")
-    ] + [interval_dir / "test_locked.tsv", registry_path, benchmark_path]
+    ] + [
+        interval_dir / "development_train.tsv",
+        interval_dir / "test_locked.tsv",
+        registry_path,
+        benchmark_path,
+    ]
     missing = [
         str(path.relative_to(REPO_ROOT)) for path in expected_paths if not path.is_file()
     ]
@@ -1488,6 +1493,16 @@ def review_p4() -> dict[str, Any]:
         ):
             core_errors.append(f"fold{fold}:core partition gap/overlap")
         all_train_valid_chromosomes.update(train_chromosomes | valid_chromosomes)
+
+    development = read_tsv(interval_dir / "development_train.tsv")
+    development_chromosomes = {row["chromosome"] for row in development}
+    if (
+        development_chromosomes != set(cv_chromosomes)
+        or any(row["role"] != "train" for row in development)
+        or any(row["chromosome"] == "X" for row in development)
+        or int(registry.get("development_train_windows", -1)) != len(development)
+    ):
+        split_errors.append("invalid development training split")
 
     test_rows = read_tsv(interval_dir / "test_locked.tsv")
     test_core_sorted = sorted(test_rows, key=lambda row: int(row["core_start"]))
@@ -1904,6 +1919,265 @@ def review_p6a() -> dict[str, Any]:
     }
 
 
+def review_p6b() -> dict[str, Any]:
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    paths = {
+        "spec": metadata_dir / "p6b_matrix_spec.json",
+        "execution": metadata_dir / "p6b_execution.json",
+        "results": metadata_dir / "p6b_cv_results.tsv",
+        "selection": metadata_dir / "p6b_selection.json",
+        "lock": metadata_dir / "final_test_lock.json",
+        "means": metadata_dir / "track_nonzero_means_v2.tsv",
+    }
+    missing = [
+        str(path.relative_to(REPO_ROOT))
+        for path in paths.values()
+        if not path.is_file()
+    ]
+    checks = [check("R6B.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P6B",
+            "review": "R6B",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    spec = json.loads(paths["spec"].read_text())
+    execution = json.loads(paths["execution"].read_text())
+    results = read_tsv(paths["results"])
+    selection = json.loads(paths["selection"].read_text())
+    lock = json.loads(paths["lock"].read_text())
+    spec_sha = sha256(paths["spec"])
+    expected_jobs = {
+        (model, loss, fold)
+        for model in ("A", "B", "C")
+        for loss in ("paper", "log1p_mse")
+        for fold in range(1, 6)
+    }
+    observed_jobs = {
+        (row.get("model"), row.get("loss"), int(row.get("fold", -1)))
+        for row in execution.get("jobs", [])
+    }
+    job_errors = []
+    for job in execution.get("jobs", []):
+        try:
+            fold = int(job["fold"])
+            run_path = REPO_ROOT / job["run_path"]
+            validation_path = REPO_ROOT / job["validation_path"]
+            checkpoint_path = REPO_ROOT / job["checkpoint_path"]
+            log_path = REPO_ROOT / job["log_path"]
+            run = json.loads(run_path.read_text())
+            validation = json.loads(validation_path.read_text())
+            if (
+                job["spec_sha256"] != spec_sha
+                or int(job["seed"]) != 20260714
+                or int(job["steps"]) != 2000
+                or int(job["sequence_length"]) != 131072
+                or int(job["physical_gpu"]) not in {2, 3}
+            ):
+                raise ValueError("job registration mismatch")
+            if (
+                sha256(checkpoint_path) != job["checkpoint_sha256"]
+                or run["checkpoint_sha256"] != job["checkpoint_sha256"]
+                or not log_path.is_file()
+                or log_path.stat().st_size == 0
+            ):
+                raise ValueError("checkpoint or log integrity mismatch")
+            expected_train = sha256(
+                REPO_ROOT / f"alphagenome_custom/intervals/v2/fold_{fold}/train.tsv"
+            )
+            expected_valid = sha256(
+                REPO_ROOT / f"alphagenome_custom/intervals/v2/fold_{fold}/valid.tsv"
+            )
+            if (
+                run.get("model") != job["model"]
+                or run.get("loss") != job["loss"]
+                or run.get("fold") != fold
+                or run.get("seed") != 20260714
+                or run.get("steps") != 2000
+                or run.get("intervals_sha256") != expected_train
+                or run.get("means_sha256") != sha256(paths["means"])
+            ):
+                raise ValueError("training contract mismatch")
+            mean_metrics = validation.get("mean_metrics", {})
+            if (
+                validation.get("model") != job["model"]
+                or validation.get("training_loss") != job["loss"]
+                or validation.get("fold") != fold
+                or validation.get("checkpoint_sha256") != job["checkpoint_sha256"]
+                or validation.get("intervals_sha256") != expected_valid
+                or validation.get("chromosome_x_read") is not False
+                or float(validation.get("validation_core_coverage_fraction", 0)) < 0.99
+                or int(validation.get("validation_subwindows", 0)) <= 0
+                or int(validation.get("finite_per_track_pearson_128bp", 0)) <= 0
+                or not math.isfinite(float(mean_metrics.get("paper_loss", "nan")))
+                or not math.isfinite(float(mean_metrics.get("log1p_mse", "nan")))
+                or not math.isfinite(
+                    float(validation.get("mean_per_track_pearson_128bp", "nan"))
+                )
+            ):
+                raise ValueError("validation contract mismatch")
+        except Exception as error:
+            job_errors.append(
+                f"{job.get('model')}/{job.get('loss')}/fold{job.get('fold')}:{error}"
+            )
+
+    result_keys = {(row["model"], row["loss"]) for row in results}
+    result_numeric = all(
+        int(row["folds"]) == 5
+        and math.isfinite(float(row["mean_five_fold_paper_loss"]))
+        and math.isfinite(float(row["mean_five_fold_log1p_mse"]))
+        and math.isfinite(float(row["mean_five_fold_per_track_pearson_128bp"]))
+        for row in results
+    )
+    expected_configs = {
+        (model, loss) for model in ("A", "B", "C")
+        for loss in ("paper", "log1p_mse")
+    }
+    selected_row = min(
+        results,
+        key=lambda row: (
+            float(row["mean_five_fold_paper_loss"]),
+            float(row["mean_five_fold_log1p_mse"]),
+            -float(row["mean_five_fold_per_track_pearson_128bp"]),
+            row["model"],
+            row["loss"],
+        ),
+    )
+    selected = selection.get("selected", {})
+    selection_valid = (
+        selected.get("model") == selected_row["model"]
+        and selected.get("loss") == selected_row["loss"]
+        and math.isclose(
+            float(selected.get("mean_five_fold_paper_loss", "nan")),
+            float(selected_row["mean_five_fold_paper_loss"]),
+            rel_tol=1e-12,
+        )
+        and selection.get("cv_results_sha256") == sha256(paths["results"])
+        and selection.get("spec_sha256") == spec_sha
+        and selection.get("chromosome_x_read") is False
+    )
+    development_errors = []
+    try:
+        development = execution["development"]
+        run_path = REPO_ROOT / development["run_path"]
+        checkpoint_path = REPO_ROOT / development["checkpoint_path"]
+        run = json.loads(run_path.read_text())
+        expected_development = sha256(
+            REPO_ROOT / "alphagenome_custom/intervals/v2/development_train.tsv"
+        )
+        if (
+            development["model"] != selected_row["model"]
+            or development["loss"] != selected_row["loss"]
+            or int(development["fold"]) != 0
+            or int(development["steps"]) != 2500
+            or int(development["physical_gpu"]) not in {2, 3}
+            or development["spec_sha256"] != spec_sha
+            or development["intervals_sha256"] != expected_development
+            or sha256(checkpoint_path) != development["checkpoint_sha256"]
+            or run.get("fold") != 0
+            or run.get("mean_column") != "development_I_V_nonzero_mean"
+            or run.get("intervals_sha256") != expected_development
+        ):
+            raise ValueError("development retraining mismatch")
+    except Exception as error:
+        development_errors.append(str(error))
+    state = json.loads(
+        (REPO_ROOT / "alphagenome_custom/metadata/v2/execution_state.json").read_text()
+    )
+    g5 = state.get("approvals", {}).get("G5_final_test", {})
+    lock_valid = False
+    try:
+        checkpoint_path = REPO_ROOT / lock["checkpoint_path"]
+        lock_valid = (
+            lock["checkpoint_sha256"] == sha256(checkpoint_path)
+            and lock["model"] == selected_row["model"]
+            and lock["loss"] == selected_row["loss"]
+            and lock["training_chromosomes"] == ["I", "II", "III", "IV", "V"]
+            and lock["selection_sha256"] == sha256(paths["selection"])
+            and lock["spec_sha256"] == spec_sha
+            and lock["legacy_chr_x_prior_exposure_disclosed"] is True
+            and lock["test_consumed"] is False
+            and lock["test_consumed_at"] is None
+        )
+    except Exception:
+        lock_valid = False
+    checks.extend(
+        [
+            check(
+                "R6B.02_preregistered_matrix",
+                spec.get("locked_before_p6b") is True
+                and spec.get("models") == ["A", "B", "C"]
+                and spec.get("losses") == ["paper", "log1p_mse"]
+                and spec.get("cv_folds") == [1, 2, 3, 4, 5]
+                and spec.get("chromosome_x_access") == "prohibited",
+                f"spec_sha256={spec_sha}",
+            ),
+            check(
+                "R6B.03_complete_fair_matrix",
+                execution.get("status") == "completed"
+                and execution.get("jobs_expected") == 30
+                and observed_jobs == expected_jobs
+                and not execution.get("failures")
+                and not job_errors,
+                f"jobs={len(observed_jobs)}/30 errors={job_errors[:5]}",
+            ),
+            check(
+                "R6B.04_gpu_policy",
+                set(execution.get("selected_physical_gpus", [])).issubset({2, 3})
+                and bool(execution.get("selected_physical_gpus")),
+                f"selected={execution.get('selected_physical_gpus')}",
+            ),
+            check(
+                "R6B.05_cv_aggregation",
+                len(results) == 6
+                and result_keys == expected_configs
+                and result_numeric,
+                f"configs={sorted(result_keys)}",
+            ),
+            check(
+                "R6B.06_locked_selection_rule",
+                selection_valid,
+                f"selected={selected.get('model')}/{selected.get('loss')}",
+            ),
+            check(
+                "R6B.07_development_retrain",
+                not development_errors,
+                f"errors={development_errors}",
+            ),
+            check(
+                "R6B.08_final_checkpoint_lock",
+                lock_valid and execution.get("lock_sha256") == sha256(paths["lock"]),
+                f"checkpoint={lock.get('checkpoint_path')}",
+            ),
+            check(
+                "R6B.09_test_embargo",
+                g5.get("approved") is not True
+                and all(
+                    json.loads((REPO_ROOT / job["validation_path"]).read_text()).get(
+                        "chromosome_x_read"
+                    )
+                    is False
+                    for job in execution.get("jobs", [])
+                ),
+                "chromosome X remained blocked; G5 is unapproved",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P6B",
+        "review": "R6B",
+        "reviewed_at": utc_now(),
+        "status": "PASS"
+        if all(item["status"] == "PASS" for item in checks)
+        else "FAIL",
+        "checks": checks,
+    }
+
+
 def write_report(report: dict[str, Any]) -> None:
     audit_dir = AUDIT_ROOT / report["phase"]
     audit_dir.mkdir(parents=True, exist_ok=True)
@@ -1931,7 +2205,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--phase",
         required=True,
-        choices=["P0", "P1", "P2", "P3A", "P3B", "P4", "P5", "P6A"],
+        choices=["P0", "P1", "P2", "P3A", "P3B", "P4", "P5", "P6A", "P6B"],
     )
     return parser.parse_args()
 
@@ -1952,8 +2226,10 @@ def main() -> None:
         report = review_p4()
     elif args.phase == "P5":
         report = review_p5()
-    else:
+    elif args.phase == "P6A":
         report = review_p6a()
+    else:
+        report = review_p6b()
     assert report is not None
     write_report(report)
     print(json.dumps(report, indent=2, sort_keys=True))

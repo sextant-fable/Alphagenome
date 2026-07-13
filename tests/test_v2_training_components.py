@@ -11,11 +11,46 @@ from alphagenome_pytorch.heads import targets_scaling
 from alphagenome_pytorch.losses import multinomial_loss
 from scripts import v2_training_components as components
 from scripts import compute_v2_track_means
+from scripts import evaluate_v2_model
 from scripts import v2_gpu_resources
 from scripts import train_v2_model
 
 
 class V2TrainingComponentsTest(unittest.TestCase):
+    def test_validation_subwindows_stay_inside_nonoverlapping_cores(self) -> None:
+        intervals = [
+            {
+                "start": "0",
+                "end": str(2**20),
+                "core_start": "0",
+                "core_end": str(6 * 131072),
+            },
+            {
+                "start": str(2**19),
+                "end": str(3 * 2**19),
+                "core_start": str(6 * 131072),
+                "core_end": str(10 * 131072),
+            },
+        ]
+        windows, eligible = evaluate_v2_model.core_subwindows(intervals, 131072)
+        self.assertEqual(len(windows), 10)
+        self.assertEqual(eligible, 10 * 131072)
+        self.assertEqual(windows[0], (0, 0))
+        self.assertEqual(windows[6], (1, 2 * 131072))
+
+    def test_pearson_accumulator_matches_exact_correlation(self) -> None:
+        x = torch.tensor([[1.0, 2.0, 3.0]], dtype=torch.float64).numpy()
+        y = torch.tensor([[2.0, 4.0, 6.0]], dtype=torch.float64).numpy()
+        observed = evaluate_v2_model.pearson_from_sums(
+            3,
+            x.sum(axis=1),
+            y.sum(axis=1),
+            (x * x).sum(axis=1),
+            (y * y).sum(axis=1),
+            (x * y).sum(axis=1),
+        )
+        self.assertAlmostEqual(float(observed[0]), 1.0)
+
     def test_gpu_selector_uses_only_idle_gpu_2_then_3(self) -> None:
         resources = {
             "gpus": [

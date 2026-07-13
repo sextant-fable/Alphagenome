@@ -1,0 +1,57 @@
+{
+  "augmentation": {
+    "max_shift_bp": 1024,
+    "reverse_complement_probability": 0.5
+  },
+  "chromosome_x_access": "prohibited",
+  "cv_folds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "development_retrain": {
+    "fold_argument": 0,
+    "max_steps": 2500,
+    "mean_column": "development_I_V_nonzero_mean",
+    "split": "alphagenome_custom/intervals/v2/development_train.tsv"
+  },
+  "gpu_policy": {
+    "allowed_physical_indices": [
+      2,
+      3
+    ],
+    "maximum_concurrent_jobs_per_gpu": 1,
+    "minimum_free_mib": 70000
+  },
+  "locked_before_p6b": true,
+  "losses": [
+    "paper",
+    "log1p_mse"
+  ],
+  "models": [
+    "A",
+    "B",
+    "C"
+  ],
+  "schema_version": 1,
+  "selection": {
+    "primary_minimize": "mean_five_fold_paper_loss",
+    "secondary_minimize": "mean_five_fold_log1p_mse",
+    "tertiary_maximize": "mean_five_fold_per_track_pearson_128bp"
+  },
+  "training": {
+    "gene_weight": 0.1,
+    "hidden_channels": 64,
+    "learning_rate": 0.0001,
+    "max_steps": 2000,
+    "seed": 20260714,
+    "sequence_length": 131072,
+    "weight_decay": 0.0001
+  },
+  "validation": {
+    "policy": "all_complete_nonoverlapping_core_only_subwindows",
+    "sequence_length": 131072
+  }
+}

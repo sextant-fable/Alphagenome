@@ -160,7 +160,7 @@ def main() -> None:
         "model_b_lora_rank": 8,
         "model_b_lora_alpha": 16,
         "model_b_organism_index": 2,
-        "promotion_metric": "mean_five_fold_gene_exon_coverage_pearson_then_mean_per_track_pearson",
+        "promotion_metric": "mean_five_fold_paper_loss_then_log1p_mse_then_mean_per_track_pearson",
         "chromosome_x_access": "prohibited_until_locked_G5_P6C",
     }
     MODEL_SPEC_PATH.write_text(
