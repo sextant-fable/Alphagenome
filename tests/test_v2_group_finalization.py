@@ -12,6 +12,23 @@ from scripts import finalize_v2_reprocessed_groups as finalizer
 
 
 class V2GroupFinalizationTest(unittest.TestCase):
+    def test_full_audit_schema_separates_reference_archive_and_extraction(self) -> None:
+        row = {
+            "run_accession": "SRR1",
+            "source_transport_backend": "ncbi_sra",
+            "source_fastq_urls": "ena.example/SRR1.fastq.gz",
+            "source_fastq_md5": "a" * 32,
+            "source_fastq_sha256": "b" * 64,
+            "source_fastq_bytes": 123,
+            "extracted_fastq_sha256": "b" * 64,
+        }
+        updated = finalizer.audit_schema_v2(row)
+        self.assertEqual(updated["audit_schema_version"], 2)
+        self.assertEqual(updated["source_reference_ena_fastq_md5"], "a" * 32)
+        self.assertEqual(updated["extracted_fastq_sha256"], "b" * 64)
+        self.assertNotIn("source_fastq_md5", updated)
+        self.assertNotIn("source_fastq_sha256", updated)
+
     def test_final_hierarchy_restores_three_distinct_study_runs(self) -> None:
         samples = p2.read_tsv(finalizer.SAMPLE_MANIFEST)
         contexts = p2.read_tsv(finalizer.CONTEXT_MANIFEST)

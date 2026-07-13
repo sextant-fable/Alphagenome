@@ -36,6 +36,7 @@ PAIR_QC = METADATA_DIR / "replicate_pair_qc_v2_post_reprocessing.tsv"
 GROUP_QC = METADATA_DIR / "replicate_group_qc_v2_post_reprocessing.tsv"
 DUPLICATE_REVIEW = METADATA_DIR / "duplicate_source_reuse_review_v2.tsv"
 SUMMARY_PATH = METADATA_DIR / "p3_group_summary.json"
+AUDIT_SCHEMA_SUMMARY = METADATA_DIR / "p3_audit_schema_summary.json"
 EXPECTED_RUNS = 482
 EXPECTED_GROUPS = 241
 TARGET_TOTAL = 100_000_000.0
@@ -83,6 +84,75 @@ def sha256(path: Path) -> str:
         while chunk := handle.read(8 * 1024 * 1024):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def audit_schema_v2(row: dict[str, Any]) -> dict[str, Any]:
+    if row.get("audit_schema_version") == 2:
+        return dict(row)
+    if row.get("source_transport_backend") != "ncbi_sra":
+        raise RuntimeError(
+            f"Unexpected transport during audit migration: {row.get('run_accession')}"
+        )
+    extracted_sha = row.get("extracted_fastq_sha256")
+    if row.get("source_fastq_sha256") != extracted_sha:
+        raise RuntimeError(
+            f"Extracted FASTQ SHA mismatch during audit migration: {row.get('run_accession')}"
+        )
+    updated = dict(row)
+    updated["audit_schema_version"] = 2
+    updated["source_reference_ena_fastq_urls"] = updated.pop("source_fastq_urls")
+    updated["source_reference_ena_fastq_md5"] = updated.pop("source_fastq_md5")
+    updated["source_reference_ena_fastq_bytes"] = updated.pop("source_fastq_bytes")
+    updated.pop("source_fastq_sha256")
+    updated["source_archive_integrity"] = "NCBI_SDL_MD5_and_local_SHA256"
+    updated["extracted_fastq_integrity"] = "local_SHA256_and_layout_aware_record_count"
+    return updated
+
+
+def upgrade_full_audit_schema() -> list[dict[str, Any]]:
+    audit_dir = NORMALIZED_DIR / "sample_audits"
+    paths = sorted(audit_dir.glob("*.json"))
+    if len(paths) != EXPECTED_RUNS:
+        raise RuntimeError(
+            f"Expected {EXPECTED_RUNS} sample audits before schema lock, got {len(paths)}"
+        )
+    rows = []
+    for path in paths:
+        updated = audit_schema_v2(json.loads(path.read_text()))
+        atomic_json(path, updated)
+        rows.append(updated)
+    write_tsv(FULL_LEDGER, rows)
+    summary = {
+        "schema_version": 2,
+        "sample_audits": len(rows),
+        "transport": "ncbi_sra",
+        "source_reference_fields": [
+            "source_reference_ena_fastq_urls",
+            "source_reference_ena_fastq_md5",
+            "source_reference_ena_fastq_bytes",
+        ],
+        "source_archive_fields": [
+            "source_archive_url",
+            "source_archive_md5",
+            "source_archive_sha256",
+            "source_archive_bytes",
+        ],
+        "extracted_fastq_fields": [
+            "extracted_fastq_sha256",
+            "extracted_fastq_bytes",
+            "extracted_fastq_record_count",
+        ],
+        "ambiguous_legacy_fields_removed": [
+            "source_fastq_urls",
+            "source_fastq_md5",
+            "source_fastq_sha256",
+            "source_fastq_bytes",
+        ],
+        "ledger_sha256": sha256(FULL_LEDGER),
+        "completed_at": utc_now(),
+    }
+    atomic_json(AUDIT_SCHEMA_SUMMARY, summary)
+    return rows
 
 
 def chromosomes() -> dict[str, int]:
@@ -360,6 +430,7 @@ def duplicate_source_review(
 
 
 def main() -> None:
+    upgrade_full_audit_schema()
     expected_chromosomes = chromosomes()
     groups, members = build_final_hierarchy()
     write_tsv(FINAL_GROUPS, groups)

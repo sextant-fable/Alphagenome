@@ -1104,6 +1104,7 @@ def review_p3b() -> dict[str, Any]:
         "execution": metadata_dir / "p3b_execution.json",
         "sra_sources": metadata_dir / "p3_ncbi_sra_sources.tsv",
         "sra_summary": metadata_dir / "p3_ncbi_sra_summary.json",
+        "audit_schema": metadata_dir / "p3_audit_schema_summary.json",
     }
     missing = [
         str(path.relative_to(REPO_ROOT))
@@ -1135,6 +1136,7 @@ def review_p3b() -> dict[str, Any]:
     execution = json.loads(paths["execution"].read_text())
     sra_sources = read_tsv(paths["sra_sources"])
     sra_summary = json.loads(paths["sra_summary"].read_text())
+    audit_schema = json.loads(paths["audit_schema"].read_text())
     rna_runs = {row["run_accession"] for row in samples if row["assay"] == "RNA-Seq"}
     sample_by_run = {row["run_accession"]: row for row in samples}
     context_by_run = {row["run_accession"]: row for row in contexts}
@@ -1169,6 +1171,27 @@ def review_p3b() -> dict[str, Any]:
                 raise ValueError("coverage policy mismatch")
             if row["output_strand"] != ".":
                 raise ValueError("output strand mismatch")
+            if (
+                row.get("audit_schema_version") != "2"
+                or row.get("source_transport_backend") != "ncbi_sra"
+                or len(row.get("source_archive_md5", "")) != 32
+                or len(row.get("source_archive_sha256", "")) != 64
+                or not row.get("source_reference_ena_fastq_urls")
+                or not row.get("source_reference_ena_fastq_md5")
+                or int(row.get("source_reference_ena_fastq_bytes", 0)) <= 0
+                or not row.get("extracted_fastq_sha256")
+                or int(row.get("extracted_fastq_record_count", 0)) <= 0
+                or any(
+                    ambiguous in row
+                    for ambiguous in (
+                        "source_fastq_urls",
+                        "source_fastq_md5",
+                        "source_fastq_sha256",
+                        "source_fastq_bytes",
+                    )
+                )
+            ):
+                raise ValueError("source audit schema/provenance mismatch")
         except Exception as error:
             normalized_errors.append(f"{accession}:{error}")
 
@@ -1395,6 +1418,21 @@ def review_p3b() -> dict[str, Any]:
                 and full_summary.get("sra_manifest_sha256")
                 == sha256(paths["sra_sources"]),
                 f"sra_sources={len(sra_sources)} total_bytes={sra_summary.get('total_sra_bytes')}",
+            ),
+            check(
+                "R3.14_unambiguous_audit_schema",
+                audit_schema.get("schema_version") == 2
+                and audit_schema.get("sample_audits") == 482
+                and audit_schema.get("transport") == "ncbi_sra"
+                and audit_schema.get("ledger_sha256") == sha256(paths["ledger"])
+                and set(audit_schema.get("ambiguous_legacy_fields_removed", []))
+                == {
+                    "source_fastq_urls",
+                    "source_fastq_md5",
+                    "source_fastq_sha256",
+                    "source_fastq_bytes",
+                },
+                f"schema={audit_schema.get('schema_version')} audits={audit_schema.get('sample_audits')}",
             ),
         ]
     )
