@@ -89,6 +89,13 @@ class V2ReprocessingFullTest(unittest.TestCase):
             )
         )
 
+    def test_locked_sra_manifest_matches_full_scope_when_present(self) -> None:
+        if not full.SRA_MANIFEST.is_file():
+            self.skipTest("SRA transport manifest is generated at P3B start")
+        rows = full.read_tsv(full.SRA_MANIFEST)
+        by_run = full.validate_sra_manifest(rows)
+        self.assertEqual(len(by_run), 482)
+
     def test_complete_fastq_is_reused_without_network_call(self) -> None:
         payload = b"verified-fastq"
         with tempfile.TemporaryDirectory() as directory:

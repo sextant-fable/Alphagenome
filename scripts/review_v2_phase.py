@@ -1053,6 +1053,8 @@ def review_p3b() -> dict[str, Any]:
         "duplicate_review": metadata_dir / "duplicate_source_reuse_review_v2.tsv",
         "group_summary": metadata_dir / "p3_group_summary.json",
         "execution": metadata_dir / "p3b_execution.json",
+        "sra_sources": metadata_dir / "p3_ncbi_sra_sources.tsv",
+        "sra_summary": metadata_dir / "p3_ncbi_sra_summary.json",
     }
     missing = [
         str(path.relative_to(REPO_ROOT))
@@ -1082,6 +1084,8 @@ def review_p3b() -> dict[str, Any]:
     full_summary = json.loads(paths["full_summary"].read_text())
     group_summary = json.loads(paths["group_summary"].read_text())
     execution = json.loads(paths["execution"].read_text())
+    sra_sources = read_tsv(paths["sra_sources"])
+    sra_summary = json.loads(paths["sra_summary"].read_text())
     rna_runs = {row["run_accession"] for row in samples if row["assay"] == "RNA-Seq"}
     sample_by_run = {row["run_accession"]: row for row in samples}
     context_by_run = {row["run_accession"]: row for row in contexts}
@@ -1330,6 +1334,18 @@ def review_p3b() -> dict[str, Any]:
                 and execution.get("threads_per_sample") == 16
                 and bool(execution.get("log_path")),
                 f"status={execution.get('status')} log={execution.get('log_path')}",
+            ),
+            check(
+                "R3.13_sra_transport_provenance",
+                len(sra_sources) == 482
+                and len({row["run_accession"] for row in sra_sources}) == 482
+                and all(len(row["sra_md5"]) == 32 for row in sra_sources)
+                and sra_summary.get("run_count") == 482
+                and sra_summary.get("sra_manifest_sha256")
+                == sha256(paths["sra_sources"])
+                and full_summary.get("sra_manifest_sha256")
+                == sha256(paths["sra_sources"]),
+                f"sra_sources={len(sra_sources)} total_bytes={sra_summary.get('total_sra_bytes')}",
             ),
         ]
     )

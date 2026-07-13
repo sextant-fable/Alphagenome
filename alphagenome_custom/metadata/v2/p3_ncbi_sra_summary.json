@@ -1,0 +1,11 @@
+{
+  "resolved_at": "2026-07-13T17:55:50+00:00",
+  "run_count": 482,
+  "schema_version": 1,
+  "source_manifest": "alphagenome_custom/metadata/v2/p3_full_sources.tsv",
+  "source_manifest_sha256": "f1906514fe1550473ed9566f41c8dfa1a733ef968aadab8900ae27309fccf98e",
+  "sra_manifest": "alphagenome_custom/metadata/v2/p3_ncbi_sra_sources.tsv",
+  "sra_manifest_sha256": "c04c455ebdc4b7b0daf3382533b09bbd519aa43cadb7fd77109e99aa178c71f6",
+  "total_sra_bytes": 722781740735,
+  "transport": "NCBI SDL full-quality SRA public ODP S3"
+}

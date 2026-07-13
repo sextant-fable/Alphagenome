@@ -24,6 +24,7 @@ import pyBigWig
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SAMPLE_MANIFEST = REPO_ROOT / "alphagenome_custom/metadata/v2/rna_seq_samples_v2.tsv"
 SOURCE_MANIFEST = REPO_ROOT / "alphagenome_custom/metadata/v2/p3_full_sources.tsv"
+SRA_MANIFEST = REPO_ROOT / "alphagenome_custom/metadata/v2/p3_ncbi_sra_sources.tsv"
 LEDGER_PATH = REPO_ROOT / "alphagenome_custom/metadata/v2/p3_full_outputs.tsv"
 SUMMARY_PATH = REPO_ROOT / "alphagenome_custom/metadata/v2/p3_full_summary.json"
 DOH_ARGS = [
@@ -508,6 +509,30 @@ def validate_manifests(
     return sample_by_run
 
 
+def validate_sra_manifest(rows: list[dict[str, str]]) -> dict[str, dict[str, str]]:
+    if len(rows) != EXPECTED_RUN_COUNT:
+        raise RuntimeError(f"Expected {EXPECTED_RUN_COUNT} SRA sources, got {len(rows)}")
+    by_run = {row["run_accession"]: row for row in rows}
+    if len(by_run) != EXPECTED_RUN_COUNT:
+        raise RuntimeError("SRA source run accessions are not unique")
+    expected_runs = {
+        row["run_accession"] for row in read_tsv(SOURCE_MANIFEST)
+    }
+    if set(by_run) != expected_runs:
+        raise RuntimeError("SRA transport manifest does not equal the P3 RNA scope")
+    for accession, row in by_run.items():
+        expected_url = (
+            f"https://sra-pub-run-odp.s3.amazonaws.com/sra/{accession}/{accession}"
+        )
+        if (
+            row["sra_url"] != expected_url
+            or len(row["sra_md5"]) != 32
+            or int(row["sra_bytes"]) <= 0
+        ):
+            raise RuntimeError(f"Invalid SRA transport record: {accession}")
+    return by_run
+
+
 def process_sample(
     source: dict[str, str],
     sample: dict[str, str],
@@ -519,6 +544,7 @@ def process_sample(
     threads: int,
     download_backend: str,
     toolkit_bin: Path | None,
+    sra_source: dict[str, str] | None,
 ) -> dict[str, Any]:
     accession = source["run_accession"]
     sample_dir = work_dir / accession
@@ -529,6 +555,10 @@ def process_sample(
         if (
             audit.get("output_sha256") == sha256(output_path)
             and audit.get("source_manifest_sha256") == sha256(SOURCE_MANIFEST)
+            and (
+                download_backend != "ncbi_sra"
+                or audit.get("sra_manifest_sha256") == sha256(SRA_MANIFEST)
+            )
         ):
             validate_bigwig(output_path, chromosomes)
             if sample_dir.exists():
@@ -573,9 +603,13 @@ def process_sample(
         if download_backend == "ncbi_sra":
             if toolkit_bin is None:
                 raise RuntimeError("SRA Toolkit was not configured")
-            archive = locate_sra_archive(
-                runner, accession, sample_dir / "ncbi_sdl.json"
-            )
+            if sra_source is None:
+                raise RuntimeError(f"Missing locked SRA source for {accession}")
+            archive = {
+                "url": sra_source["sra_url"],
+                "md5": sra_source["sra_md5"],
+                "size": int(sra_source["sra_bytes"]),
+            }
             archive_path = sample_dir / f"{accession}.sra"
             archive_sha, archive_md5 = download_sra_archive(
                 runner, archive, archive_path
@@ -744,6 +778,9 @@ def process_sample(
             ),
             "source_manifest_sha256": sha256(SOURCE_MANIFEST),
             "sample_manifest_sha256": sha256(SAMPLE_MANIFEST),
+            "sra_manifest_sha256": (
+                sha256(SRA_MANIFEST) if download_backend == "ncbi_sra" else ""
+            ),
             "commands_json": json.dumps(runner.commands, separators=(",", ":")),
             "sample_peak_work_bytes": runner.peak_bytes,
             "elapsed_seconds": f"{time.monotonic() - started:.6f}",
@@ -802,6 +839,11 @@ def main() -> None:
     sources = read_tsv(SOURCE_MANIFEST)
     samples = read_tsv(SAMPLE_MANIFEST)
     sample_by_run = validate_manifests(sources, samples)
+    sra_by_run = (
+        validate_sra_manifest(read_tsv(SRA_MANIFEST))
+        if args.download_backend == "ncbi_sra"
+        else {}
+    )
     work_dir = REPO_ROOT / args.work_dir
     output_dir = REPO_ROOT / args.output_dir
     index_dir = REPO_ROOT / args.star_index
@@ -840,6 +882,7 @@ def main() -> None:
                 args.threads_per_sample,
                 args.download_backend,
                 toolkit_bin,
+                sra_by_run.get(accession),
             )
             futures[future] = accession
 
@@ -879,6 +922,9 @@ def main() -> None:
         "source_manifest": str(SOURCE_MANIFEST.relative_to(REPO_ROOT)),
         "source_manifest_sha256": sha256(SOURCE_MANIFEST),
         "sample_manifest_sha256": sha256(SAMPLE_MANIFEST),
+        "sra_manifest_sha256": (
+            sha256(SRA_MANIFEST) if args.download_backend == "ncbi_sra" else None
+        ),
         "expected_runs": EXPECTED_RUN_COUNT,
         "completed_runs": len(rows),
         "source_fastq_bytes": EXPECTED_FASTQ_BYTES,
