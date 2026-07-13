@@ -59,11 +59,16 @@
       "check_id": "R1.12_g1_packet",
       "evidence": "fastq_bytes=1020357970574 approval_not_granted",
       "status": "PASS"
+    },
+    {
+      "check_id": "R1.13_full_rna_source_manifest",
+      "evidence": "482 RNA-seq runs have per-file URL, MD5, byte count, and layout",
+      "status": "PASS"
     }
   ],
   "phase": "P1",
   "review": "R1",
-  "reviewed_at": "2026-07-13T14:38:24+00:00",
+  "reviewed_at": "2026-07-13T16:34:58+00:00",
   "schema_version": 1,
   "status": "PASS"
 }

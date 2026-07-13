@@ -1,8 +1,8 @@
 # G1 Source-read Reprocessing Approval Packet
 
-Status: **APPROVAL REQUIRED - NOT EXECUTED**
+Status: **P1 PLANNING ESTIMATE - CURRENT AUTHORIZATION IS RECORDED IN `execution_state.json`**
 
-Generated: `2026-07-13T14:07:48+00:00`
+Generated: `2026-07-13T16:28:38+00:00`
 
 ## Classification
 

@@ -1,64 +1,56 @@
-# P3A Pilot Approval Request
+# P3 Full Streaming Authorization
 
-Status: **G1/G2/G3 APPROVAL REQUIRED - NOT EXECUTED**
+Status: **G1/G2/G3 APPROVED FOR ALL 482 RNA-SEQ RUNS**
 
-## G2 Scientific Manifest Review
+Authorization recorded: `2026-07-13T16:35:12+00:00`.
 
-The corrected R2 hierarchy contains 479 current RNA-seq signal members in 240 candidate groups:
+## Scientific Scope
 
-- 82 groups contain multiple source-reported biological units.
-- 15 groups contain multiple runs from the same ENA experiment and preserve that technical-run relationship.
-- 158 groups are single biological units.
-- 3 ChIP-seq accessions are excluded from RNA-seq.
-- 3 secondary byte-identical bigWigs are held while their source reuse is preserved in provenance.
-- `SRR941651` and `SRR941697` are separate groups and stages.
-- 108 of 645 current-signal pairs trigger a review-only QC flag, affecting 17 groups. No sample was automatically removed for this reason.
+- The 485-accession inventory contains 482 RNA-seq runs and 3 ChIP-seq runs.
+- The three ChIP-seq accessions (`SRR3535777`, `SRR3535778`, and `SRR3535779`) remain excluded from RNA-seq processing.
+- The audited 240-group hierarchy is accepted as the starting hierarchy. Existing unknown-unit bigWigs remain non-formal until uniform source-read processing is complete.
+- All 482 RNA-seq source runs are processed, including the three secondary accessions whose provided bigWigs duplicate another file; their uniformly regenerated signals are reviewed before final membership is decided.
+- All 482 libraries have unknown strandedness, so the locked comparable signal layer is explicitly unstranded (`.`).
 
-All 240 groups remain non-formal because their current bigWig unit is unknown. G2 approval accepts this hierarchy for reprocessing and pilot evaluation; it does not promote the current bigWigs to formal labels.
+## Source and Resource Scope
 
-## G1 Bounded Download and Tooling
+- Source manifest: `alphagenome_custom/metadata/v2/p3_full_sources.tsv`.
+- Exact compressed FASTQ volume: `1,014,217,532,067` bytes (`944.56 GiB`).
+- Layout: 290 single-end and 192 paired-end runs.
+- Largest compressed run: `SRR14701368`, `12,637,552,636` bytes (`11.77 GiB`).
+- Host capacity at authorization: 112 logical CPUs, approximately 1 TiB RAM, and 2.1 TiB free disk.
+- P3B runs four concurrent samples with 16 CPU threads each after P3A measurements pass.
+- Per-sample FASTQ, BAM, and bedGraph intermediates are checksum-verified, audited, and removed after atomic bigWig publication. Failed-sample work is retained for diagnosis and the phase pauses.
 
-The pilot manifest is `alphagenome_custom/metadata/v2/p3_pilot_sources.tsv` and contains five runs covering legacy/new, single/paired, cDNA, inverse-rRNA, random-selection, and PolyA libraries.
+## Existing Project Environment
 
-- Exact compressed FASTQ volume: `6,221,459,671` bytes (`5.79 GiB`).
-- FASTQ integrity: ENA-provided per-file MD5.
-- Threads: `16` CPU threads.
-- No GPU is used.
-- No existing raw file is modified.
+The existing `alphagenome` environment is reused. Installation is guarded by:
 
-Required isolated environment command:
+1. pre-install environment and runtime snapshots;
+2. `conda --freeze-installed --dry-run` through a localhost-only DoH proxy;
+3. rejection of changes to AlphaGenome, NumPy, PyTorch, CUDA, pyBigWig, or Triton;
+4. allowance for a Python build change only when the Python version remains exactly `3.12.13`;
+5. post-install imports, CUDA availability check, and repository unit tests.
 
-```bash
-conda create -y -n alphagenome-rnaseq-v2 \
-  -c conda-forge -c bioconda \
-  python=3.12 star=2.7.11b samtools=1.24 bedtools=2.31.1 \
-  ucsc-bedgraphtobigwig pybigwig=0.3.25 numpy curl
-```
+Locked tools:
 
-The environment is not installed until G1 approval.
+- STAR `2.7.11b`;
+- samtools `1.23.1` (samtools 1.24 conflicts with STAR's required `htslib <1.24`);
+- bedtools `2.31.1`;
+- UCSC `bedGraphToBigWig` package `482`.
 
-## G3 Pilot Data Write
+## Processing Contract
 
-Approved command after the environment is available:
+- Reference: WBcel235 FASTA and release-115 GTF already frozen in legacy_v1.
+- Alignment: STAR primary unique alignments, mismatch/read-length ratio at most `0.04`.
+- BAM filter: exclude flags `2308`, minimum MAPQ `1`.
+- Coverage: `bedtools genomecov -split -bg`.
+- Scale: `100000000 / sum((end-start) * raw_coverage)`, equivalent to the locked `1e6 x 100 bp` total-signal convention.
+- Outputs: `alphagenome_custom/tracks/rna_seq_v2_normalized/` and `alphagenome_custom/tracks/rna_seq_v2_grouped/`.
+- Source and generated large files remain ignored by Git; small ledgers, commands, checksums, reviews, and summaries are tracked.
 
-```bash
-conda run --no-capture-output -n alphagenome-rnaseq-v2 \
-  python scripts/run_v2_reprocessing_pilot.py \
-  --manifest alphagenome_custom/metadata/v2/p3_pilot_sources.tsv \
-  --threads 16 \
-  --work-dir shared/source_reads/v2/pilot_20260713 \
-  --output-dir alphagenome_custom/tracks/rna_seq_v2_normalized_pilot \
-  --star-index shared/reference_indexes/WBcel235_STAR_2.7.11b
-```
+## Later GPU Scope
 
-The pilot uses STAR unique primary alignments, spliced coverage, and an explicit final scaling to total per-base signal `100,000,000`. Output tracks are deliberately unstranded (`.`), so strand behavior is defined even when library strandedness is absent.
+G4 is approved as `r6_gpu_auto_available_2_3`. At GPU phases the controller must recheck `nvidia-smi`, use GPU 2 by default for one-GPU work and GPU 2/3 for two-GPU work, and never interrupt unrelated processes. P3 remains CPU/I/O work.
 
-Expected temporary use is well below the available `2.1 TiB`, but the bulk 485-run workflow is not approved by this packet. R3A measures runtime, observed managed-disk peak, mapping rate, output signal, tool/command provenance, raw-file immutability, and agreement with the provided bigWigs before a streaming bulk command and cleanup policy are proposed.
-
-## Exact Approval Scopes
-
-- `G1:p3a_five_run_pilot`: isolated environment installation plus the five-run FASTQ download and CPU realignment.
-- `G2:v2_manifest_candidate_hierarchy`: accept the corrected candidate hierarchy for the pilot without promoting unknown-unit bigWigs to formal labels.
-- `G3:p3a_five_run_pilot_outputs`: write only the ignored P3A work, index, BAM, bedGraph, and normalized pilot bigWig paths shown above.
-
-After all three scopes are recorded, `scripts/v2_phase_controller.py run --auto` may execute P3A and R3A. A PASS advances to P3B, which immediately requires the separately scoped `G1:p3b_full_reprocessing` and `G3:p3b_full_normalized_outputs`; no five-run approval can authorize the 485-run bulk operation.
+G5 is not approved. Chromosome X remains locked until one checkpoint and its SHA-256 are frozen after R6B.

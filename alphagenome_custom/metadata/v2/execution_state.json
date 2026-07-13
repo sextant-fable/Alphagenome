@@ -1,28 +1,28 @@
 {
   "approvals": {
     "G1_large_source_download_or_realignment": {
-      "approved": false,
-      "note": null,
-      "scope": null,
-      "updated_at": null
+      "approved": true,
+      "note": "User directed full RNA-seq processing rather than a pilot-only endpoint; process all 482 verified RNA-seq runs with streaming cleanup in the existing alphagenome environment.",
+      "scope": "p3_full_rna_streaming_482",
+      "updated_at": "2026-07-13T16:35:12+00:00"
     },
     "G2_v2_manifest_scientific_review": {
-      "approved": false,
-      "note": null,
-      "scope": null,
-      "updated_at": null
+      "approved": true,
+      "note": "User accepted continuing from the audited 240-group hierarchy; current unknown-unit bigWigs remain non-formal and the hierarchy is finalized after uniform reprocessing.",
+      "scope": "v2_manifest_candidate_hierarchy",
+      "updated_at": "2026-07-13T16:35:12+00:00"
     },
     "G3_dataset_or_cache_generation": {
-      "approved": false,
-      "note": null,
-      "scope": null,
-      "updated_at": null
+      "approved": true,
+      "note": "User authorized full normalized/grouped outputs and subsequent manifest-driven loader/split artifacts; no 439/485-channel monolithic NPZ.",
+      "scope": "p3_full_outputs_and_p4_loader",
+      "updated_at": "2026-07-13T16:35:12+00:00"
     },
     "G4_gpu_experiments": {
-      "approved": false,
-      "note": null,
-      "scope": null,
-      "updated_at": null
+      "approved": true,
+      "note": "User directed later GPU phases to find available GPUs and proceed; enforce project policy to prefer GPU 2/3 and never interrupt unrelated processes.",
+      "scope": "r6_gpu_auto_available_2_3",
+      "updated_at": "2026-07-13T16:35:12+00:00"
     },
     "G5_final_test": {
       "approved": false,
@@ -152,10 +152,34 @@
       "phase": "P3A",
       "status": "APPROVAL_REQUIRED",
       "timestamp": "2026-07-13T14:55:09+00:00"
+    },
+    {
+      "detail": "scope=p3_full_rna_streaming_482; User directed full RNA-seq processing rather than a pilot-only endpoint; process all 482 verified RNA-seq runs with streaming cleanup in the existing alphagenome environment.",
+      "phase": "P3A",
+      "status": "G1_APPROVED",
+      "timestamp": "2026-07-13T16:35:12+00:00"
+    },
+    {
+      "detail": "scope=v2_manifest_candidate_hierarchy; User accepted continuing from the audited 240-group hierarchy; current unknown-unit bigWigs remain non-formal and the hierarchy is finalized after uniform reprocessing.",
+      "phase": "P3A",
+      "status": "G2_APPROVED",
+      "timestamp": "2026-07-13T16:35:12+00:00"
+    },
+    {
+      "detail": "scope=p3_full_outputs_and_p4_loader; User authorized full normalized/grouped outputs and subsequent manifest-driven loader/split artifacts; no 439/485-channel monolithic NPZ.",
+      "phase": "P3A",
+      "status": "G3_APPROVED",
+      "timestamp": "2026-07-13T16:35:12+00:00"
+    },
+    {
+      "detail": "scope=r6_gpu_auto_available_2_3; User directed later GPU phases to find available GPUs and proceed; enforce project policy to prefer GPU 2/3 and never interrupt unrelated processes.",
+      "phase": "P3A",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-07-13T16:35:12+00:00"
     }
   ],
   "schema_version": 2,
-  "status": "APPROVAL_REQUIRED",
-  "updated_at": "2026-07-13T14:55:09+00:00",
+  "status": "PENDING",
+  "updated_at": "2026-07-13T16:35:12+00:00",
   "workflow": "c_elegans_rna_seq_v2"
 }

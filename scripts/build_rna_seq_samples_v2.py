@@ -60,6 +60,7 @@ ENA_FIELDS = [
     "center_name",
     "read_count",
     "base_count",
+    "fastq_md5",
     "fastq_bytes",
     "fastq_ftp",
     "bam_bytes",
@@ -179,7 +180,12 @@ def fetch_ena_runs(accessions: list[str]) -> tuple[dict[str, dict[str, str]], li
         chunk = accessions[chunk_index : chunk_index + 40]
         output_path = chunks_dir / f"chunk_{chunk_index // 40:03d}.tsv"
         query = " OR ".join(f'run_accession="{accession}"' for accession in chunk)
-        if not output_path.is_file():
+        cache_valid = False
+        if output_path.is_file():
+            with output_path.open() as handle:
+                cached_fields = handle.readline().rstrip("\n").split("\t")
+            cache_valid = set(ENA_FIELDS).issubset(cached_fields)
+        if not cache_valid:
             curl_to_file(
                 [
                     "-G",
@@ -610,6 +616,8 @@ def build_manifests() -> tuple[list[dict[str, Any]], list[dict[str, str]], dict[
                 "read_count": read_count,
                 "base_count": base_count,
                 "fastq_available": str(bool(ena.get("fastq_ftp"))),
+                "fastq_md5": ena.get("fastq_md5", ""),
+                "fastq_file_bytes": ena.get("fastq_bytes", ""),
                 "fastq_bytes": fastq_bytes,
                 "fastq_ftp": ena.get("fastq_ftp", ""),
                 "bam_available": str(bool(ena.get("bam_ftp"))),
@@ -663,7 +671,7 @@ def write_approval_request(summary: dict[str, Any]) -> None:
     path.write_text(
         f"""# G1 Source-read Reprocessing Approval Packet
 
-Status: **APPROVAL REQUIRED - NOT EXECUTED**
+Status: **P1 PLANNING ESTIMATE - CURRENT AUTHORIZATION IS RECORDED IN `execution_state.json`**
 
 Generated: `{summary['created_at']}`
 
@@ -702,6 +710,30 @@ def main() -> None:
     manifest, evidence, summary = build_manifests()
     manifest_fields = list(manifest[0])
     write_tsv(METADATA_DIR / "rna_seq_samples_v2.tsv", manifest, manifest_fields)
+    source_fields = [
+        "run_accession",
+        "experiment_accession",
+        "batch",
+        "library_layout",
+        "library_selection",
+        "read_count",
+        "base_count",
+        "fastq_ftp",
+        "fastq_md5",
+        "fastq_bytes",
+    ]
+    full_sources = []
+    for row in manifest:
+        if row["assay"] != "RNA-Seq":
+            continue
+        source_row = {field: row[field] for field in source_fields}
+        source_row["fastq_bytes"] = row["fastq_file_bytes"]
+        full_sources.append(source_row)
+    write_tsv(
+        METADATA_DIR / "p3_full_sources.tsv",
+        full_sources,
+        source_fields,
+    )
     write_tsv(
         METADATA_DIR / "rna_seq_metadata_evidence_v2.tsv",
         evidence,

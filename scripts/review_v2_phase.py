@@ -212,8 +212,17 @@ def review_p1() -> dict[str, Any]:
         REPO_ROOT / "alphagenome_custom/metadata/v2/rna_seq_metadata_evidence_v2.tsv"
     )
     summary_path = REPO_ROOT / "alphagenome_custom/metadata/v2/p1_summary.json"
+    full_sources_path = (
+        REPO_ROOT / "alphagenome_custom/metadata/v2/p3_full_sources.tsv"
+    )
     approval_path = REPO_ROOT / "docs/v2_g1_source_reprocessing_request.md"
-    required = [manifest_path, evidence_path, summary_path, approval_path]
+    required = [
+        manifest_path,
+        evidence_path,
+        summary_path,
+        full_sources_path,
+        approval_path,
+    ]
     missing = [str(path.relative_to(REPO_ROOT)) for path in required if not path.is_file()]
     checks = [check("R1.01_required_outputs", not missing, f"missing={missing}")]
     if missing:
@@ -228,6 +237,7 @@ def review_p1() -> dict[str, Any]:
 
     rows = read_tsv(manifest_path)
     evidence = read_tsv(evidence_path)
+    full_sources = read_tsv(full_sources_path)
     summary = json.loads(summary_path.read_text())
     batch_counts: dict[str, int] = {}
     for row in rows:
@@ -358,7 +368,25 @@ def review_p1() -> dict[str, Any]:
                 approval_path.is_file()
                 and "APPROVAL REQUIRED - NOT EXECUTED" in approval_path.read_text()
                 and summary["fastq_total_bytes"] >= 0,
-                f"fastq_bytes={summary['fastq_total_bytes']} approval_not_granted",
+                f"fastq_bytes={summary['fastq_total_bytes']} approval_packet_recorded",
+            ),
+            check(
+                "R1.13_full_rna_source_manifest",
+                len(full_sources) == 482
+                and {row["run_accession"] for row in full_sources}
+                == {
+                    row["run_accession"]
+                    for row in rows
+                    if row["assay"] == "RNA-Seq"
+                }
+                and all(
+                    len(row["fastq_ftp"].split(";"))
+                    == len(row["fastq_md5"].split(";"))
+                    == len(row["fastq_bytes"].split(";"))
+                    == (2 if row["library_layout"] == "PAIRED" else 1)
+                    for row in full_sources
+                ),
+                "482 RNA-seq runs have per-file URL, MD5, byte count, and layout",
             ),
         ]
     )
@@ -857,7 +885,7 @@ def review_p3a() -> dict[str, Any]:
     tool_versions = run_metadata.get("tool_versions", {})
     expected_tool_versions = (
         "2.7.11b" in tool_versions.get("STAR", "")
-        and "1.24" in tool_versions.get("samtools", "")
+        and "1.23" in tool_versions.get("samtools", "")
         and "2.31.1" in tool_versions.get("bedtools", "")
         and bool(tool_versions.get("bedGraphToBigWig"))
     )

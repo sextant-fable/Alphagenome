@@ -40,3 +40,14 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Defense in depth: the P3A wrapper independently verifies current phase and exact G1/G2/G3 scopes before environment installation, download, alignment, or output writes.
 - Preflight result: Python compilation, command-plan inspection, missing-approval refusal, scope-mismatch refusal, and approval-boundary auto-stop passed without installing tools or writing large data.
 - Current boundary: `P3A / APPROVAL_REQUIRED`; no P3A data action has run.
+
+## 2026-07-13 - Full P3 and Standing GPU Authorization
+
+- User direction: do not stop at a five-run endpoint; process the complete verified RNA-seq scope and automatically use available project GPUs in later phases.
+- G1: approved `p3_full_rna_streaming_482` for 482 RNA-seq runs and 944.56 GiB compressed FASTQ in the existing `alphagenome` environment.
+- G2: approved the audited 240-group candidate hierarchy as the reprocessing starting point; unknown-unit provided bigWigs remain non-formal.
+- G3: approved full normalized/grouped outputs and the subsequent manifest-driven P4 loader/split; the 347 GB monolithic NPZ remains prohibited.
+- G4: approved automatic available-device selection under the repository GPU 2/3 policy. No GPU is used in P3.
+- G5: remains unapproved until a single checkpoint is locked after R6B.
+- Storage design: use four 16-thread streaming workers and remove verified per-run FASTQ/BAM/bedGraph intermediates instead of retaining the approximately 3.8 TiB planning envelope.
+- Metadata correction: added ENA per-file FASTQ MD5 and byte lists; R1 now passes 13 checks for an exact 482-run source manifest.

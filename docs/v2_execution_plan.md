@@ -13,8 +13,8 @@ The canonical state is `alphagenome_custom/metadata/v2/execution_state.json`. Ph
 1. `P0/R0`: freeze the legacy 20-sample, 11-track, 188-window data and model lineage without modifying large assets.
 2. `P1/R1`: build a 485-accession provenance manifest with evidence and A/B/C/D normalization classification.
 3. `P2/R2`: resolve duplicate content, the invalid T38 grouping, ontology, replicate context, inclusion, and exclusion decisions.
-4. `P3A/R3A`: run the bounded five-accession source-read pilot and measure integrity, mapping, scale, I/O, runtime, disk use, and agreement with the provided signals.
-5. `P3B/R3`: after a separate bulk approval informed by R3A, create immutable normalized and grouped bigWigs for the approved formal scope.
+4. `P3A/R3A`: run five representative accessions as an automatic checkpoint and measure integrity, mapping, scale, I/O, runtime, disk use, and agreement with the provided signals.
+5. `P3B/R3`: on R3A PASS, stream all 482 verified RNA-seq runs under the same full-processing approval, retaining normalized/grouped bigWigs while cleaning per-run FASTQ/BAM/bedGraph intermediates.
 6. `P4/R4`: implement manifest-driven BigWig loading, five autosomal validation folds, and a locked chromosome-X test embargo.
 7. `P5/R5`: implement model-space two-resolution count loss, gene loss, augmentation, and genuine C. elegans organism adaptation.
 8. `P6A/R6A`: run the approved GPU smoke/pilot and validate environment, numerics, resource use, logging, and checkpoint reload.
@@ -29,7 +29,7 @@ The canonical state is `alphagenome_custom/metadata/v2/execution_state.json`. Ph
 - `G4`: any GPU smoke test or formal experiment.
 - `G5`: the single final chromosome-X evaluation.
 
-Approvals are records with an exact scope, note, and timestamp rather than reusable booleans. The P3A pilot scopes do not authorize P3B bulk processing, and G4 does not authorize G5. Passing an automated review does not override these boundaries. After the exact approval is recorded, the bounded phase may run automatically through its next review.
+Approvals are records with an exact scope, note, and timestamp rather than reusable booleans. The user-approved `p3_full_rna_streaming_482` scope covers both P3A and P3B, and `p3_full_outputs_and_p4_loader` continues through P4 without a monolithic NPZ. The standing G4 scope permits later phases to select available GPU 2/3 but does not authorize G5. Passing an automated review does not override the one-time chromosome-X boundary.
 
 ## Completion Standard
 

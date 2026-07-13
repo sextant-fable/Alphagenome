@@ -35,14 +35,19 @@ GATE_KEYS = {
     "G5": "G5_final_test",
 }
 APPROVAL_SCOPES = {
-    "G1": {"p3a_five_run_pilot", "p3b_full_reprocessing"},
+    "G1": {
+        "p3a_five_run_pilot",
+        "p3b_full_reprocessing",
+        "p3_full_rna_streaming_482",
+    },
     "G2": {"v2_manifest_candidate_hierarchy"},
     "G3": {
         "p3a_five_run_pilot_outputs",
         "p3b_full_normalized_outputs",
         "p4_dynamic_loader_split_pilot",
+        "p3_full_outputs_and_p4_loader",
     },
-    "G4": {"r6_gpu_experiment_matrix"},
+    "G4": {"r6_gpu_experiment_matrix", "r6_gpu_auto_available_2_3"},
     "G5": {"r6c_single_chr_x_test"},
 }
 APPROVAL_SCOPE_PHASES = {
@@ -53,24 +58,27 @@ APPROVAL_SCOPE_PHASES = {
     "p3b_full_normalized_outputs": {"P3B"},
     "p4_dynamic_loader_split_pilot": {"P4"},
     "r6_gpu_experiment_matrix": {"P6A"},
+    "p3_full_rna_streaming_482": {"P3A"},
+    "p3_full_outputs_and_p4_loader": {"P3A"},
+    "r6_gpu_auto_available_2_3": {"P3A"},
     "r6c_single_chr_x_test": {"P6C"},
 }
 PHASE_REQUIRED_APPROVALS = {
     "P3A": (
-        ("G1", "p3a_five_run_pilot"),
+        ("G1", "p3_full_rna_streaming_482"),
         ("G2", "v2_manifest_candidate_hierarchy"),
-        ("G3", "p3a_five_run_pilot_outputs"),
+        ("G3", "p3_full_outputs_and_p4_loader"),
     ),
     "P3B": (
-        ("G1", "p3b_full_reprocessing"),
+        ("G1", "p3_full_rna_streaming_482"),
         ("G2", "v2_manifest_candidate_hierarchy"),
-        ("G3", "p3b_full_normalized_outputs"),
+        ("G3", "p3_full_outputs_and_p4_loader"),
     ),
-    "P4": (("G3", "p4_dynamic_loader_split_pilot"),),
-    "P6A": (("G4", "r6_gpu_experiment_matrix"),),
-    "P6B": (("G4", "r6_gpu_experiment_matrix"),),
+    "P4": (("G3", "p3_full_outputs_and_p4_loader"),),
+    "P6A": (("G4", "r6_gpu_auto_available_2_3"),),
+    "P6B": (("G4", "r6_gpu_auto_available_2_3"),),
     "P6C": (
-        ("G4", "r6_gpu_experiment_matrix"),
+        ("G4", "r6_gpu_auto_available_2_3"),
         ("G5", "r6c_single_chr_x_test"),
     ),
 }

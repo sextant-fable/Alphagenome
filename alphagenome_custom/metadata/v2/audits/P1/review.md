@@ -2,7 +2,7 @@
 
 Status: **PASS**
 
-Reviewed at: `2026-07-13T14:38:24+00:00`
+Reviewed at: `2026-07-13T16:34:58+00:00`
 
 | Check | Status | Evidence |
 | --- | --- | --- |
@@ -18,3 +18,4 @@ Reviewed at: `2026-07-13T14:38:24+00:00`
 | R1.10_bigwig_provenance_explicit | PASS | unknown provenance is explicit rather than inferred from bigWig statistics |
 | R1.11_conflicts_preserved | PASS | conflict_flagged=61 |
 | R1.12_g1_packet | PASS | fastq_bytes=1020357970574 approval_not_granted |
+| R1.13_full_rna_source_manifest | PASS | 482 RNA-seq runs have per-file URL, MD5, byte count, and layout |
