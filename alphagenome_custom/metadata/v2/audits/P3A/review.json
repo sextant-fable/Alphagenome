@@ -1,0 +1,74 @@
+{
+  "checks": [
+    {
+      "check_id": "R3A.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.02_bounded_scope",
+      "evidence": "runs=['SRR10882545', 'SRR23049895', 'SRR36719198', 'SRR7443583', 'SRR941632'] formal=False",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.03_manifest_integrity",
+      "evidence": "pilot, sample, and locked SRA manifest SHA-256 values match the executed record",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.04_output_membership",
+      "evidence": "outputs=['SRR10882545', 'SRR23049895', 'SRR36719198', 'SRR7443583', 'SRR941632']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.05_fastq_integrity",
+      "evidence": "errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.06_raw_bigwig_immutability",
+      "evidence": "errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.07_tool_and_command_provenance",
+      "evidence": "commands=21 versions={'STAR': '2.7.11b', 'bedGraphToBigWig': 'bedGraphToBigWig v 2.10 - Convert a bedGraph file to bigWig format (bbi version: 4).', 'bedtools': 'bedtools v2.31.1', 'fasterq-dump': '/home/zelinli6/Alphagenome/shared/tools/sratoolkit.3.4.1-ubuntu64/bin/fasterq-dump : 3.4.1', 'samtools': 'samtools 1.23.1', 'vdb-validate': '/home/zelinli6/Alphagenome/shared/tools/sratoolkit.3.4.1-ubuntu64/bin/vdb-validate : 3.4.1'}",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.08_mapping_metrics",
+      "evidence": "mapping_errors=[] bam_errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.09_normalization_formula",
+      "evidence": "explicit 1e6 x 100 bp total-signal scale",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.10_bigwig_integrity",
+      "evidence": "errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.11_path_and_partial_file_safety",
+      "evidence": "path_errors=[] partial_files=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.12_resource_measurement",
+      "evidence": "elapsed=483.578713 observed_bytes=25792977581",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3A.13_provided_signal_comparison",
+      "evidence": "comparisons=5 errors=[]",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P3A",
+  "review": "R3A",
+  "reviewed_at": "2026-07-13T18:17:11+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

@@ -1,0 +1,6 @@
+run_accession	bin_count	raw_1kb_pearson	log1p_1kb_pearson	output_zero_bin_fraction	provided_zero_bin_fraction	interpretation
+SRR10882545	100275	0.890881727871	0.923316695659	0.228691099476	0.142059336824	diagnostic_only_unknown_provided_bigwig_unit
+SRR23049895	100275	0.817158681795	0.901621858134	0.373612565445	0.31808526552	diagnostic_only_unknown_provided_bigwig_unit
+SRR36719198	100275	0.761509469071	0.934273281904	0.349588631264	0.267304911493	diagnostic_only_unknown_provided_bigwig_unit
+SRR7443583	100275	0.567715251829	0.910200767381	0.266656694091	0.180244328098	diagnostic_only_unknown_provided_bigwig_unit
+SRR941632	100275	0.667415370838	0.923626054782	0.169214659686	0.0977611568187	diagnostic_only_unknown_provided_bigwig_unit

@@ -31,7 +31,7 @@
       "updated_at": null
     }
   },
-  "current_phase": "P3A",
+  "current_phase": "P3B",
   "history": [
     {
       "detail": "Phase command started.",
@@ -188,10 +188,64 @@
       "phase": "P3A",
       "status": "FAIL",
       "timestamp": "2026-07-13T16:45:56+00:00"
+    },
+    {
+      "detail": "Resume after tested curl partial-transfer continuation fix; first attempt failed before alignment with remote exit 18.",
+      "phase": "P3A",
+      "status": "REOPENED",
+      "timestamp": "2026-07-13T16:48:09+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3A",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T16:48:09+00:00"
+    },
+    {
+      "detail": "Controlled restart after proving curl internal retries discard current-process bytes; Python now restarts single-attempt curl processes and resumes retained partials.",
+      "phase": "P3A",
+      "status": "REOPENED",
+      "timestamp": "2026-07-13T17:13:03+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3A",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T17:13:03+00:00"
+    },
+    {
+      "detail": "Controlled restart after SRR36719198 ENA range endpoint repeatedly stalled; resume the same accession from the locked full-quality NCBI SRA object under the audited one-run fallback.",
+      "phase": "P3A",
+      "status": "REOPENED",
+      "timestamp": "2026-07-13T18:06:56+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3A",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T18:07:02+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P3A",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-13T18:15:25+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P3A",
+      "status": "PASS",
+      "timestamp": "2026-07-13T18:17:11+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P3A PASS.",
+      "phase": "P3B",
+      "status": "PENDING",
+      "timestamp": "2026-07-13T18:17:11+00:00"
     }
   ],
   "schema_version": 2,
-  "status": "FAIL",
-  "updated_at": "2026-07-13T16:45:56+00:00",
+  "status": "PENDING",
+  "updated_at": "2026-07-13T18:17:11+00:00",
   "workflow": "c_elegans_rna_seq_v2"
 }

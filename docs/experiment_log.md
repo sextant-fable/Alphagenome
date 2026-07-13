@@ -92,6 +92,21 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 - Next actions: Reopen P3A, complete the fifth alignment/coverage, run R3A, then start the locked 482-run P3B SRA workflow on PASS.
 - Claim status: verified
 
+## 2026-07-14 - RNA-seq v2 P3A/R3A Technical Checkpoint PASS
+
+- Run type: preprocessing and technical review
+- Purpose: Complete the five-accession checkpoint before the authorized full 482-run processing phase.
+- Git commit: `78c681b` for executed pilot/review code; execution record committed immediately after PASS.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU` (`hy8`); 16 CPU threads; no GPU used.
+- Input data: four checksum-verified ENA FASTQ accessions and one locked full-quality NCBI SRA fallback (`SRR36719198`); WBcel235 reference and Ensembl release 115 GTF.
+- Output path: `alphagenome_custom/tracks/rna_seq_v2_normalized_pilot/` and retained diagnostics under `shared/source_reads/v2/pilot_20260713/`.
+- Result summary: PASS. Five normalized bigWigs were produced at total signal 100,000,000 under the primary unique, spliced, unstranded coverage policy.
+- Verification: R3A passed all 13 checks, including source/archive/FASTQ integrity, BAM hashes, raw provided-bigWig immutability, exact five-run membership, normalization, output read-back, path containment, no partial files, resource measurement, and five diagnostic provided-signal comparisons. The final resumed pass took 483.58 seconds and observed 25,792,977,581 managed bytes.
+- Failures or warnings: Provided bigWigs retain unknown units and comparisons against them are diagnostic only. P3A outputs are not formal v2 labels.
+- Next actions: Start P3B for all 482 locked RNA-seq accessions using the validated NCBI SRA transport and per-sample streaming cleanup.
+- Claim status: verified
+
 ## 2026-07-08 - Latest RNA-seq11 Valid/Test Prediction bigWig Export
 
 - Run type: evaluation and generated-artifact export
