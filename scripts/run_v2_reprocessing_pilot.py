@@ -171,7 +171,7 @@ def download_fastq(url: str, expected_md5: str, expected_bytes: int, path: Path)
         ):
             stagnant_attempts = 0
             previous_size = tmp_path.stat().st_size if tmp_path.exists() else 0
-            for attempt in range(1, 201):
+            for attempt in range(1, 1001):
                 try:
                     run(
                         [
@@ -197,9 +197,9 @@ def download_fastq(url: str, expected_md5: str, expected_bytes: int, path: Path)
                 stagnant_attempts = (
                     stagnant_attempts + 1 if current_size <= previous_size else 0
                 )
-                if stagnant_attempts >= 10:
+                if stagnant_attempts >= 20:
                     raise RuntimeError(
-                        f"FASTQ transfer made no progress for 10 attempts: {tmp_path}"
+                        f"FASTQ transfer made no progress for 20 attempts: {tmp_path}"
                     )
                 print(
                     f"download_resume\t{path.name}\tattempt={attempt}\t"

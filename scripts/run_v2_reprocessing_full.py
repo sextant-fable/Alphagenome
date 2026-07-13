@@ -208,7 +208,7 @@ def download_fastq(
     if not partial_complete:
         stagnant_attempts = 0
         previous_size = temporary.stat().st_size if temporary.exists() else 0
-        for attempt in range(1, 201):
+        for attempt in range(1, 1001):
             try:
                 runner.run(
                     [
@@ -234,9 +234,9 @@ def download_fastq(
             stagnant_attempts = (
                 stagnant_attempts + 1 if current_size <= previous_size else 0
             )
-            if stagnant_attempts >= 10:
+            if stagnant_attempts >= 20:
                 raise RuntimeError(
-                    f"FASTQ transfer made no progress for 10 attempts: {temporary}"
+                    f"FASTQ transfer made no progress for 20 attempts: {temporary}"
                 )
             print(
                 f"download_resume\t{path.name}\tattempt={attempt}\t"
