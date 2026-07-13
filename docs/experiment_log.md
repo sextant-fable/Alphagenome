@@ -107,6 +107,23 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 - Next actions: Start P3B for all 482 locked RNA-seq accessions using the validated NCBI SRA transport and per-sample streaming cleanup.
 - Claim status: verified
 
+## 2026-07-14 - RNA-seq v2 P3B Full 482-Run Reprocessing
+
+- Run type: preprocessing
+- Purpose: Uniformly regenerate formal comparable coverage for all 482 verified RNA-seq accessions, then build the reviewed 241-track biological hierarchy.
+- Git commit: `6630e111609eb68f9876cd74767d1a731c6e5a4c` at run start.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU` (`hy8`); non-Slurm CPU preprocessing; no GPU requested.
+- Resources: four concurrent samples, 16 threads per sample; 112 logical CPUs, approximately 945 GiB available RAM and 2.0 TiB available disk at launch.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python scripts/v2_phase_controller.py run --phase P3B`.
+- Input data: 482 locked NCBI full-quality SRA objects totaling 722,781,740,735 bytes (673.14 GiB), manifest SHA-256 `c04c455ebdc4b7b0daf3382533b09bbd519aa43cadb7fd77109e99aa178c71f6`; WBcel235 reference; 482 immutable provided bigWigs used only for identity/immutability evidence.
+- Output path: normalized run tracks under `alphagenome_custom/tracks/rna_seq_v2_normalized/`; grouped tracks under `alphagenome_custom/tracks/rna_seq_v2_grouped/`; streaming work under `shared/source_reads/v2/full_streaming/`; log under `logs/v2_p3b_20260714/p3b_full.log`.
+- Result summary: Running.
+- Verification: Each sample must match archive MD5, pass `vdb-validate`, reproduce the layout-aware FASTQ record count, pass STAR/BAM/bigWig checks, and reach total signal 100,000,000 before its SRA/FASTQ/BAM/bedGraph intermediates are deleted. R3 must pass before P4.
+- Failures or warnings: This is a long CPU/network run. A failed sample stops admission of new samples and retains its work directory for diagnosis; completed normalized outputs are resumable. Existing unknown-unit bigWigs are not reused as labels.
+- Next actions: Monitor progress, append the final result without removing failures, run R3, and advance to P4 only on PASS.
+- Claim status: unverified
+
 ## 2026-07-08 - Latest RNA-seq11 Valid/Test Prediction bigWig Export
 
 - Run type: evaluation and generated-artifact export
