@@ -83,3 +83,15 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Test embargo: chromosome X requires P6C state, scoped G5 approval, a locked checkpoint SHA-256, and an unused one-time test record.
 - Benchmark design: one full 241-track CPU window plus direct pyBigWig, 128 bp pooling, single/multi-worker determinism, file descriptor, RAM, and I/O timing checks. No v2 NPZ is generated.
 - Status: implementation tests pass; real R4 benchmark remains conditional on R3 PASS.
+
+## 2026-07-14 - P5 Loss, Augmentation, and Model Contracts
+
+- Model-space target: nonzero-mean normalization, RNA `x^0.75` compression, and soft clipping use the local AlphaGenome PyTorch formula; Poisson/multinomial receives the positive model-space prediction and scaled target directly.
+- Resolution loss: both 1 bp and 128 bp sum-pooled targets use eight genomic segments, positional weight 5.0, and a strand-aware gene-body cross-track KL term weighted 0.1.
+- Controlled baseline: the same model-space outputs can instead be unscaled and compared with log1p-MSE under identical data and seeds.
+- Augmentation: deterministic per-epoch shifts are sampled within +/-1024 bp and chromosome bounds; reverse complement probability is 0.5, with DNA, 1/128 bp targets, masks, gene strands, track strands, and strand-paired channels transformed together.
+- Model A: frozen AlphaGenome trunk with a new 241-track, two-resolution RNA head.
+- Model B: four actual AlphaGenome organism embeddings are expanded from two to three rows; row 2 is initialized from the human/mouse mean and is the only embedding row receiving gradients. Final transformer modules receive LoRA. This is not an out-of-range `organism_index=2` shortcut.
+- Model C: a residual dilated sequence baseline produces matched positive 1 bp and 128 bp outputs from scratch.
+- Leakage control: per-track nonzero means are computed separately from each fold's four training chromosomes. An I-V development mean is retained only for the registered comparison; chromosome X is not read.
+- Status: synthetic formula, gradient, shift, reverse-complement, strand, pooling, embedding, and baseline tests pass. Actual checkpoint/LoRA CPU inspection remains conditional on P4 PASS.

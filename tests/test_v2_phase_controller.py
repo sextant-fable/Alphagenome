@@ -65,6 +65,14 @@ class V2PhaseControllerTest(unittest.TestCase):
             any(value == "P4" for value in controller.REVIEW_COMMANDS["P4"])
         )
 
+    def test_p5_components_and_review_are_registered(self) -> None:
+        self.assertTrue(
+            any(value.endswith("run_v2_p5.py") for value in controller.PHASE_COMMANDS["P5"])
+        )
+        self.assertTrue(
+            any(value == "P5" for value in controller.REVIEW_COMMANDS["P5"])
+        )
+
     def test_final_test_scope_cannot_be_approved_early(self) -> None:
         with self.assertRaisesRegex(ValueError, "only in P6C"):
             controller.validate_approval_scope(

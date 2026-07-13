@@ -238,15 +238,23 @@ class V2BigWigDataset(Dataset):
             values = [future.result() for future in futures]
         return np.stack(values, axis=0)
 
-    def __getitem__(self, index: int) -> dict[str, Any]:
-        if index in self._cache:
+    def _load_item(self, index: int, shift_bp: int = 0) -> dict[str, Any]:
+        if shift_bp == 0 and index in self._cache:
             item = self._cache.pop(index)
             self._cache[index] = item
             return item
         self._ensure_handles()
         row = self.intervals[index]
         chromosome = row["chromosome"]
-        start, end = int(row["start"]), int(row["end"])
+        if shift_bp and row["role"] != "train":
+            raise ValueError("Random shifts are allowed only for training intervals")
+        start = int(row["start"]) + shift_bp
+        end = int(row["end"]) + shift_bp
+        chromosome_length = self.fai[chromosome][0]
+        if start < 0 or end > chromosome_length:
+            raise ValueError(
+                f"Shift {shift_bp} moves {chromosome}:{start}-{end} out of bounds"
+            )
         width = end - start
         if width % 128:
             raise ValueError(f"Window width {width} is not divisible by 128")
@@ -262,8 +270,8 @@ class V2BigWigDataset(Dataset):
             axis=0,
         )
         core_mask = np.zeros(width, dtype=bool)
-        core_start = int(row["core_start"]) - start
-        core_end = int(row["core_end"]) - start
+        core_start = int(row["core_start"]) + shift_bp - start
+        core_end = int(row["core_end"]) + shift_bp - start
         core_mask[core_start:core_end] = True
         item = {
             "dna_sequence": torch.from_numpy(np.ascontiguousarray(dna)),
@@ -277,12 +285,20 @@ class V2BigWigDataset(Dataset):
             "interval_start": torch.tensor(start, dtype=torch.long),
             "interval_end": torch.tensor(end, dtype=torch.long),
             "group_ids": tuple(row["group_id"] for row in self.track_rows),
+            "shift_bp": shift_bp,
+            "reverse_complemented": False,
         }
-        if self.cache_size:
+        if self.cache_size and shift_bp == 0:
             self._cache[index] = item
             while len(self._cache) > self.cache_size:
                 self._cache.popitem(last=False)
         return item
+
+    def __getitem__(self, index: int) -> dict[str, Any]:
+        return self._load_item(index, shift_bp=0)
+
+    def get_shifted_item(self, index: int, shift_bp: int) -> dict[str, Any]:
+        return self._load_item(index, shift_bp=int(shift_bp))
 
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()

@@ -1560,6 +1560,156 @@ def review_p4() -> dict[str, Any]:
     }
 
 
+def review_p5() -> dict[str, Any]:
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    paths = {
+        "means": metadata_dir / "track_nonzero_means_v2.tsv",
+        "means_summary": metadata_dir / "track_nonzero_means_v2_summary.json",
+        "specs": metadata_dir / "model_specs_v2.json",
+        "audit": metadata_dir / "p5_component_audit.json",
+    }
+    missing = [
+        str(path.relative_to(REPO_ROOT))
+        for path in paths.values()
+        if not path.is_file()
+    ]
+    checks = [check("R5.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P5",
+            "review": "R5",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    means = read_tsv(paths["means"])
+    means_summary = json.loads(paths["means_summary"].read_text())
+    specs = json.loads(paths["specs"].read_text())
+    audit = json.loads(paths["audit"].read_text())
+    mean_fields = [
+        "development_I_V_nonzero_mean",
+        *(f"fold_{fold}_train_nonzero_mean" for fold in range(1, 6)),
+    ]
+    means_valid = (
+        len(means) == 241
+        and len({row["group_id"] for row in means}) == 241
+        and all(
+            math.isfinite(float(row[field])) and float(row[field]) > 0
+            for row in means
+            for field in mean_fields
+        )
+    )
+    model_by_id = {row["model_id"]: row for row in specs.get("models", [])}
+    expected_embedding_paths = {
+        "organism_embed",
+        "embedder_128bp.organism_embed",
+        "embedder_1bp.organism_embed",
+        "embedder_pair.organism_embed",
+    }
+    checks.extend(
+        [
+            check(
+                "R5.02_leakage_safe_track_means",
+                means_valid
+                and means_summary.get("chromosome_x_read") is False
+                and means_summary.get("fold_mean_policy")
+                == "nonzero_mean_on_four_training_chromosomes_only"
+                and means_summary.get("output_sha256") == sha256(paths["means"]),
+                f"tracks={len(means)} x_read={means_summary.get('chromosome_x_read')}",
+            ),
+            check(
+                "R5.03_model_space_scaling_and_dual_loss",
+                audit.get("scale_implementation")
+                == "alphagenome_pytorch.heads.targets_scaling"
+                and audit.get("loss_implementation")
+                == "alphagenome_pytorch.losses.multinomial_loss_on_scaled_prediction_and_target"
+                and specs.get("resolutions") == [1, 128]
+                and specs.get("num_segments") == 8
+                and audit.get("head_loss_finite") is True
+                and audit.get("head_gradients_finite") is True,
+                f"head_shapes={audit.get('head_prediction_shapes')} loss={audit.get('head_loss')}",
+            ),
+            check(
+                "R5.04_gene_loss_and_augmentation_lock",
+                math.isclose(specs.get("gene_cross_track_weight", -1), 0.1)
+                and specs.get("augmentation")
+                == {"max_shift_bp": 1024, "reverse_complement_probability": 0.5}
+                and "gene_cross_track" in audit.get("loss_metrics", {}),
+                f"gene_weight={specs.get('gene_cross_track_weight')} augmentation={specs.get('augmentation')}",
+            ),
+            check(
+                "R5.05_three_model_contract",
+                set(model_by_id) == {"A", "B", "C"}
+                and model_by_id.get("A", {}).get("trunk_policy") == "frozen"
+                and model_by_id.get("B", {}).get("trunk_policy")
+                == "worm_embeddings_and_lora_only"
+                and model_by_id.get("C", {}).get("trunk_policy") == "from_scratch",
+                f"models={model_by_id}",
+            ),
+            check(
+                "R5.06_real_worm_embedding",
+                audit.get("worm_embedding_rows") == 3
+                and audit.get("worm_embedding_index") == 2
+                and audit.get("worm_embedding_finite") is True
+                and set(audit.get("worm_embedding_paths", []))
+                == expected_embedding_paths
+                and specs.get("model_b_organism_index") == 2,
+                f"paths={audit.get('worm_embedding_paths')} index={audit.get('worm_embedding_index')}",
+            ),
+            check(
+                "R5.07_checkpoint_freeze_and_lora_scope",
+                audit.get("base_checkpoint_loaded") is True
+                and len(audit.get("base_checkpoint_sha256", "")) == 64
+                and audit.get("unexpected_base_trainable_parameters") == []
+                and int(audit.get("lora_trainable_parameters", 0)) > 0
+                and audit.get("lora_modules")
+                and audit.get("lora_targets")
+                == ["tower.blocks.8.mha", "tower.blocks.8.mlp"],
+                f"lora_modules={len(audit.get('lora_modules', []))} unexpected={audit.get('unexpected_base_trainable_parameters')}",
+            ),
+            check(
+                "R5.08_cpu_forward_backward",
+                audit.get("device") == "cpu"
+                and audit.get("head_prediction_shapes")
+                == {"1": [1, 241, 1024], "128": [1, 241, 8]}
+                and audit.get("baseline_prediction_shapes")
+                == {"1": [1, 16, 1024], "128": [1, 16, 8]}
+                and audit.get("baseline_gradients_finite") is True,
+                f"head={audit.get('head_prediction_shapes')} baseline={audit.get('baseline_prediction_shapes')}",
+            ),
+            check(
+                "R5.09_unit_and_golden_tests",
+                audit.get("unit_tests_return_code") == 0
+                and int(audit.get("unit_test_count", 0)) >= 31,
+                f"unit_tests={audit.get('unit_test_count')} return={audit.get('unit_tests_return_code')}",
+            ),
+            check(
+                "R5.10_test_embargo",
+                specs.get("chromosome_x_access")
+                == "prohibited_until_locked_G5_P6C",
+                specs.get("chromosome_x_access"),
+            ),
+            check(
+                "R5.11_manifest_hashes",
+                audit.get("means_sha256") == sha256(paths["means"])
+                and audit.get("model_specs_sha256") == sha256(paths["specs"]),
+                "P5 audit hashes bind means and model specification",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P5",
+        "review": "R5",
+        "reviewed_at": utc_now(),
+        "status": "PASS"
+        if all(item["status"] == "PASS" for item in checks)
+        else "FAIL",
+        "checks": checks,
+    }
+
+
 def write_report(report: dict[str, Any]) -> None:
     audit_dir = AUDIT_ROOT / report["phase"]
     audit_dir.mkdir(parents=True, exist_ok=True)
@@ -1585,7 +1735,9 @@ def write_report(report: dict[str, Any]) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--phase", required=True, choices=["P0", "P1", "P2", "P3A", "P3B", "P4"]
+        "--phase",
+        required=True,
+        choices=["P0", "P1", "P2", "P3A", "P3B", "P4", "P5"],
     )
     return parser.parse_args()
 
@@ -1602,8 +1754,10 @@ def main() -> None:
         report = review_p3a()
     elif args.phase == "P3B":
         report = review_p3b()
-    else:
+    elif args.phase == "P4":
         report = review_p4()
+    else:
+        report = review_p5()
     assert report is not None
     write_report(report)
     print(json.dumps(report, indent=2, sort_keys=True))
