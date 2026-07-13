@@ -394,9 +394,17 @@ def extract_sra_fastq(
         ]
     else:
         paths = [runner.sample_dir / f"{accession}.fastq"]
+    expected_records = expected_fastq_records(library_layout, expected_spots)
+    if all(path.is_file() for path in paths):
+        try:
+            hashes, read_count, total_bytes = fastq_stats(paths)
+            if read_count == expected_records:
+                return paths, hashes, total_bytes
+        except (OSError, RuntimeError):
+            pass
+    for path in runner.sample_dir.glob(f"{accession}*.fastq"):
+        path.unlink()
     if not all(path.is_file() for path in paths):
-        for path in runner.sample_dir.glob(f"{accession}*.fastq"):
-            path.unlink()
         temporary = runner.sample_dir / "fasterq_tmp"
         if temporary.exists():
             shutil.rmtree(temporary)
@@ -418,7 +426,6 @@ def extract_sra_fastq(
     if not all(path.is_file() for path in paths):
         raise RuntimeError(f"Missing extracted FASTQ for {accession}: {paths}")
     hashes, read_count, total_bytes = fastq_stats(paths)
-    expected_records = expected_fastq_records(library_layout, expected_spots)
     if read_count != expected_records:
         raise RuntimeError(
             f"Extracted read count mismatch for {accession}: "

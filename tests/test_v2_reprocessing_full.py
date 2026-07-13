@@ -71,6 +71,37 @@ class V2ReprocessingFullTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             full.expected_fastq_records("UNKNOWN", 11)
 
+    def test_partial_extracted_fastq_is_rebuilt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            sample_dir = Path(directory)
+            archive = sample_dir / "SRR1.sra"
+            archive.write_bytes(b"archive")
+            fastq = sample_dir / "SRR1.fastq"
+            fastq.write_bytes(b"incomplete")
+
+            class ExtractionRunner:
+                def __init__(self) -> None:
+                    self.sample_dir = sample_dir
+                    self.calls = 0
+
+                def run(self, command: list[str], *, stdout=None) -> None:
+                    self.calls += 1
+                    fastq.write_bytes(b"@r1\nA\n+\n!\n")
+
+            runner = ExtractionRunner()
+            paths, _, total_bytes = full.extract_sra_fastq(
+                runner,
+                Path("/fake/toolkit"),
+                archive,
+                "SRR1",
+                "SINGLE",
+                1,
+                2,
+            )
+            self.assertEqual(runner.calls, 1)
+            self.assertEqual(paths, [fastq])
+            self.assertEqual(total_bytes, len(b"@r1\nA\n+\n!\n"))
+
     def test_full_source_manifest_is_exactly_the_rna_scope(self) -> None:
         sources = full.read_tsv(full.SOURCE_MANIFEST)
         samples = full.read_tsv(full.SAMPLE_MANIFEST)
