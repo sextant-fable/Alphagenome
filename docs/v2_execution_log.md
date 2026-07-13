@@ -77,6 +77,7 @@ Entries are append-only. Failed phases and corrected conclusions remain in the r
 - Full-run policy: P3B uses `ncbi_sra` transport by default and retains `ena_fastq` as an explicit fallback. Every run must match the SDL archive MD5, pass archive validation, and reproduce the manifest read count before STAR. Transport provenance and extracted FASTQ SHA-256 values are recorded per run.
 - Count semantics: ENA `read_count` is treated as the SRA spot count. A single-end archive must extract one FASTQ record per spot and a paired-end archive must extract two; both the source spot count and extracted FASTQ record count are retained in each audit.
 - Locked source inventory: all 482 RNA-seq accessions resolved to one public full-quality SRA object. The tracked transport manifest contains 722,781,740,735 bytes (673.14 GiB) and has SHA-256 `c04c455ebdc4b7b0daf3382533b09bbd519aa43cadb7fd77109e99aa178c71f6`.
+- Audit schema lock: before group finalization, all 482 sample audits are migrated to schema v2. ENA FASTQ URL/MD5/bytes are explicitly labeled as source-reference metadata; NCBI SRA URL/MD5/SHA-256/bytes identify the downloaded archive; extracted FASTQ SHA-256/bytes/record count identify the STAR input. Ambiguous legacy `source_fastq_*` checksum fields are removed before R3.
 
 ## 2026-07-14 - Transfer Retry Semantics Correction
 
