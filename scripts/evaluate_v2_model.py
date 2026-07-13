@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from datetime import datetime, timezone
 import hashlib
 import json
 import math
@@ -27,12 +28,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", choices=("A", "B", "C"), required=True)
     parser.add_argument("--training-loss", choices=("paper", "log1p_mse"), required=True)
-    parser.add_argument("--fold", type=int, choices=range(1, 6), required=True)
+    parser.add_argument("--fold", type=int, choices=range(0, 6), required=True)
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--sequence-length", type=int, default=131072)
     parser.add_argument("--hidden-channels", type=int, default=64)
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--final-test", action="store_true")
     return parser.parse_args()
 
 
@@ -47,6 +49,43 @@ def sha256(path: Path) -> str:
 def read_tsv(path: Path) -> list[dict[str, str]]:
     with path.open(newline="") as handle:
         return list(csv.DictReader(handle, delimiter="\t"))
+
+
+def atomic_json(path: Path, payload: dict[str, object]) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    temporary.replace(path)
+
+
+def consume_final_test(checkpoint_sha256: str) -> None:
+    lock_path = METADATA_DIR / "final_test_lock.json"
+    lock = json.loads(lock_path.read_text())
+    if (
+        lock.get("checkpoint_sha256") != checkpoint_sha256
+        or lock.get("test_consumed") is True
+    ):
+        raise RuntimeError("Final-test lock is mismatched or already consumed")
+    lock["test_consumed"] = True
+    lock["test_consumed_at"] = datetime.now(timezone.utc).replace(
+        microsecond=0
+    ).isoformat()
+    lock["test_status"] = "running"
+    atomic_json(lock_path, lock)
+
+
+def finalize_final_test(checkpoint_sha256: str, report_path: Path) -> None:
+    lock_path = METADATA_DIR / "final_test_lock.json"
+    lock = json.loads(lock_path.read_text())
+    if (
+        lock.get("checkpoint_sha256") != checkpoint_sha256
+        or lock.get("test_consumed") is not True
+        or lock.get("test_status") != "running"
+    ):
+        raise RuntimeError("Final-test lock changed during evaluation")
+    lock["test_status"] = "completed"
+    lock["final_report_path"] = str(report_path.relative_to(REPO_ROOT))
+    lock["final_report_sha256"] = sha256(report_path)
+    atomic_json(lock_path, lock)
 
 
 def core_subwindows(
@@ -136,21 +175,25 @@ def main() -> None:
         raise RuntimeError("Registered P6B evaluation requires CUDA")
     if visible not in {"2", "3"}:
         raise RuntimeError("Evaluation must use exactly one physical GPU 2 or 3")
+    if (args.fold == 0) != args.final_test:
+        raise RuntimeError("fold 0 is reserved exclusively for the one-time final test")
 
     means_path = METADATA_DIR / "track_nonzero_means_v2.tsv"
     means_rows = read_tsv(means_path)
-    mean_column = f"fold_{args.fold}_train_nonzero_mean"
+    mean_column = (
+        "development_I_V_nonzero_mean"
+        if args.final_test
+        else f"fold_{args.fold}_train_nonzero_mean"
+    )
     fold_means = torch.tensor(
         [float(row[mean_column]) for row in means_rows],
         dtype=torch.float32,
         device=device,
     )
     intervals_path = (
-        REPO_ROOT / f"alphagenome_custom/intervals/v2/fold_{args.fold}/valid.tsv"
-    )
-    dataset = V2BigWigDataset(intervals_path, max_io_workers=16)
-    subwindows, eligible_bases = core_subwindows(
-        dataset.intervals, args.sequence_length
+        REPO_ROOT / "alphagenome_custom/intervals/v2/test_locked.tsv"
+        if args.final_test
+        else REPO_ROOT / f"alphagenome_custom/intervals/v2/fold_{args.fold}/valid.tsv"
     )
     model = train_v2_model.build_model(
         args.model,
@@ -168,6 +211,17 @@ def main() -> None:
         expected_sequence_length=args.sequence_length,
         expected_hidden_channels=args.hidden_channels,
     )
+    checkpoint_sha = sha256(checkpoint_path)
+    dataset = V2BigWigDataset(
+        intervals_path,
+        max_io_workers=16,
+        final_test_checkpoint_sha256=checkpoint_sha if args.final_test else None,
+    )
+    subwindows, eligible_bases = core_subwindows(
+        dataset.intervals, args.sequence_length
+    )
+    if args.final_test:
+        consume_final_test(checkpoint_sha)
     model.eval()
     metric_sums: dict[str, float] = {}
     n_tracks = len(means_rows)
@@ -247,13 +301,14 @@ def main() -> None:
         raise RuntimeError("No finite per-track validation Pearson values")
     record = {
         "schema_version": 1,
-        "phase": "P6B",
+        "phase": "P6C" if args.final_test else "P6B",
         "model": args.model,
         "training_loss": args.training_loss,
         "fold": args.fold,
+        "mean_column": mean_column,
         "seed": checkpoint["seed"],
         "checkpoint_path": args.checkpoint,
-        "checkpoint_sha256": sha256(checkpoint_path),
+        "checkpoint_sha256": checkpoint_sha,
         "sequence_length": args.sequence_length,
         "validation_policy": "all_complete_nonoverlapping_core_only_131072bp_subwindows",
         "validation_subwindows": len(subwindows),
@@ -275,11 +330,13 @@ def main() -> None:
         "means_sha256": sha256(means_path),
         "physical_cuda_visible_devices": visible,
         "cuda_device_name": torch.cuda.get_device_name(0),
-        "chromosome_x_read": False,
+        "chromosome_x_read": args.final_test,
     }
     output_path = REPO_ROOT / args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    if args.final_test:
+        finalize_final_test(checkpoint_sha, output_path)
     print(json.dumps(record, indent=2, sort_keys=True))
 
 

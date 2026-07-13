@@ -2178,6 +2178,127 @@ def review_p6b() -> dict[str, Any]:
     }
 
 
+def review_p6c() -> dict[str, Any]:
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    paths = {
+        "execution": metadata_dir / "p6c_execution.json",
+        "claim": metadata_dir / "final_test_claim.json",
+        "report": metadata_dir / "final_test_report.json",
+        "lock": metadata_dir / "final_test_lock.json",
+        "selection": metadata_dir / "p6b_selection.json",
+        "test_intervals": REPO_ROOT
+        / "alphagenome_custom/intervals/v2/test_locked.tsv",
+    }
+    missing = [
+        str(path.relative_to(REPO_ROOT))
+        for path in paths.values()
+        if not path.is_file()
+    ]
+    checks = [check("R6C.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P6C",
+            "review": "R6C",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    execution = json.loads(paths["execution"].read_text())
+    claim = json.loads(paths["claim"].read_text())
+    report = json.loads(paths["report"].read_text())
+    lock = json.loads(paths["lock"].read_text())
+    selection = json.loads(paths["selection"].read_text())
+    state = json.loads(
+        (REPO_ROOT / "alphagenome_custom/metadata/v2/execution_state.json").read_text()
+    )
+    g5 = state.get("approvals", {}).get("G5_final_test", {})
+    log_path = REPO_ROOT / execution.get("log_path", "missing")
+    mean_metrics = report.get("mean_metrics", {})
+    report_valid = (
+        report.get("phase") == "P6C"
+        and report.get("fold") == 0
+        and report.get("model") == lock.get("model")
+        and report.get("training_loss") == lock.get("loss")
+        and report.get("checkpoint_sha256") == lock.get("checkpoint_sha256")
+        and report.get("intervals_sha256") == sha256(paths["test_intervals"])
+        and report.get("chromosome_x_read") is True
+        and report.get("mean_column") == "development_I_V_nonzero_mean"
+        and int(report.get("validation_subwindows", 0)) > 0
+        and float(report.get("validation_core_coverage_fraction", 0)) >= 0.99
+        and math.isfinite(float(mean_metrics.get("paper_loss", "nan")))
+        and math.isfinite(float(mean_metrics.get("log1p_mse", "nan")))
+        and math.isfinite(float(report.get("mean_per_track_pearson_128bp", "nan")))
+    )
+    lock_valid = (
+        lock.get("test_consumed") is True
+        and bool(lock.get("test_consumed_at"))
+        and lock.get("test_status") == "completed"
+        and lock.get("final_report_path")
+        == str(paths["report"].relative_to(REPO_ROOT))
+        and lock.get("final_report_sha256") == sha256(paths["report"])
+        and lock.get("selection_sha256") == sha256(paths["selection"])
+        and lock.get("legacy_chr_x_prior_exposure_disclosed") is True
+    )
+    checks.extend(
+        [
+            check(
+                "R6C.02_single_claim",
+                claim.get("status") == "completed"
+                and claim.get("checkpoint_sha256") == lock.get("checkpoint_sha256")
+                and int(claim.get("physical_gpu", -1)) in {2, 3},
+                f"claimed_at={claim.get('claimed_at')} gpu={claim.get('physical_gpu')}",
+            ),
+            check(
+                "R6C.03_execution_and_gpu",
+                execution.get("status") == "completed"
+                and int(execution.get("physical_gpu", -1)) in {2, 3}
+                and log_path.is_file()
+                and log_path.stat().st_size > 0,
+                f"status={execution.get('status')} gpu={execution.get('physical_gpu')}",
+            ),
+            check(
+                "R6C.04_locked_checkpoint_only",
+                report.get("checkpoint_sha256") == lock.get("checkpoint_sha256")
+                and selection.get("selected", {}).get("model") == lock.get("model")
+                and selection.get("selected", {}).get("loss") == lock.get("loss"),
+                f"checkpoint={lock.get('checkpoint_path')}",
+            ),
+            check(
+                "R6C.05_final_metrics",
+                report_valid,
+                f"paper={mean_metrics.get('paper_loss')} log1p={mean_metrics.get('log1p_mse')}",
+            ),
+            check(
+                "R6C.06_permanent_consumption",
+                lock_valid,
+                f"consumed_at={lock.get('test_consumed_at')} status={lock.get('test_status')}",
+            ),
+            check(
+                "R6C.07_scoped_final_approval",
+                g5.get("approved") is True
+                and g5.get("scope") == "r6c_single_chr_x_test",
+                f"scope={g5.get('scope')}",
+            ),
+            check(
+                "R6C.08_prior_exposure_disclosure",
+                lock.get("legacy_chr_x_prior_exposure_disclosed") is True,
+                "legacy chr X exposure remains disclosed; v2 test was read once after lock",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P6C",
+        "review": "R6C",
+        "reviewed_at": utc_now(),
+        "status": "PASS"
+        if all(item["status"] == "PASS" for item in checks)
+        else "FAIL",
+        "checks": checks,
+    }
+
+
 def write_report(report: dict[str, Any]) -> None:
     audit_dir = AUDIT_ROOT / report["phase"]
     audit_dir.mkdir(parents=True, exist_ok=True)
@@ -2205,7 +2326,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--phase",
         required=True,
-        choices=["P0", "P1", "P2", "P3A", "P3B", "P4", "P5", "P6A", "P6B"],
+        choices=[
+            "P0",
+            "P1",
+            "P2",
+            "P3A",
+            "P3B",
+            "P4",
+            "P5",
+            "P6A",
+            "P6B",
+            "P6C",
+        ],
     )
     return parser.parse_args()
 
@@ -2228,8 +2360,10 @@ def main() -> None:
         report = review_p5()
     elif args.phase == "P6A":
         report = review_p6a()
-    else:
+    elif args.phase == "P6B":
         report = review_p6b()
+    else:
+        report = review_p6c()
     assert report is not None
     write_report(report)
     print(json.dumps(report, indent=2, sort_keys=True))
