@@ -24,7 +24,8 @@ GATE_KEYS = {
 }
 PHASE_REQUIRED_APPROVALS = {
     "P3": ("G1", "G2", "G3"),
-    "P6": ("G4",),
+    "P5": ("G4",),
+    "P6": ("G4", "G5"),
 }
 PHASE_COMMANDS = {
     "P0": [sys.executable, "scripts/freeze_legacy_v1.py"],
