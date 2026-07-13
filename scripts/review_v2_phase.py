@@ -783,6 +783,10 @@ def review_p3a() -> dict[str, Any]:
     path_errors = []
     approved_work_dir = (REPO_ROOT / expected_work_rel).resolve()
     approved_output_dir = (REPO_ROOT / expected_output_rel).resolve()
+    sra_manifest_path = REPO_ROOT / "alphagenome_custom/metadata/v2/p3_ncbi_sra_sources.tsv"
+    sra_by_run = {
+        row["run_accession"]: row for row in read_tsv(sra_manifest_path)
+    }
     for accession in sorted(expected_runs):
         if accession not in output_by_run or accession not in sample_by_run:
             continue
@@ -792,14 +796,43 @@ def review_p3a() -> dict[str, Any]:
         expected_md5 = row["source_fastq_md5"].split(";")
         expected_sha = row["source_fastq_sha256"].split(";")
         pilot_row = pilot_by_run[accession]
-        expected_names = [Path(value).name for value in pilot_row["fastq_ftp"].split(";")]
-        if (
-            row["source_fastq_md5"] != pilot_row["fastq_md5"]
-            or int(row["source_fastq_bytes"])
-            != sum(int(value) for value in pilot_row["fastq_bytes"].split(";"))
-            or [path.name for path in fastq_paths] != expected_names
-        ):
-            fastq_errors.append(f"{accession}:does not match pilot manifest")
+        backend = row.get("source_transport_backend", "ena_fastq")
+        if backend == "ena_fastq":
+            expected_names = [
+                Path(value).name for value in pilot_row["fastq_ftp"].split(";")
+            ]
+            if (
+                row["source_fastq_md5"] != pilot_row["fastq_md5"]
+                or int(row["source_fastq_bytes"])
+                != sum(int(value) for value in pilot_row["fastq_bytes"].split(";"))
+                or [path.name for path in fastq_paths] != expected_names
+            ):
+                fastq_errors.append(f"{accession}:does not match pilot manifest")
+        elif backend == "ncbi_sra" and accession == "SRR36719198":
+            sra = sra_by_run[accession]
+            if (
+                row.get("source_reference_ena_fastq_md5") != pilot_row["fastq_md5"]
+                or int(row.get("source_reference_ena_fastq_bytes", 0))
+                != sum(int(value) for value in pilot_row["fastq_bytes"].split(";"))
+                or [path.name for path in fastq_paths] != [f"{accession}.fastq"]
+                or row.get("source_archive_url") != sra["sra_url"]
+                or row.get("source_archive_md5") != sra["sra_md5"]
+                or int(row.get("source_archive_bytes", 0)) != int(sra["sra_bytes"])
+            ):
+                fastq_errors.append(f"{accession}:SRA provenance mismatch")
+            try:
+                archive_path = REPO_ROOT / row["source_archive_path"]
+                actual_archive_sha, actual_archive_md5 = file_hashes(archive_path)
+                if (
+                    actual_archive_sha != row["source_archive_sha256"]
+                    or actual_archive_md5 != row["source_archive_md5"]
+                    or not archive_path.resolve().is_relative_to(approved_work_dir)
+                ):
+                    raise ValueError("SRA archive integrity or path mismatch")
+            except (KeyError, OSError, ValueError) as error:
+                fastq_errors.append(f"{accession}:{error}")
+        else:
+            fastq_errors.append(f"{accession}:unapproved transport {backend}")
         if not (len(fastq_paths) == len(expected_md5) == len(expected_sha)):
             fastq_errors.append(f"{accession}:FASTQ field length mismatch")
         else:
@@ -888,6 +921,8 @@ def review_p3a() -> dict[str, Any]:
         and "1.23" in tool_versions.get("samtools", "")
         and "2.31.1" in tool_versions.get("bedtools", "")
         and bool(tool_versions.get("bedGraphToBigWig"))
+        and "3.4.1" in tool_versions.get("fasterq-dump", "")
+        and "3.4.1" in tool_versions.get("vdb-validate", "")
     )
     partial_files = [
         str(path.relative_to(REPO_ROOT))
@@ -956,8 +991,11 @@ def review_p3a() -> dict[str, Any]:
                 "R3A.03_manifest_integrity",
                 run_metadata.get("manifest_sha256") == sha256(pilot_manifest_path)
                 and run_metadata.get("sample_manifest_sha256")
-                == sha256(sample_manifest_path),
-                "pilot and 485-sample manifest SHA-256 match the executed record",
+                == sha256(sample_manifest_path)
+                and run_metadata.get("sra_manifest_sha256")
+                == sha256(sra_manifest_path)
+                and run_metadata.get("sra_fallback_runs") == ["SRR36719198"],
+                "pilot, sample, and locked SRA manifest SHA-256 values match the executed record",
             ),
             check(
                 "R3A.04_output_membership",
@@ -967,7 +1005,18 @@ def review_p3a() -> dict[str, Any]:
             ),
             check(
                 "R3A.05_fastq_integrity",
-                not fastq_errors,
+                not fastq_errors
+                and {
+                    row.get("source_transport_backend", "ena_fastq")
+                    for row in outputs
+                }
+                == {"ena_fastq", "ncbi_sra"}
+                and {
+                    row["run_accession"]
+                    for row in outputs
+                    if row.get("source_transport_backend") == "ncbi_sra"
+                }
+                == {"SRR36719198"},
                 f"errors={fastq_errors}",
             ),
             check(

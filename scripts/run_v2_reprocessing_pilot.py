@@ -16,9 +16,15 @@ import sys
 import time
 from typing import Iterable
 
+try:
+    from scripts import run_v2_reprocessing_full as full_reprocessing
+except ModuleNotFoundError:
+    import run_v2_reprocessing_full as full_reprocessing
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SAMPLE_MANIFEST = REPO_ROOT / "alphagenome_custom/metadata/v2/rna_seq_samples_v2.tsv"
+SRA_MANIFEST = REPO_ROOT / "alphagenome_custom/metadata/v2/p3_ncbi_sra_sources.tsv"
 EXPECTED_PILOT_RUNS = {
     "SRR7443583",
     "SRR941632",
@@ -26,6 +32,7 @@ EXPECTED_PILOT_RUNS = {
     "SRR23049895",
     "SRR36719198",
 }
+SRA_FALLBACK_RUNS = {"SRR36719198"}
 COMMAND_LOG: list[dict[str, object]] = []
 MONITOR_PATHS: list[Path] = []
 DOH_ARGS = [
@@ -350,6 +357,8 @@ def main() -> None:
     pilot_rows = read_tsv(manifest_path)
     sample_rows = read_tsv(SAMPLE_MANIFEST)
     sample_by_run = validate_pilot_manifest(pilot_rows, sample_rows)
+    sra_by_run = full_reprocessing.validate_sra_manifest(read_tsv(SRA_MANIFEST))
+    toolkit_bin = full_reprocessing.find_sra_toolkit()
     expected_chromosomes = read_reference_chromosomes()
     raw_before = {
         row["run_accession"]: sha256(REPO_ROOT / sample_by_run[row["run_accession"]]["local_path"])
@@ -379,6 +388,8 @@ def main() -> None:
         "samtools": tool_version(["samtools", "--version"]),
         "bedtools": tool_version(["bedtools", "--version"]),
         "bedGraphToBigWig": tool_version(["bedGraphToBigWig"]),
+        "fasterq-dump": tool_version([str(toolkit_bin / "fasterq-dump"), "--version"]),
+        "vdb-validate": tool_version([str(toolkit_bin / "vdb-validate"), "--version"]),
     }
     for row in pilot_rows:
         sample_started = time.monotonic()
@@ -388,12 +399,66 @@ def main() -> None:
         urls = row["fastq_ftp"].split(";")
         checksums = row["fastq_md5"].split(";")
         sizes = [int(value) for value in row["fastq_bytes"].split(";")]
-        fastq_paths = []
-        for url, checksum, size in zip(urls, checksums, sizes, strict=True):
-            path = sample_dir / Path(url).name
-            download_fastq(url, checksum, size, path)
-            fastq_paths.append(path)
-        fastq_sha256 = [sha256(path) for path in fastq_paths]
+        source_transport_backend = "ena_fastq"
+        source_archive_path: Path | None = None
+        source_archive_url = ""
+        source_archive_md5 = ""
+        source_archive_sha256 = ""
+        source_archive_bytes = 0
+        abandoned_ena_partial_bytes = 0
+        read_files_command = ["--readFilesCommand", "zcat"]
+        if accession in SRA_FALLBACK_RUNS:
+            source_transport_backend = "ncbi_sra"
+            sra_source = sra_by_run[accession]
+            archive = {
+                "url": sra_source["sra_url"],
+                "md5": sra_source["sra_md5"],
+                "size": int(sra_source["sra_bytes"]),
+            }
+
+            class PilotRunner:
+                def __init__(self, directory: Path) -> None:
+                    self.sample_dir = directory
+
+                def run(self, command: list[str], *, stdout=None) -> None:
+                    run(command, stdout=stdout)
+
+            adapter = PilotRunner(sample_dir)
+            source_archive_path = sample_dir / f"{accession}.sra"
+            source_archive_sha256, source_archive_md5 = (
+                full_reprocessing.download_sra_archive(
+                    adapter, archive, source_archive_path
+                )
+            )
+            run([str(toolkit_bin / "vdb-validate"), str(source_archive_path)])
+            fastq_paths, fastq_sha256, _ = full_reprocessing.extract_sra_fastq(
+                adapter,
+                toolkit_bin,
+                source_archive_path,
+                accession,
+                row["library_layout"],
+                int(row["read_count"]),
+                args.threads,
+            )
+            source_archive_url = str(archive["url"])
+            source_archive_bytes = int(archive["size"])
+            read_files_command = []
+            for url in urls:
+                partial = sample_dir / (Path(url).name + ".part")
+                if partial.is_file():
+                    abandoned_ena_partial_bytes += partial.stat().st_size
+                    partial.unlink()
+            checksums_actual = [md5(path) for path in fastq_paths]
+            sizes_actual = [path.stat().st_size for path in fastq_paths]
+        else:
+            fastq_paths = []
+            for url, checksum, size in zip(urls, checksums, sizes, strict=True):
+                path = sample_dir / Path(url).name
+                download_fastq(url, checksum, size, path)
+                fastq_paths.append(path)
+            fastq_sha256 = [sha256(path) for path in fastq_paths]
+            checksums_actual = checksums
+            sizes_actual = sizes
 
         star_prefix = sample_dir / "star_"
         aligned_bam = sample_dir / "star_Aligned.sortedByCoord.out.bam"
@@ -407,8 +472,7 @@ def main() -> None:
                     str(index_dir),
                     "--readFilesIn",
                     *map(str, fastq_paths),
-                    "--readFilesCommand",
-                    "zcat",
+                    *read_files_command,
                     "--outFileNamePrefix",
                     str(star_prefix),
                     "--outSAMtype",
@@ -480,9 +544,22 @@ def main() -> None:
                 "source_fastq_paths": ";".join(
                     str(path.relative_to(REPO_ROOT)) for path in fastq_paths
                 ),
-                "source_fastq_md5": ";".join(checksums),
+                "source_transport_backend": source_transport_backend,
+                "source_reference_ena_fastq_md5": ";".join(checksums),
+                "source_reference_ena_fastq_bytes": sum(sizes),
+                "source_archive_path": (
+                    str(source_archive_path.relative_to(REPO_ROOT))
+                    if source_archive_path
+                    else ""
+                ),
+                "source_archive_url": source_archive_url,
+                "source_archive_md5": source_archive_md5,
+                "source_archive_sha256": source_archive_sha256,
+                "source_archive_bytes": source_archive_bytes,
+                "abandoned_ena_partial_bytes": abandoned_ena_partial_bytes,
+                "source_fastq_md5": ";".join(checksums_actual),
                 "source_fastq_sha256": ";".join(fastq_sha256),
-                "source_fastq_bytes": sum(sizes),
+                "source_fastq_bytes": sum(sizes_actual),
                 "provided_bigwig_path": sample_by_run[accession]["local_path"],
                 "provided_bigwig_expected_sha256": sample_by_run[accession]["sha256"],
                 "provided_bigwig_sha256_before": raw_before[accession],
@@ -551,6 +628,8 @@ def main() -> None:
                 "manifest": args.manifest,
                 "manifest_sha256": sha256(manifest_path),
                 "sample_manifest_sha256": sha256(SAMPLE_MANIFEST),
+                "sra_manifest_sha256": sha256(SRA_MANIFEST),
+                "sra_fallback_runs": sorted(SRA_FALLBACK_RUNS),
                 "threads": args.threads,
                 "work_dir": args.work_dir,
                 "output_dir": args.output_dir,
