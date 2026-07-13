@@ -36,6 +36,7 @@ DOH_ARGS = [
 EXPECTED_RUN_COUNT = 482
 EXPECTED_FASTQ_BYTES = 1_014_217_532_067
 MIN_FREE_BYTES = 200 * 1024**3
+STAR_SORT_RAM_BYTES = 128_000_000_000
 LEDGER_LOCK = threading.Lock()
 SRA_TOOLKIT_GLOB = "shared/tools/sratoolkit.*-ubuntu64/bin"
 
@@ -788,7 +789,7 @@ def process_sample(
                 "--alignSJDBoverhangMin",
                 "1",
                 "--limitBAMsortRAM",
-                "8000000000",
+                str(STAR_SORT_RAM_BYTES),
             ]
         )
         aligned_bam = sample_dir / "star_Aligned.sortedByCoord.out.bam"
@@ -875,6 +876,7 @@ def process_sample(
                 "Uniquely mapped reads %"
             ],
             "coverage_policy": "primary_unique_spliced_unstranded",
+            "star_sort_ram_limit_bytes": STAR_SORT_RAM_BYTES,
             "output_strand": ".",
             "normalization_formula": "100000000/sum((end-start)*raw_coverage)",
             "raw_bedgraph_total": f"{raw_total:.12g}",
@@ -1049,6 +1051,7 @@ def main() -> None:
         "work_dir": args.work_dir,
         "output_dir": args.output_dir,
         "star_index": args.star_index,
+        "star_sort_ram_limit_bytes": STAR_SORT_RAM_BYTES,
         "failures": failures,
         "started_at": started_at,
         "completed_at": utc_now(),

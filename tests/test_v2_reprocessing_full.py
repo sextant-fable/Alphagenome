@@ -9,6 +9,10 @@ from scripts import run_v2_reprocessing_full as full
 
 
 class V2ReprocessingFullTest(unittest.TestCase):
+    def test_star_sort_limit_supports_large_full_scope_runs(self) -> None:
+        self.assertEqual(full.STAR_SORT_RAM_BYTES, 128_000_000_000)
+        self.assertLess(4 * full.STAR_SORT_RAM_BYTES, 1024**4)
+
     def test_ncbi_sdl_selects_full_sra_not_noqual_lite(self) -> None:
         payload = {
             "result": [

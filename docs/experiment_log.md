@@ -156,6 +156,22 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 - Next actions: Let already-active jobs finish, reopen P3B, reuse the retained verified FASTQs, and continue all 482 accessions.
 - Claim status: verified
 
+## 2026-07-14 - RNA-seq v2 P3B STAR BAM-Sort Memory Limit Failure
+
+- Run type: preprocessing failure analysis
+- Purpose: Record and correct a STAR BAM-sort resource ceiling reached by a larger paired-end fallback sample.
+- Git commit: `c19ef99` at failed-run start; resource-limit correction committed before restart.
+- Branch: `setup/agent-maintenance`
+- Host: `HY-GPU` (`hy8`); non-Slurm CPU preprocessing; no GPU requested.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python scripts/v2_phase_controller.py run --phase P3B`.
+- Input data: Checksum-verified paired ENA FASTQs for `SRR7443589`, selected only after its locked, MD5-valid SRA archive returned `fasterq-dump` code 3 for unavailable external reference objects.
+- Output path: Retained source and STAR diagnostics under `shared/source_reads/v2/full_streaming/SRR7443589/`; no normalized output was accepted for this failed attempt.
+- Result summary: STAR completed mapping but exited with code 102 before writing the sorted BAM. Its log calculated 8,222,616,722 bytes needed for BAM sorting and required a limit of at least 9,222,616,722 bytes, exceeding the configured 8,000,000,000-byte ceiling. P3B stopped admitting new samples at 228 completed runs and allowed already-active samples to finish.
+- Verification: Both ENA files matched the locked expected byte counts and MD5 values before STAR. The STAR log reached `finished mapping`, then reported only the BAM-sort memory ceiling; this is not a FASTQ integrity, read-count, reference-index, GPU, or host-memory failure. The host had approximately 1.00 TB available memory at diagnosis.
+- Failures or warnings: The full manifest includes runs up to 134,163,355 spots, so the pilot-era 8 GB cap is not appropriate for the complete scope. The correction raises `--limitBAMsortRAM` to 128,000,000,000 bytes and records that value per audit and in the run summary. This is an upper bound; STAR computes and uses the memory actually needed. Four such upper bounds remain below 1 TiB, while observed use is expected to be substantially lower.
+- Next actions: Let already-active jobs finish, reopen P3B, reuse 228 completed outputs and the verified `SRR7443589` FASTQs, then continue the full 482-run scope.
+- Claim status: verified
+
 ## 2026-07-08 - Latest RNA-seq11 Valid/Test Prediction bigWig Export
 
 - Run type: evaluation and generated-artifact export
