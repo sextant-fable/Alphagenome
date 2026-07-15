@@ -128,6 +128,8 @@ def main() -> None:
             break
     single_seconds = time.monotonic() - single_started
     single_dataset.close()
+    del batch, single_loader, single_dataset
+    gc.collect()
 
     multi_dataset = V2BigWigDataset(
         intervals, track_indices=worker_indices, max_io_workers=4
@@ -148,6 +150,7 @@ def main() -> None:
             break
     multi_seconds = time.monotonic() - multi_started
     multi_dataset.close()
+    del batch, multi_loader, multi_dataset
     gc.collect()
     fd_after = len(list(Path("/proc/self/fd").iterdir()))
     rss_after = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
