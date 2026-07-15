@@ -82,29 +82,25 @@ PHASE_REQUIRED_APPROVALS = {
         ("G5", "r6c_single_chr_x_test"),
     ),
 }
+def module_command(module: str, *arguments: str) -> list[str]:
+    return [sys.executable, "-m", f"scripts.{module}", *arguments]
+
+
 PHASE_COMMANDS = {
-    "P0": [sys.executable, "scripts/freeze_legacy_v1.py"],
-    "P1": [sys.executable, "scripts/build_rna_seq_samples_v2.py"],
-    "P2": [sys.executable, "scripts/build_rna_seq_groups_v2.py"],
-    "P3A": [sys.executable, "scripts/run_v2_p3a.py"],
-    "P3B": [sys.executable, "scripts/run_v2_p3b.py"],
-    "P4": [sys.executable, "scripts/run_v2_p4.py"],
-    "P5": [sys.executable, "scripts/run_v2_p5.py"],
-    "P6A": [sys.executable, "scripts/run_v2_p6a.py"],
-    "P6B": [sys.executable, "scripts/run_v2_p6b.py"],
-    "P6C": [sys.executable, "scripts/run_v2_p6c.py"],
+    "P0": module_command("freeze_legacy_v1"),
+    "P1": module_command("build_rna_seq_samples_v2"),
+    "P2": module_command("build_rna_seq_groups_v2"),
+    "P3A": module_command("run_v2_p3a"),
+    "P3B": module_command("run_v2_p3b"),
+    "P4": module_command("run_v2_p4"),
+    "P5": module_command("run_v2_p5"),
+    "P6A": module_command("run_v2_p6a"),
+    "P6B": module_command("run_v2_p6b"),
+    "P6C": module_command("run_v2_p6c"),
 }
 REVIEW_COMMANDS = {
-    "P0": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P0"],
-    "P1": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P1"],
-    "P2": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P2"],
-    "P3A": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P3A"],
-    "P3B": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P3B"],
-    "P4": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P4"],
-    "P5": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P5"],
-    "P6A": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P6A"],
-    "P6B": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P6B"],
-    "P6C": [sys.executable, "scripts/review_v2_phase.py", "--phase", "P6C"],
+    phase: module_command("review_v2_phase", "--phase", phase)
+    for phase in PHASES
 }
 
 

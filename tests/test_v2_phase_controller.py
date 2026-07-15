@@ -51,7 +51,7 @@ class V2PhaseControllerTest(unittest.TestCase):
         self.assertIn("P3B", controller.PHASE_COMMANDS)
         self.assertIn("P3B", controller.REVIEW_COMMANDS)
         self.assertTrue(
-            any(value.endswith("run_v2_p3b.py") for value in controller.PHASE_COMMANDS["P3B"])
+            "scripts.run_v2_p3b" in controller.PHASE_COMMANDS["P3B"]
         )
         self.assertTrue(
             any(value == "P3B" for value in controller.REVIEW_COMMANDS["P3B"])
@@ -59,7 +59,7 @@ class V2PhaseControllerTest(unittest.TestCase):
 
     def test_p4_loader_and_review_are_registered(self) -> None:
         self.assertTrue(
-            any(value.endswith("run_v2_p4.py") for value in controller.PHASE_COMMANDS["P4"])
+            "scripts.run_v2_p4" in controller.PHASE_COMMANDS["P4"]
         )
         self.assertTrue(
             any(value == "P4" for value in controller.REVIEW_COMMANDS["P4"])
@@ -67,7 +67,7 @@ class V2PhaseControllerTest(unittest.TestCase):
 
     def test_p5_components_and_review_are_registered(self) -> None:
         self.assertTrue(
-            any(value.endswith("run_v2_p5.py") for value in controller.PHASE_COMMANDS["P5"])
+            "scripts.run_v2_p5" in controller.PHASE_COMMANDS["P5"]
         )
         self.assertTrue(
             any(value == "P5" for value in controller.REVIEW_COMMANDS["P5"])
@@ -75,7 +75,7 @@ class V2PhaseControllerTest(unittest.TestCase):
 
     def test_p6a_gpu_smoke_and_review_are_registered(self) -> None:
         self.assertTrue(
-            any(value.endswith("run_v2_p6a.py") for value in controller.PHASE_COMMANDS["P6A"])
+            "scripts.run_v2_p6a" in controller.PHASE_COMMANDS["P6A"]
         )
         self.assertTrue(
             any(value == "P6A" for value in controller.REVIEW_COMMANDS["P6A"])
@@ -83,7 +83,7 @@ class V2PhaseControllerTest(unittest.TestCase):
 
     def test_p6b_formal_matrix_and_review_are_registered(self) -> None:
         self.assertTrue(
-            any(value.endswith("run_v2_p6b.py") for value in controller.PHASE_COMMANDS["P6B"])
+            "scripts.run_v2_p6b" in controller.PHASE_COMMANDS["P6B"]
         )
         self.assertTrue(
             any(value == "P6B" for value in controller.REVIEW_COMMANDS["P6B"])
@@ -91,7 +91,7 @@ class V2PhaseControllerTest(unittest.TestCase):
 
     def test_p6c_final_test_and_review_are_registered(self) -> None:
         self.assertTrue(
-            any(value.endswith("run_v2_p6c.py") for value in controller.PHASE_COMMANDS["P6C"])
+            "scripts.run_v2_p6c" in controller.PHASE_COMMANDS["P6C"]
         )
         self.assertTrue(
             any(value == "P6C" for value in controller.REVIEW_COMMANDS["P6C"])
@@ -105,6 +105,12 @@ class V2PhaseControllerTest(unittest.TestCase):
         controller.validate_approval_scope(
             "G5", "r6c_single_chr_x_test", "P6C"
         )
+
+    def test_all_controller_entries_use_repository_module_execution(self) -> None:
+        for commands in (controller.PHASE_COMMANDS, controller.REVIEW_COMMANDS):
+            for command in commands.values():
+                self.assertEqual(command[1], "-m")
+                self.assertTrue(command[2].startswith("scripts."))
 
     def test_schema_v1_migration_is_fail_closed(self) -> None:
         state = {
