@@ -8,9 +8,9 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import sys
 
 from scripts import v2_gpu_resources
+from scripts import v2_subprocess
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -48,9 +48,8 @@ def main() -> None:
     for model in ("A", "B", "C"):
         output_dir = run_root / model
         commands.append(
-            [
-                sys.executable,
-                "scripts/train_v2_model.py",
+            v2_subprocess.module_command(
+                "train_v2_model",
                 "--model",
                 model,
                 "--fold",
@@ -67,7 +66,7 @@ def main() -> None:
                 str(output_dir.relative_to(REPO_ROOT)),
                 "--device",
                 "cuda",
-            ]
+            )
         )
     record = {
         "schema_version": 1,

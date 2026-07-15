@@ -20,6 +20,7 @@ from alphagenome_pytorch.extensions.finetuning.adapters import (
     get_adapter_params,
 )
 from scripts import v2_training_components as components
+from scripts import v2_subprocess
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -52,7 +53,7 @@ def resolve_module(root: torch.nn.Module, path: str) -> torch.nn.Module:
 
 def main() -> None:
     subprocess.run(
-        [sys.executable, "scripts/compute_v2_track_means.py"],
+        v2_subprocess.module_command("compute_v2_track_means"),
         cwd=REPO_ROOT,
         check=True,
     )

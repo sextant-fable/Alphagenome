@@ -9,7 +9,6 @@ import json
 from pathlib import Path
 import resource
 import subprocess
-import sys
 import time
 
 import numpy as np
@@ -17,6 +16,7 @@ import pyBigWig
 from torch.utils.data import DataLoader
 
 from scripts.v2_bigwig_dataset import V2BigWigDataset
+from scripts import v2_subprocess
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -51,7 +51,11 @@ def batch_digest(batch: dict[str, object]) -> str:
 
 
 def main() -> None:
-    subprocess.run([sys.executable, "scripts/build_v2_splits.py"], cwd=REPO_ROOT, check=True)
+    subprocess.run(
+        v2_subprocess.module_command("build_v2_splits"),
+        cwd=REPO_ROOT,
+        check=True,
+    )
     intervals = REPO_ROOT / "alphagenome_custom/intervals/v2/fold_1/valid.tsv"
     started = time.monotonic()
     fd_before = len(list(Path("/proc/self/fd").iterdir()))

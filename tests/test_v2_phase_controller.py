@@ -4,6 +4,7 @@ import copy
 import unittest
 
 from scripts import run_v2_p3a
+from scripts import v2_subprocess
 from scripts import v2_phase_controller as controller
 
 
@@ -111,6 +112,17 @@ class V2PhaseControllerTest(unittest.TestCase):
             for command in commands.values():
                 self.assertEqual(command[1], "-m")
                 self.assertTrue(command[2].startswith("scripts."))
+
+    def test_subprocess_helper_uses_repository_module_execution(self) -> None:
+        command = v2_subprocess.module_command(
+            "train_v2_model", "--model", "A"
+        )
+        self.assertEqual(
+            command[1:],
+            ["-m", "scripts.train_v2_model", "--model", "A"],
+        )
+        with self.assertRaises(ValueError):
+            v2_subprocess.module_command("scripts.train_v2_model")
 
     def test_schema_v1_migration_is_fail_closed(self) -> None:
         state = {

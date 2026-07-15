@@ -8,10 +8,10 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import sys
 
 from scripts import run_v2_p6b
 from scripts import v2_gpu_resources
+from scripts import v2_subprocess
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -69,9 +69,8 @@ def main() -> None:
         raise RuntimeError("Final-test claim already exists; refusing a second entry") from error
     with os.fdopen(descriptor, "w") as handle:
         handle.write(json.dumps(claim, indent=2, sort_keys=True) + "\n")
-    command = [
-        sys.executable,
-        "scripts/evaluate_v2_model.py",
+    command = v2_subprocess.module_command(
+        "evaluate_v2_model",
         "--model",
         str(lock["model"]),
         "--training-loss",
@@ -89,7 +88,7 @@ def main() -> None:
         "--device",
         "cuda",
         "--final-test",
-    ]
+    )
     log_path = REPO_ROOT / "logs/v2_p6c_20260714/final_test.log"
     record = {
         "schema_version": 1,

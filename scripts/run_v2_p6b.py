@@ -12,11 +12,11 @@ import math
 import os
 from pathlib import Path
 import subprocess
-import sys
 import time
 from typing import Any
 
 from scripts import v2_gpu_resources
+from scripts import v2_subprocess
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -135,9 +135,8 @@ def run_cv_job(
             return existing
     output_dir.mkdir(parents=True, exist_ok=True)
     training = spec["training"]
-    train_command = [
-        sys.executable,
-        "scripts/train_v2_model.py",
+    train_command = v2_subprocess.module_command(
+        "train_v2_model",
         "--model",
         model,
         "--fold",
@@ -166,11 +165,10 @@ def run_cv_job(
         str(relative_root),
         "--device",
         "cuda",
-    ]
+    )
     validation_relative = relative_root / "validation.json"
-    evaluate_command = [
-        sys.executable,
-        "scripts/evaluate_v2_model.py",
+    evaluate_command = v2_subprocess.module_command(
+        "evaluate_v2_model",
         "--model",
         model,
         "--training-loss",
@@ -187,7 +185,7 @@ def run_cv_job(
         str(validation_relative),
         "--device",
         "cuda",
-    ]
+    )
     started = time.monotonic()
     run_command(train_command, log_path, gpu)
     run_command(evaluate_command, log_path, gpu)
@@ -277,9 +275,8 @@ def run_development(
     output_dir.mkdir(parents=True, exist_ok=True)
     training = spec["training"]
     max_steps = spec["development_retrain"]["max_steps"]
-    command = [
-        sys.executable,
-        "scripts/train_v2_model.py",
+    command = v2_subprocess.module_command(
+        "train_v2_model",
         "--model",
         model,
         "--fold",
@@ -308,7 +305,7 @@ def run_development(
         str(relative_root),
         "--device",
         "cuda",
-    ]
+    )
     run_command(command, log_path, gpu)
     run_path = output_dir / "run.json"
     checkpoint_path = output_dir / "checkpoint.pt"
