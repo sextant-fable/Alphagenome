@@ -9,14 +9,18 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pyBigWig
 
-from scripts import build_rna_seq_groups_v2 as p2
+try:
+    from scripts import build_rna_seq_groups_v2 as p2
+except ModuleNotFoundError as error:
+    if error.name != "scripts":
+        raise
+    import build_rna_seq_groups_v2 as p2
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +44,7 @@ AUDIT_SCHEMA_SUMMARY = METADATA_DIR / "p3_audit_schema_summary.json"
 EXPECTED_RUNS = 482
 EXPECTED_GROUPS = 241
 TARGET_TOTAL = 100_000_000.0
+DECODED_TOTAL_RELATIVE_TOLERANCE = 1e-6
 CHUNK_SIZE = 1_000_000
 DUPLICATE_PAIRS = {
     "SRR13964554": "SRR12483327",
@@ -152,7 +157,65 @@ def audit_schema_v2(row: dict[str, Any]) -> dict[str, Any]:
     return updated
 
 
-def upgrade_full_audit_schema() -> list[dict[str, Any]]:
+def decoded_bigwig_total(
+    bigwig: pyBigWig.pyBigWig, expected_chromosomes: dict[str, int]
+) -> float:
+    total = 0.0
+    for chromosome, length in expected_chromosomes.items():
+        value = bigwig.stats(
+            chromosome, 0, length, type="sum", exact=True
+        )[0]
+        if value is not None:
+            total += float(value)
+    if not math.isfinite(total) or total <= 0:
+        raise RuntimeError(f"Invalid decoded bigWig total: {total}")
+    return total
+
+
+def decoded_rescale_to_target(decoded_total: float) -> float:
+    if not math.isfinite(decoded_total) or decoded_total <= 0:
+        raise RuntimeError(f"Invalid decoded signal total: {decoded_total}")
+    return TARGET_TOTAL / decoded_total
+
+
+def validate_bigwig(
+    path: Path,
+    expected_chromosomes: dict[str, int],
+    expected_decoded_total: float | None = None,
+) -> dict[str, float]:
+    with pyBigWig.open(str(path)) as bigwig:
+        if not bigwig.isBigWig() or bigwig.chroms() != expected_chromosomes:
+            raise RuntimeError(f"Invalid bigWig reference: {path}")
+        header = bigwig.header()
+        decoded_total = decoded_bigwig_total(bigwig, expected_chromosomes)
+    stats = {key: float(header[key]) for key in ("minVal", "maxVal", "sumData")}
+    if not all(math.isfinite(value) for value in stats.values()):
+        raise RuntimeError(f"Non-finite bigWig statistics: {path}")
+    if stats["minVal"] < 0 or stats["maxVal"] < 0:
+        raise RuntimeError(f"Negative signal: {path}")
+    stats["header_relative_target_error"] = (
+        abs(stats["sumData"] - TARGET_TOTAL) / TARGET_TOTAL
+    )
+    stats["decoded_total_signal"] = decoded_total
+    stats["decoded_relative_target_error"] = (
+        abs(decoded_total - TARGET_TOTAL) / TARGET_TOTAL
+    )
+    if expected_decoded_total is not None:
+        relative_error = (
+            abs(decoded_total - expected_decoded_total) / expected_decoded_total
+        )
+        stats["decoded_relative_expected_error"] = relative_error
+        if relative_error > DECODED_TOTAL_RELATIVE_TOLERANCE:
+            raise RuntimeError(
+                f"Decoded total signal {decoded_total} differs from expected "
+                f"{expected_decoded_total}: {path}"
+            )
+    return stats
+
+
+def upgrade_full_audit_schema(
+    expected_chromosomes: dict[str, int],
+) -> list[dict[str, Any]]:
     audit_dir = NORMALIZED_DIR / "sample_audits"
     paths = sorted(audit_dir.glob("*.json"))
     if len(paths) != EXPECTED_RUNS:
@@ -162,6 +225,32 @@ def upgrade_full_audit_schema() -> list[dict[str, Any]]:
     rows = []
     for path in paths:
         updated = audit_schema_v2(json.loads(path.read_text()))
+        output_path = REPO_ROOT / updated["output_path"]
+        if (
+            updated.get("decoded_total_source_sha256")
+            != updated["output_sha256"]
+            or not updated.get("output_decoded_total_signal")
+        ):
+            stats = validate_bigwig(output_path, expected_chromosomes)
+            decoded_total = stats["decoded_total_signal"]
+            updated["output_header_total_signal"] = f"{stats['sumData']:.12g}"
+            updated["output_header_relative_target_error"] = (
+                f"{stats['header_relative_target_error']:.12g}"
+            )
+            updated["output_decoded_total_signal"] = f"{decoded_total:.12g}"
+            updated["output_decoded_relative_target_error"] = (
+                f"{stats['decoded_relative_target_error']:.12g}"
+            )
+            updated["decoded_rescale_to_1e8"] = (
+                f"{decoded_rescale_to_target(decoded_total):.12g}"
+            )
+            updated["decoded_total_method"] = (
+                "sum_of_pyBigWig_exact_per_reference_chromosome"
+            )
+            updated["decoded_total_source_sha256"] = updated["output_sha256"]
+            updated["formal_group_member_normalization_formula"] = (
+                "decoded_bigwig_signal*(100000000/output_decoded_total_signal)"
+            )
         atomic_json(path, updated)
         rows.append(updated)
     write_tsv(FULL_LEDGER, rows)
@@ -200,6 +289,29 @@ def upgrade_full_audit_schema() -> list[dict[str, Any]]:
             "source_fastq_sha256",
             "source_fastq_bytes",
         ],
+        "signal_total_fields": [
+            "output_header_total_signal",
+            "output_decoded_total_signal",
+            "decoded_rescale_to_1e8",
+        ],
+        "decoded_total_method": "sum_of_pyBigWig_exact_per_reference_chromosome",
+        "decoded_total_relative_error_min": min(
+            float(row["output_decoded_relative_target_error"]) for row in rows
+        ),
+        "decoded_total_relative_error_median": float(
+            np.median(
+                [
+                    float(row["output_decoded_relative_target_error"])
+                    for row in rows
+                ]
+            )
+        ),
+        "decoded_total_relative_error_max": max(
+            float(row["output_decoded_relative_target_error"]) for row in rows
+        ),
+        "formal_group_member_correction": (
+            "rescale decoded sample signal to 1e8 before biological aggregation"
+        ),
         "ledger_sha256": sha256(FULL_LEDGER),
         "completed_at": utc_now(),
     }
@@ -214,22 +326,6 @@ def chromosomes() -> dict[str, int]:
             name, length, *_ = line.rstrip("\n").split("\t")
             result[name] = int(length)
     return result
-
-
-def validate_bigwig(path: Path, expected_chromosomes: dict[str, int]) -> dict[str, float]:
-    with pyBigWig.open(str(path)) as bigwig:
-        if not bigwig.isBigWig() or bigwig.chroms() != expected_chromosomes:
-            raise RuntimeError(f"Invalid bigWig reference: {path}")
-        header = bigwig.header()
-    stats = {key: float(header[key]) for key in ("minVal", "maxVal", "sumData")}
-    if not all(math.isfinite(value) for value in stats.values()):
-        raise RuntimeError(f"Non-finite bigWig statistics: {path}")
-    if stats["minVal"] < 0 or stats["maxVal"] < 0:
-        raise RuntimeError(f"Negative signal: {path}")
-    stats["relative_total_error"] = abs(stats["sumData"] - TARGET_TOTAL) / TARGET_TOTAL
-    if stats["relative_total_error"] > 1e-5:
-        raise RuntimeError(f"Unexpected total signal {stats['sumData']}: {path}")
-    return stats
 
 
 def build_final_hierarchy() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -295,6 +391,8 @@ def build_final_hierarchy() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
         updated["sha256"] = ledger["output_sha256"]
         updated["membership_status"] = "formal_v2_uniform_reprocessed"
         updated["raw_bedgraph_total"] = ledger["raw_bedgraph_total"]
+        updated["decoded_total_signal"] = ledger["output_decoded_total_signal"]
+        updated["decoded_rescale_to_1e8"] = ledger["decoded_rescale_to_1e8"]
         final_members.append(updated)
     final_members.sort(key=lambda row: (row["group_id"], row["run_accession"]))
     if len({row["run_accession"] for row in final_members}) != EXPECTED_RUNS:
@@ -344,6 +442,8 @@ def aggregate_group(
             "run_accession": row["run_accession"],
             "sha256": row["sha256"],
             "raw_bedgraph_total": row["raw_bedgraph_total"],
+            "decoded_total_signal": row["decoded_total_signal"],
+            "decoded_rescale_to_1e8": row["decoded_rescale_to_1e8"],
             "biological_unit": biological_unit(row),
         }
         for row in members
@@ -357,7 +457,11 @@ def aggregate_group(
             audit.get("source_signature_sha256") == signature
             and audit.get("output_sha256") == sha256(output_path)
         ):
-            validate_bigwig(output_path, expected_chromosomes)
+            validate_bigwig(
+                output_path,
+                expected_chromosomes,
+                expected_decoded_total=TARGET_TOTAL,
+            )
             return audit
 
     GROUPED_DIR.mkdir(parents=True, exist_ok=True)
@@ -375,41 +479,43 @@ def aggregate_group(
         units: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for row in members:
             units[biological_unit(row)].append(row)
-        if len(members) == 1:
-            source_path = REPO_ROOT / members[0]["local_path"]
-            temporary.symlink_to(Path(os.path.relpath(source_path, temporary.parent)))
-        else:
-            output = pyBigWig.open(str(temporary), "w")
-            output.addHeader(list(expected_chromosomes.items()))
-            for chromosome, length in expected_chromosomes.items():
-                for start in range(0, length, CHUNK_SIZE):
-                    end = min(start + CHUNK_SIZE, length)
-                    group_values = np.zeros(end - start, dtype=np.float64)
-                    for unit_members in units.values():
-                        unit_values = np.zeros(end - start, dtype=np.float64)
-                        total_weight = 0.0
-                        for member in unit_members:
-                            weight = float(member["raw_bedgraph_total"])
-                            values = handles[member["run_accession"]].values(
-                                chromosome, start, end, numpy=True
+        output = pyBigWig.open(str(temporary), "w")
+        output.addHeader(list(expected_chromosomes.items()))
+        for chromosome, length in expected_chromosomes.items():
+            for start in range(0, length, CHUNK_SIZE):
+                end = min(start + CHUNK_SIZE, length)
+                group_values = np.zeros(end - start, dtype=np.float64)
+                for unit_members in units.values():
+                    unit_values = np.zeros(end - start, dtype=np.float64)
+                    total_weight = 0.0
+                    for member in unit_members:
+                        weight = float(member["raw_bedgraph_total"])
+                        decoded_scale = float(member["decoded_rescale_to_1e8"])
+                        values = handles[member["run_accession"]].values(
+                            chromosome, start, end, numpy=True
+                        )
+                        if np.any(np.isinf(values)) or np.any(values < 0):
+                            raise RuntimeError(
+                                f"Invalid decoded member signal in {group_id}: "
+                                f"{member['run_accession']}"
                             )
-                            values = np.nan_to_num(
-                                values, nan=0.0, posinf=0.0, neginf=0.0
-                            ).astype(np.float64, copy=False)
-                            unit_values += values * weight
-                            total_weight += weight
-                        if total_weight <= 0:
-                            raise RuntimeError(f"Non-positive unit weight in {group_id}")
-                        group_values += unit_values / total_weight
-                    group_values /= len(units)
-                    write_nonzero_runs(
-                        output,
-                        chromosome,
-                        start,
-                        group_values.astype(np.float32),
-                    )
-            output.close()
-            output = None
+                        values = np.nan_to_num(values, nan=0.0).astype(
+                            np.float64, copy=False
+                        )
+                        unit_values += values * decoded_scale * weight
+                        total_weight += weight
+                    if total_weight <= 0:
+                        raise RuntimeError(f"Non-positive unit weight in {group_id}")
+                    group_values += unit_values / total_weight
+                group_values /= len(units)
+                write_nonzero_runs(
+                    output,
+                    chromosome,
+                    start,
+                    group_values.astype(np.float32),
+                )
+        output.close()
+        output = None
         temporary.replace(output_path)
     finally:
         if output is not None:
@@ -419,7 +525,11 @@ def aggregate_group(
         if temporary.exists():
             temporary.unlink()
 
-    stats = validate_bigwig(output_path, expected_chromosomes)
+    stats = validate_bigwig(
+        output_path,
+        expected_chromosomes,
+        expected_decoded_total=TARGET_TOTAL,
+    )
     audit = {
         "group_id": group_id,
         "n_runs": len(members),
@@ -427,16 +537,36 @@ def aggregate_group(
         "run_accessions": ";".join(row["run_accession"] for row in members),
         "source_signature_sha256": signature,
         "aggregation_policy": (
-            "identity_symlink_singleton"
-            if len(members) == 1
-            else "raw_coverage_weighted_within_biological_unit_then_equal_mean_across_units"
+            "decoded_signal_rescaled_to_1e8_then_raw_coverage_weighted_within_"
+            "biological_unit_then_equal_mean_across_units"
+        ),
+        "source_decoded_total_signal": ";".join(
+            row["decoded_total_signal"] for row in members
+        ),
+        "source_decoded_rescale_to_1e8": ";".join(
+            row["decoded_rescale_to_1e8"] for row in members
         ),
         "output_is_symlink": output_path.is_symlink(),
         "output_path": str(output_path.relative_to(REPO_ROOT)),
         "output_size_bytes": output_path.stat().st_size,
         "output_sha256": sha256(output_path),
-        "output_total_signal": f"{stats['sumData']:.12g}",
-        "output_relative_total_error": f"{stats['relative_total_error']:.12g}",
+        "output_header_total_signal": f"{stats['sumData']:.12g}",
+        "output_header_relative_target_error": (
+            f"{stats['header_relative_target_error']:.12g}"
+        ),
+        "output_decoded_total_signal": f"{stats['decoded_total_signal']:.12g}",
+        "output_decoded_relative_target_error": (
+            f"{stats['decoded_relative_target_error']:.12g}"
+        ),
+        "reconstruction_expected_total_signal": f"{TARGET_TOTAL:.12g}",
+        "output_reconstruction_relative_error": (
+            f"{stats['decoded_relative_expected_error']:.12g}"
+        ),
+        "decoded_total_relative_tolerance": DECODED_TOTAL_RELATIVE_TOLERANCE,
+        "normalization_deviation_reason": (
+            "sample bedGraphToBigWig header totals can differ from interval-decoded "
+            "totals; formal grouped labels rescale the decoded signal"
+        ),
         "completed_at": utc_now(),
     }
     atomic_json(audit_path, audit)
@@ -482,8 +612,8 @@ def duplicate_source_review(
 
 
 def main() -> None:
-    upgrade_full_audit_schema()
     expected_chromosomes = chromosomes()
+    full_ledger = upgrade_full_audit_schema(expected_chromosomes)
     groups, members = build_final_hierarchy()
     write_tsv(FINAL_GROUPS, groups)
     write_tsv(FINAL_MEMBERS, members)
@@ -536,9 +666,31 @@ def main() -> None:
         "replicate_flagged_pairs": sum(row["review_flag"] == "True" for row in pair_qc),
         "duplicate_source_pairs_resolved": len(duplicate_rows),
         "aggregation_policy": (
-            "raw_coverage_weighted_within_biological_unit_then_equal_mean_across_units"
+            "decoded_signal_rescaled_to_1e8_then_raw_coverage_weighted_within_"
+            "biological_unit_then_equal_mean_across_units"
         ),
         "normalization_target_total": int(TARGET_TOTAL),
+        "decoded_total_relative_tolerance": DECODED_TOTAL_RELATIVE_TOLERANCE,
+        "sample_decoded_relative_target_error_min": min(
+            float(row["output_decoded_relative_target_error"])
+            for row in full_ledger
+        ),
+        "sample_decoded_relative_target_error_median": float(
+            np.median(
+                [
+                    float(row["output_decoded_relative_target_error"])
+                    for row in full_ledger
+                ]
+            )
+        ),
+        "sample_decoded_relative_target_error_max": max(
+            float(row["output_decoded_relative_target_error"])
+            for row in full_ledger
+        ),
+        "group_decoded_relative_target_error_max": max(
+            float(row["output_decoded_relative_target_error"])
+            for row in audits
+        ),
         "sample_manifest_sha256": sha256(SAMPLE_MANIFEST),
         "full_ledger_sha256": sha256(FULL_LEDGER),
         "final_group_manifest_sha256": sha256(FINAL_GROUPS),

@@ -682,9 +682,17 @@ def bigwig_summary(path: Path, expected_chromosomes: dict[str, int]) -> dict[str
         if bigwig.chroms() != expected_chromosomes:
             raise RuntimeError(f"Chromosome mismatch: {path}")
         header = bigwig.header()
+        decoded_total = 0.0
+        for chromosome, length in expected_chromosomes.items():
+            value = bigwig.stats(
+                chromosome, 0, length, type="sum", exact=True
+            )[0]
+            if value is not None:
+                decoded_total += float(value)
     summary = {
         key: float(header[key]) for key in ("minVal", "maxVal", "sumData", "sumSquared")
     }
+    summary["decoded_total_signal"] = decoded_total
     if not all(math.isfinite(value) for value in summary.values()):
         raise RuntimeError(f"Non-finite bigWig header: {path}")
     if summary["minVal"] < 0 or summary["maxVal"] < 0:
@@ -1170,6 +1178,26 @@ def review_p3b() -> dict[str, Any]:
                 raise ValueError("size mismatch")
             if abs(stats["sumData"] - 100_000_000.0) / 100_000_000.0 > 1e-5:
                 raise ValueError(f"total={stats['sumData']}")
+            recorded_decoded_total = float(row["output_decoded_total_signal"])
+            decoded_rescale = float(row["decoded_rescale_to_1e8"])
+            if (
+                abs(stats["decoded_total_signal"] - recorded_decoded_total)
+                / recorded_decoded_total
+                > 1e-9
+            ):
+                raise ValueError("decoded total audit mismatch")
+            if (
+                abs(recorded_decoded_total * decoded_rescale - 100_000_000.0)
+                / 100_000_000.0
+                > 1e-9
+            ):
+                raise ValueError("decoded rescale does not restore target total")
+            if row.get("decoded_total_method") != (
+                "sum_of_pyBigWig_exact_per_reference_chromosome"
+            ):
+                raise ValueError("decoded total method mismatch")
+            if row.get("decoded_total_source_sha256") != row["output_sha256"]:
+                raise ValueError("decoded total source SHA mismatch")
             if row["cleanup_status"] != "completed":
                 raise ValueError("cleanup incomplete")
             if row["coverage_policy"] != "primary_unique_spliced_unstranded":
@@ -1285,19 +1313,43 @@ def review_p3b() -> dict[str, Any]:
                 raise ValueError("SHA-256 mismatch")
             if abs(stats["sumData"] - 100_000_000.0) / 100_000_000.0 > 1e-5:
                 raise ValueError(f"total={stats['sumData']}")
+            decoded_relative_error = (
+                abs(stats["decoded_total_signal"] - 100_000_000.0)
+                / 100_000_000.0
+            )
+            if decoded_relative_error > 1e-6:
+                raise ValueError(
+                    f"decoded_total={stats['decoded_total_signal']}"
+                )
+            if (
+                abs(
+                    stats["decoded_total_signal"]
+                    - float(row["output_decoded_total_signal"])
+                )
+                / 100_000_000.0
+                > 1e-9
+            ):
+                raise ValueError("group decoded total audit mismatch")
+            if float(row["output_reconstruction_relative_error"]) > 1e-6:
+                raise ValueError("group reconstruction error exceeds tolerance")
             expected_members = members_by_group.get(group_id, [])
             if int(row["n_runs"]) != len(expected_members):
                 raise ValueError("run count mismatch")
-            singleton = len(expected_members) == 1
             expected_policy = (
-                "identity_symlink_singleton"
-                if singleton
-                else "raw_coverage_weighted_within_biological_unit_then_equal_mean_across_units"
+                "decoded_signal_rescaled_to_1e8_then_raw_coverage_weighted_within_"
+                "biological_unit_then_equal_mean_across_units"
             )
             if row["aggregation_policy"] != expected_policy:
                 raise ValueError("aggregation policy mismatch")
-            if (row["output_is_symlink"] == "True") != singleton:
-                raise ValueError("singleton symlink status mismatch")
+            if row["output_is_symlink"] != "False":
+                raise ValueError("formal grouped output must be materialized")
+            if (
+                len(row["source_decoded_total_signal"].split(";"))
+                != len(expected_members)
+                or len(row["source_decoded_rescale_to_1e8"].split(";"))
+                != len(expected_members)
+            ):
+                raise ValueError("member normalization audit count mismatch")
         except Exception as error:
             group_output_errors.append(f"{group_id}:{error}")
 
@@ -1432,6 +1484,11 @@ def review_p3b() -> dict[str, Any]:
                 group_summary.get("normalized_runs") == 482
                 and group_summary.get("formal_groups") == 241
                 and group_summary.get("group_outputs") == 241
+                and group_summary.get("decoded_total_relative_tolerance") == 1e-6
+                and group_summary.get(
+                    "group_decoded_relative_target_error_max", 1.0
+                )
+                <= 1e-6
                 and group_summary.get("sample_manifest_sha256") == sha256(paths["samples"])
                 and group_summary.get("full_ledger_sha256") == sha256(paths["ledger"])
                 and group_summary.get("final_group_manifest_sha256") == sha256(paths["groups"])
@@ -1480,6 +1537,14 @@ def review_p3b() -> dict[str, Any]:
                     "source_fastq_md5",
                     "source_fastq_sha256",
                     "source_fastq_bytes",
+                }
+                and audit_schema.get("decoded_total_method")
+                == "sum_of_pyBigWig_exact_per_reference_chromosome"
+                and set(audit_schema.get("signal_total_fields", []))
+                == {
+                    "output_header_total_signal",
+                    "output_decoded_total_signal",
+                    "decoded_rescale_to_1e8",
                 },
                 f"schema={audit_schema.get('schema_version')} audits={audit_schema.get('sample_audits')}",
             ),
