@@ -2071,7 +2071,7 @@ def review_p6a() -> dict[str, Any]:
     }
 
 
-def review_p6b() -> dict[str, Any]:
+def review_p6b_original() -> dict[str, Any]:
     metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
     paths = {
         "spec": metadata_dir / "p6b_matrix_spec.json",
@@ -2374,6 +2374,220 @@ def review_p6b() -> dict[str, Any]:
         "status": "PASS"
         if all(item["status"] == "PASS" for item in checks)
         else "FAIL",
+        "checks": checks,
+    }
+
+
+def review_p6b() -> dict[str, Any]:
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    paths = {
+        "spec": metadata_dir / "p6b_amendment_spec.json",
+        "execution": metadata_dir / "p6b_amendment_execution.json",
+        "results": metadata_dir / "p6b_amendment_cv_results.tsv",
+        "ablations": metadata_dir / "p6b_amendment_ablation_results.tsv",
+        "selection": metadata_dir / "p6b_amendment_selection.json",
+        "legacy": metadata_dir / "p6b_legacy_v1_disposition.json",
+        "lock": metadata_dir / "final_test_lock.json",
+        "old_lock": metadata_dir / "final_test_lock_original_p6b.json",
+        "means": metadata_dir / "track_nonzero_means_v2.tsv",
+    }
+    missing = [str(path.relative_to(REPO_ROOT)) for path in paths.values() if not path.is_file()]
+    checks = [check("R6B.A1_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 2, "phase": "P6B", "review": "R6B-amended",
+            "reviewed_at": utc_now(), "status": "FAIL", "checks": checks,
+        }
+    spec = json.loads(paths["spec"].read_text())
+    execution = json.loads(paths["execution"].read_text())
+    results = read_tsv(paths["results"])
+    ablations = read_tsv(paths["ablations"])
+    selection = json.loads(paths["selection"].read_text())
+    legacy = json.loads(paths["legacy"].read_text())
+    final_lock = json.loads(paths["lock"].read_text())
+    old_lock = json.loads(paths["old_lock"].read_text())
+    state = json.loads((metadata_dir / "execution_state.json").read_text())
+    spec_sha = sha256(paths["spec"])
+    formal_expected = {
+        (model, loss, seed, fold)
+        for model in ("A", "B", "C")
+        for loss in ("paper", "log1p_mse")
+        for seed in (20260714, 20260715, 20260716)
+        for fold in range(1, 6)
+    }
+    ablation_expected = {
+        (ablation, fold)
+        for ablation in ("no_augmentation", "no_gene_loss", "whole_I_V_mean")
+        for fold in range(1, 6)
+    }
+    formal_jobs = [job for job in execution.get("jobs", []) if job.get("job_kind") == "formal"]
+    ablation_jobs = [job for job in execution.get("jobs", []) if job.get("job_kind") == "ablation"]
+    formal_observed = {
+        (job.get("model"), job.get("loss"), int(job.get("seed", -1)), int(job.get("fold", -1)))
+        for job in formal_jobs
+    }
+    ablation_observed = {
+        (job.get("ablation_id"), int(job.get("fold", -1))) for job in ablation_jobs
+    }
+    metric_names = (
+        "primary_biological_score", "gene_exon_coverage_pearson_log1p",
+        "per_track_pearson_128bp_log1p", "paper_loss", "log1p_mse",
+        "spearman_128bp", "top1_mse_128bp", "top1_calibration_ratio_128bp",
+        "gene_body_mse_log1p_1bp", "exon_mse_log1p_1bp",
+        "local_gradient_mse_log1p_1bp",
+    )
+    job_errors = []
+    chromosome_x_reads = 0
+    for job in formal_jobs + ablation_jobs:
+        try:
+            checkpoint = REPO_ROOT / job["checkpoint_path"]
+            validation_path = REPO_ROOT / job["validation_path"]
+            job_path = REPO_ROOT / job["job_path"]
+            validation = json.loads(validation_path.read_text())
+            persisted = json.loads(job_path.read_text())
+            fold = int(job["fold"])
+            if (
+                persisted.get("amendment_spec_sha256") != spec_sha
+                or persisted.get("checkpoint_sha256") != sha256(checkpoint)
+                or validation.get("checkpoint_sha256") != persisted.get("checkpoint_sha256")
+                or validation.get("schema_version") != 2
+                or validation.get("full_metrics", {}).get("metric_contract") != "v2_full_metrics_1"
+                or validation.get("intervals_sha256") != sha256(
+                    REPO_ROOT / f"alphagenome_custom/intervals/v2/fold_{fold}/valid.tsv"
+                )
+                or float(validation.get("validation_core_coverage_fraction", 0)) < 0.98
+            ):
+                raise ValueError("artifact or validation contract mismatch")
+            chromosome_x_reads += int(validation.get("chromosome_x_read") is True)
+            if not all(math.isfinite(float(job[name])) for name in metric_names):
+                raise ValueError("non-finite summary metric")
+            primary = validation["full_metrics"]["primary"]
+            expected_score = 0.5 * float(
+                primary["mean_per_track_gene_exon_coverage_pearson_log1p"]
+            ) + 0.5 * float(primary["mean_per_track_pearson_128bp_log1p"])
+            if not math.isclose(
+                float(job["primary_biological_score"]), expected_score,
+                rel_tol=1e-12, abs_tol=1e-12,
+            ):
+                raise ValueError("primary score mismatch")
+        except Exception as error:
+            job_errors.append(f"{job.get('job_id')}:{error}")
+
+    result_keys = {(row["model"], row["loss"]) for row in results}
+    expected_result_keys = {(model, loss) for model in ("A", "B", "C") for loss in ("paper", "log1p_mse")}
+    result_contract = all(
+        int(row["jobs"]) == 15 and int(row["folds"]) == 5 and int(row["seeds"]) == 3
+        and all(math.isfinite(float(row[f"mean_{name}"])) for name in metric_names)
+        for row in results
+    )
+    selected_row = max(
+        results,
+        key=lambda row: (
+            float(row["mean_primary_biological_score"]),
+            float(row["mean_gene_exon_coverage_pearson_log1p"]),
+            float(row["mean_per_track_pearson_128bp_log1p"]),
+            -float(row["mean_paper_loss"]), row["model"], row["loss"],
+        ),
+    )
+    selected = selection.get("selected", {})
+    selection_valid = (
+        selected.get("model") == selected_row["model"]
+        and selected.get("loss") == selected_row["loss"]
+        and selection.get("amendment_spec_sha256") == spec_sha
+        and selection.get("results_sha256") == sha256(paths["results"])
+        and selection.get("chromosome_x_read") is False
+        and math.isclose(
+            float(selected.get("mean_primary_biological_score", "nan")),
+            float(selected_row["mean_primary_biological_score"]), rel_tol=1e-12,
+        )
+    )
+    ablation_contract = (
+        {(row["ablation_id"], row["model"], row["loss"]) for row in ablations}
+        == {
+            ("no_augmentation", "B", "paper"),
+            ("no_gene_loss", "B", "paper"),
+            ("whole_I_V_mean", "A", "paper"),
+        }
+        and all(int(row["jobs"]) == 5 and int(row["folds"]) == 5 for row in ablations)
+    )
+    development = execution.get("development", {})
+    lock_valid = False
+    try:
+        checkpoint = REPO_ROOT / final_lock["checkpoint_path"]
+        lock_valid = (
+            final_lock.get("schema_version") == 2
+            and final_lock.get("superseded") is False
+            and final_lock.get("test_consumed") is False
+            and final_lock.get("test_consumed_at") is None
+            and final_lock.get("model") == selected_row["model"]
+            and final_lock.get("loss") == selected_row["loss"]
+            and final_lock.get("checkpoint_sha256") == sha256(checkpoint)
+            and final_lock.get("checkpoint_sha256") == development.get("checkpoint_sha256")
+            and final_lock.get("seed") == 20260717
+            and final_lock.get("amendment_spec_sha256") == spec_sha
+            and final_lock.get("selection_sha256") == sha256(paths["selection"])
+            and final_lock.get("legacy_chr_x_prior_exposure_disclosed") is True
+        )
+    except Exception:
+        lock_valid = False
+    g5 = state.get("approvals", {}).get("G5_final_test", {})
+    checks.extend([
+        check(
+            "R6B.A2_preregistered_amendment",
+            spec.get("locked_before_comparative_full_metric_backfill") is True
+            and spec.get("chromosome_x_access") == "prohibited"
+            and spec.get("formal_matrix", {}).get("total_jobs") == 90
+            and spec.get("formal_matrix", {}).get("seeds") == [20260714, 20260715, 20260716]
+            and spec.get("metrics", {}).get("contract") == "v2_full_metrics_1",
+            f"spec_sha256={spec_sha}",
+        ),
+        check(
+            "R6B.A3_complete_three_seed_matrix",
+            execution.get("status") == "completed" and execution.get("jobs_expected") == 105
+            and formal_observed == formal_expected and not execution.get("failures") and not job_errors,
+            f"formal={len(formal_observed)}/90 errors={job_errors[:5]}",
+        ),
+        check(
+            "R6B.A4_complete_ablations",
+            ablation_observed == ablation_expected and ablation_contract,
+            f"ablations={len(ablation_observed)}/15 configs={[row.get('ablation_id') for row in ablations]}",
+        ),
+        check(
+            "R6B.A5_full_metric_aggregation",
+            result_keys == expected_result_keys and len(results) == 6 and result_contract,
+            f"configs={sorted(result_keys)}",
+        ),
+        check(
+            "R6B.A6_biological_primary_selection", selection_valid,
+            f"selected={selected.get('model')}/{selected.get('loss')}",
+        ),
+        check(
+            "R6B.A7_legacy_disposition",
+            legacy.get("decision") == "not_formally_comparable_as_a_label_scale_ablation"
+            and legacy.get("formal_promotion_use") is False
+            and legacy.get("replacement_control")
+            == "Use the registered fixed-A whole-I-V-mean versus fold-train-mean ablation on the same 241 normalized v2 tracks; retain legacy_v1 results as exploratory historical evidence only.",
+            legacy.get("decision", "missing"),
+        ),
+        check(
+            "R6B.A8_development_and_final_lock", lock_valid,
+            f"checkpoint={final_lock.get('checkpoint_path')}",
+        ),
+        check(
+            "R6B.A9_old_lock_preserved",
+            old_lock.get("superseded") is True and old_lock.get("test_consumed") is False,
+            f"old_checkpoint={old_lock.get('checkpoint_path')}",
+        ),
+        check(
+            "R6B.A10_test_embargo",
+            chromosome_x_reads == 0 and g5.get("approved") is not True,
+            f"chromosome_x_reads={chromosome_x_reads}; G5 unapproved",
+        ),
+    ])
+    return {
+        "schema_version": 2, "phase": "P6B", "review": "R6B-amended",
+        "reviewed_at": utc_now(),
+        "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
         "checks": checks,
     }
 

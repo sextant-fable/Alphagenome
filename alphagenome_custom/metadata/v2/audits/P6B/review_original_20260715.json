@@ -1,0 +1,18 @@
+{
+  "checks": [
+    {"check_id": "R6B.01_required_outputs", "evidence": "missing=[]", "status": "PASS"},
+    {"check_id": "R6B.02_preregistered_matrix", "evidence": "spec_sha256=eafb6ea38013f937b730c0b90e150096b6141f9a73bc5fe465bd829988192e5f", "status": "PASS"},
+    {"check_id": "R6B.03_complete_fair_matrix", "evidence": "jobs=30/30 errors=[]", "status": "PASS"},
+    {"check_id": "R6B.04_gpu_policy", "evidence": "selected=[2, 3]", "status": "PASS"},
+    {"check_id": "R6B.05_cv_aggregation", "evidence": "configs=[('A', 'log1p_mse'), ('A', 'paper'), ('B', 'log1p_mse'), ('B', 'paper'), ('C', 'log1p_mse'), ('C', 'paper')] errors=[]", "status": "PASS"},
+    {"check_id": "R6B.06_locked_selection_rule", "evidence": "selected=B/paper", "status": "PASS"},
+    {"check_id": "R6B.07_development_retrain", "evidence": "errors=[]", "status": "PASS"},
+    {"check_id": "R6B.08_final_checkpoint_lock", "evidence": "checkpoint=runs/v2_p6b_20260714/development_selected/checkpoint.pt", "status": "PASS"},
+    {"check_id": "R6B.09_test_embargo", "evidence": "chromosome X remained blocked; G5 is unapproved", "status": "PASS"}
+  ],
+  "phase": "P6B",
+  "review": "R6B",
+  "reviewed_at": "2026-07-15T17:07:52+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

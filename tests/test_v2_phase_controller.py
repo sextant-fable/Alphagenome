@@ -84,7 +84,7 @@ class V2PhaseControllerTest(unittest.TestCase):
 
     def test_p6b_formal_matrix_and_review_are_registered(self) -> None:
         self.assertTrue(
-            "scripts.run_v2_p6b" in controller.PHASE_COMMANDS["P6B"]
+            "scripts.run_v2_p6b_amendment" in controller.PHASE_COMMANDS["P6B"]
         )
         self.assertTrue(
             any(value == "P6B" for value in controller.REVIEW_COMMANDS["P6B"])

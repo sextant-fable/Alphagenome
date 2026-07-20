@@ -31,7 +31,7 @@
       "updated_at": null
     }
   },
-  "current_phase": "P3B",
+  "current_phase": "P6B",
   "history": [
     {
       "detail": "Phase command started.",
@@ -242,10 +242,352 @@
       "phase": "P3B",
       "status": "PENDING",
       "timestamp": "2026-07-13T18:17:11+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T18:18:41+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P3B",
+      "status": "FAIL",
+      "timestamp": "2026-07-13T18:48:08+00:00"
+    },
+    {
+      "detail": "Resume the same authorized 482-run scope after verified aligned-SRA external-reference extraction failures; retain 73 completed audited outputs and use locked ENA FASTQ only after observed SRA extraction failure.",
+      "phase": "P3B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-13T18:52:34+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T18:52:39+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P3B",
+      "status": "FAIL",
+      "timestamp": "2026-07-13T19:13:12+00:00"
+    },
+    {
+      "detail": "Resume the same authorized 482-run scope after adding exact-record-count support for SINGLE SRA archives whose only non-empty split output is named accession_1.fastq; retain 85 completed audits and both extracted FASTQs.",
+      "phase": "P3B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-13T19:13:52+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T19:13:59+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P3B",
+      "status": "FAIL",
+      "timestamp": "2026-07-13T21:34:08+00:00"
+    },
+    {
+      "detail": "Resume the same authorized 482-run scope after STAR completed mapping for SRR7443589 but its 8 GB BAM-sort ceiling was below the logged 9.22 GB requirement; retain 231 completed audits and verified FASTQs, use a recorded 128 GB upper limit for current and larger runs.",
+      "phase": "P3B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-13T21:35:33+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-13T21:35:44+00:00"
+    },
+    {
+      "detail": "Resume after the interactive execution session was interrupted externally; retain 402 completed audited outputs and resume partial source downloads without reprocessing completed accessions.",
+      "phase": "P3B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-14T09:25:48+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-14T09:26:09+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P3B",
+      "status": "FAIL",
+      "timestamp": "2026-07-15T08:08:57+00:00"
+    },
+    {
+      "detail": "Resume after tested direct-script import fix for finalize_v2_reprocessed_groups.py; retain all 482 completed audited outputs and rerun only finalization/review.",
+      "phase": "P3B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-15T08:16:20+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T08:16:43+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P3B",
+      "status": "FAIL",
+      "timestamp": "2026-07-15T08:17:27+00:00"
+    },
+    {
+      "detail": "Resume after commit 1d547c1: validate interval-decoded sample totals, rescale decoded signal to 1e8 before biological aggregation, and independently review reconstruction error; retain all 482 completed audited STAR outputs.",
+      "phase": "P3B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-15T08:36:54+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T08:37:11+00:00"
+    },
+    {
+      "detail": "Controlled resume after the interactive exec session ended; retain all 482 decoded-total sample audits and 12 completed grouped outputs, verify each by source signature and SHA256, and resume remaining group finalization without reprocessing samples.",
+      "phase": "P3B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-15T08:49:28+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T08:50:31+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P3B",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-15T09:59:37+00:00"
+    },
+    {
+      "detail": "Phase review exited with code 1.",
+      "phase": "P3B",
+      "status": "FAIL",
+      "timestamp": "2026-07-15T10:00:41+00:00"
+    },
+    {
+      "detail": "R3 operational retry only: prior review used base Python and every bigWig read failed solely because pyBigWig was absent. Re-run the controller under the existing alphagenome environment; retain and verify all 482 sample outputs, 241 grouped outputs, and completed QC artifacts.",
+      "phase": "P3B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-15T10:01:41+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P3B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T10:01:53+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P3B",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-15T10:05:04+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P3B",
+      "status": "PASS",
+      "timestamp": "2026-07-15T10:13:14+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P3B PASS.",
+      "phase": "P4",
+      "status": "PENDING",
+      "timestamp": "2026-07-15T10:13:14+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P4",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T10:14:52+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P4",
+      "status": "FAIL",
+      "timestamp": "2026-07-15T10:14:55+00:00"
+    },
+    {
+      "detail": "Resume after tested commit 8318498: all controller phase/review entries now use python -m scripts.<module>, fixing repository package visibility before any P4 data read.",
+      "phase": "P4",
+      "status": "REOPENED",
+      "timestamp": "2026-07-15T10:17:17+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P4",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T10:17:40+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P4",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-15T10:17:48+00:00"
+    },
+    {
+      "detail": "Phase review exited with code 1.",
+      "phase": "P4",
+      "status": "FAIL",
+      "timestamp": "2026-07-15T10:17:50+00:00"
+    },
+    {
+      "detail": "Resume after commit a5ea2ce: explicitly release multi-worker shared-memory batches and loaders before the P4 parent-FD audit; loader values and split artifacts were already correct.",
+      "phase": "P4",
+      "status": "REOPENED",
+      "timestamp": "2026-07-15T10:19:32+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P4",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T10:19:44+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P4",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-15T10:19:52+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P4",
+      "status": "PASS",
+      "timestamp": "2026-07-15T10:19:54+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P4 PASS.",
+      "phase": "P5",
+      "status": "PENDING",
+      "timestamp": "2026-07-15T10:19:54+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P5",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T10:19:54+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P5",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-15T10:33:33+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P5",
+      "status": "PASS",
+      "timestamp": "2026-07-15T10:33:33+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P5 PASS.",
+      "phase": "P6A",
+      "status": "PENDING",
+      "timestamp": "2026-07-15T10:33:33+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6A",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T10:33:33+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P6A",
+      "status": "FAIL",
+      "timestamp": "2026-07-15T10:33:35+00:00"
+    },
+    {
+      "detail": "Resume after tested module-command fix: prior A smoke exited before CUDA/model/data initialization solely because train_v2_model was invoked by file path. Recheck GPU 2/3 and rerun all registered A/B/C two-step smoke jobs.",
+      "phase": "P6A",
+      "status": "REOPENED",
+      "timestamp": "2026-07-15T10:35:45+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6A",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T10:35:55+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P6A",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-15T10:36:17+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P6A",
+      "status": "PASS",
+      "timestamp": "2026-07-15T10:36:17+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P6A PASS.",
+      "phase": "P6B",
+      "status": "PENDING",
+      "timestamp": "2026-07-15T10:36:17+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T10:36:17+00:00"
+    },
+    {
+      "detail": "Controlled resource restart after the P6A-to-P6B transition snapshot saw transient 32% utilization with no process on GPU 2 and selected only GPU 3. The first A/paper/fold1 attempt stopped at step 145/2000 before checkpoint; retain its log as a failed attempt, recheck both now-idle physical GPUs 2/3, and run the locked matrix with one job per GPU.",
+      "phase": "P6B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-15T10:38:19+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-15T10:38:32+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P6B",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-15T17:07:50+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P6B",
+      "status": "PASS",
+      "timestamp": "2026-07-15T17:07:52+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P6B PASS.",
+      "phase": "P6C",
+      "status": "PENDING",
+      "timestamp": "2026-07-15T17:07:52+00:00"
+    },
+    {
+      "detail": "Missing scoped approvals: G5:r6c_single_chr_x_test.",
+      "phase": "P6C",
+      "status": "APPROVAL_REQUIRED",
+      "timestamp": "2026-07-15T17:07:52+00:00"
+    },
+    {
+      "detail": "Independent pre-G5 audit on 2026-07-20 found the original R6B implementation narrower than the locked objective: one seed only, no augmentation/gene-loss ablations, no formal legacy-vs-v2 disposition, and selection omitted gene-level exon coverage Pearson plus the required diagnostic metrics. Preserve all original 30 jobs, invalidate the old promotion decision, keep chromosome X embargoed, and complete a preregistered P6B amendment before G5.",
+      "phase": "P6B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-20T09:00:13+00:00"
     }
   ],
   "schema_version": 2,
   "status": "PENDING",
-  "updated_at": "2026-07-13T18:17:11+00:00",
+  "updated_at": "2026-07-20T09:00:13+00:00",
   "workflow": "c_elegans_rna_seq_v2"
 }

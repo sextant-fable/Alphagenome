@@ -17,6 +17,7 @@ import torch
 
 from scripts import train_v2_model
 from scripts import v2_training_components as components
+from scripts import v2_validation_metrics as full_metrics
 from scripts.v2_bigwig_dataset import V2BigWigDataset
 
 
@@ -32,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--sequence-length", type=int, default=131072)
     parser.add_argument("--hidden-channels", type=int, default=64)
+    parser.add_argument("--mean-column")
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--final-test", action="store_true")
@@ -61,6 +63,8 @@ def consume_final_test(checkpoint_sha256: str) -> None:
     lock_path = METADATA_DIR / "final_test_lock.json"
     lock = json.loads(lock_path.read_text())
     if (
+        lock.get("superseded") is True
+        or
         lock.get("checkpoint_sha256") != checkpoint_sha256
         or lock.get("test_consumed") is True
     ):
@@ -77,6 +81,8 @@ def finalize_final_test(checkpoint_sha256: str, report_path: Path) -> None:
     lock_path = METADATA_DIR / "final_test_lock.json"
     lock = json.loads(lock_path.read_text())
     if (
+        lock.get("superseded") is True
+        or
         lock.get("checkpoint_sha256") != checkpoint_sha256
         or lock.get("test_consumed") is not True
         or lock.get("test_status") != "running"
@@ -115,6 +121,7 @@ def load_checkpoint(
     expected_fold: int,
     expected_sequence_length: int,
     expected_hidden_channels: int,
+    expected_mean_column: str,
 ) -> dict[str, object]:
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     expected = {
@@ -123,6 +130,7 @@ def load_checkpoint(
         "fold": expected_fold,
         "sequence_length": expected_sequence_length,
         "hidden_channels": expected_hidden_channels,
+        "mean_column": expected_mean_column,
     }
     mismatches = {
         key: (checkpoint.get(key), value)
@@ -165,6 +173,22 @@ def pearson_from_sums(
     return result
 
 
+def stats_record(
+    stats: full_metrics.PerTrackStats, group_ids: list[str]
+) -> dict[str, object]:
+    values = stats.per_track()
+    return {
+        "positions_per_track": full_metrics.keyed(values["n"], group_ids),
+        "mean_per_track_mse": full_metrics.finite_mean(values["mse"]),
+        "mean_per_track_mae": full_metrics.finite_mean(values["mae"]),
+        "mean_per_track_pearson": full_metrics.finite_mean(values["pearson"]),
+        "finite_per_track_pearson": int(np.isfinite(values["pearson"]).sum()),
+        "per_track_mse": full_metrics.keyed(values["mse"], group_ids),
+        "per_track_mae": full_metrics.keyed(values["mae"], group_ids),
+        "per_track_pearson": full_metrics.keyed(values["pearson"], group_ids),
+    }
+
+
 def main() -> None:
     args = parse_args()
     if args.sequence_length % 128:
@@ -180,11 +204,16 @@ def main() -> None:
 
     means_path = METADATA_DIR / "track_nonzero_means_v2.tsv"
     means_rows = read_tsv(means_path)
-    mean_column = (
+    default_mean_column = (
         "development_I_V_nonzero_mean"
         if args.final_test
         else f"fold_{args.fold}_train_nonzero_mean"
     )
+    mean_column = args.mean_column or default_mean_column
+    if args.final_test and mean_column != "development_I_V_nonzero_mean":
+        raise ValueError("final test requires development_I_V_nonzero_mean")
+    if mean_column not in means_rows[0]:
+        raise ValueError(f"Unknown mean column: {mean_column}")
     fold_means = torch.tensor(
         [float(row[mean_column]) for row in means_rows],
         dtype=torch.float32,
@@ -210,6 +239,7 @@ def main() -> None:
         expected_fold=args.fold,
         expected_sequence_length=args.sequence_length,
         expected_hidden_channels=args.hidden_channels,
+        expected_mean_column=mean_column,
     )
     checkpoint_sha = sha256(checkpoint_path)
     dataset = V2BigWigDataset(
@@ -220,11 +250,36 @@ def main() -> None:
     subwindows, eligible_bases = core_subwindows(
         dataset.intervals, args.sequence_length
     )
+    n_tracks = len(means_rows)
+    group_ids = [row["group_id"] for row in means_rows]
+    chromosomes = {row["chromosome"] for row in dataset.intervals}
+    genes, genes_by_chromosome = full_metrics.load_gene_exons(
+        dataset.gtf_path, chromosomes
+    )
+    gene_exons = full_metrics.GeneExonAccumulator(
+        genes, genes_by_chromosome, n_tracks=n_tracks
+    )
+    exon_intervals: dict[str, tuple[tuple[int, int], ...]] = {}
+    for chromosome in chromosomes:
+        exon_intervals[chromosome] = full_metrics.merge_intervals(
+            interval
+            for gene_index in genes_by_chromosome.get(chromosome, [])
+            for interval in genes[gene_index].intervals
+        )
+    raw_1bp_stats = full_metrics.PerTrackStats(n_tracks)
+    raw_128bp_stats = full_metrics.PerTrackStats(n_tracks)
+    log1p_1bp_stats = full_metrics.PerTrackStats(n_tracks)
+    log1p_128bp_stats = full_metrics.PerTrackStats(n_tracks)
+    gene_body_stats = full_metrics.PerTrackStats(n_tracks)
+    exon_stats = full_metrics.PerTrackStats(n_tracks)
+    gradient_1bp_stats = full_metrics.PerTrackStats(n_tracks)
+    gradient_128bp_stats = full_metrics.PerTrackStats(n_tracks)
+    prediction_128_chunks: list[np.ndarray] = []
+    target_128_chunks: list[np.ndarray] = []
     if args.final_test:
         consume_final_test(checkpoint_sha)
     model.eval()
     metric_sums: dict[str, float] = {}
-    n_tracks = len(means_rows)
     count_128 = 0
     sum_x = np.zeros(n_tracks, dtype=np.float64)
     sum_y = np.zeros(n_tracks, dtype=np.float64)
@@ -278,8 +333,42 @@ def main() -> None:
             prediction_128 = components.unscale_predictions_experimental_space(
                 predictions[128].float(), fold_means, 128
             )
-            x = torch.log1p(prediction_128.clamp_min(0))[0].double().cpu().numpy()
-            y = torch.log1p(targets[128].clamp_min(0))[0].double().cpu().numpy()
+            prediction_1 = components.unscale_predictions_experimental_space(
+                predictions[1].float(), fold_means, 1
+            )
+            raw_prediction_1 = prediction_1.clamp_min(0)[0].float().cpu().numpy()
+            raw_target_1 = targets[1].clamp_min(0)[0].float().cpu().numpy()
+            raw_prediction_128 = prediction_128.clamp_min(0)[0].float().cpu().numpy()
+            raw_target_128 = targets[128].clamp_min(0)[0].float().cpu().numpy()
+            log_prediction_1 = np.log1p(raw_prediction_1)
+            log_target_1 = np.log1p(raw_target_1)
+            x = np.log1p(raw_prediction_128)
+            y = np.log1p(raw_target_128)
+            raw_1bp_stats.update(raw_prediction_1, raw_target_1)
+            raw_128bp_stats.update(raw_prediction_128, raw_target_128)
+            log1p_1bp_stats.update(log_prediction_1, log_target_1)
+            log1p_128bp_stats.update(x, y)
+            gradient_1bp_stats.update(
+                np.diff(log_prediction_1, axis=1), np.diff(log_target_1, axis=1)
+            )
+            gradient_128bp_stats.update(np.diff(x, axis=1), np.diff(y, axis=1))
+            chromosome = str(item["interval_chromosome"])
+            interval_start = int(item["interval_start"])
+            interval_end = int(item["interval_end"])
+            gene_body_mask = item["gene_mask"].any(dim=0).cpu().numpy()
+            exon_mask = full_metrics.interval_union_mask(
+                exon_intervals.get(chromosome, ()), interval_start, interval_end
+            )
+            gene_body_stats.update(log_prediction_1, log_target_1, gene_body_mask)
+            exon_stats.update(log_prediction_1, log_target_1, exon_mask)
+            gene_exons.update(
+                chromosome,
+                interval_start,
+                raw_prediction_1,
+                raw_target_1,
+            )
+            prediction_128_chunks.append(raw_prediction_128)
+            target_128_chunks.append(raw_target_128)
             count_128 += x.shape[1]
             sum_x += x.sum(axis=1)
             sum_y += y.sum(axis=1)
@@ -299,8 +388,69 @@ def main() -> None:
     finite_pearson = per_track_pearson[np.isfinite(per_track_pearson)]
     if not finite_pearson.size:
         raise RuntimeError("No finite per-track validation Pearson values")
+    gene_exon_metrics = gene_exons.metrics(log1p=True)
+    distribution = full_metrics.distribution_metrics(
+        np.concatenate(prediction_128_chunks, axis=1),
+        np.concatenate(target_128_chunks, axis=1),
+        seed=int(checkpoint["seed"]),
+    )
+    full_metric_record = {
+        "metric_contract": "v2_full_metrics_1",
+        "primary": {
+            "mean_per_track_gene_exon_coverage_pearson_log1p": gene_exon_metrics[
+                "mean_per_track_pearson"
+            ],
+            "mean_per_track_pearson_128bp_log1p": float(finite_pearson.mean()),
+        },
+        "raw_1bp": stats_record(raw_1bp_stats, group_ids),
+        "raw_128bp_sum": stats_record(raw_128bp_stats, group_ids),
+        "log1p_1bp": stats_record(log1p_1bp_stats, group_ids),
+        "log1p_128bp_sum": stats_record(log1p_128bp_stats, group_ids),
+        "gene_body_log1p_1bp": stats_record(gene_body_stats, group_ids),
+        "exon_log1p_1bp": stats_record(exon_stats, group_ids),
+        "local_gradient_log1p_1bp": stats_record(gradient_1bp_stats, group_ids),
+        "local_gradient_log1p_128bp": stats_record(gradient_128bp_stats, group_ids),
+        "gene_exon_coverage": {
+            key: value
+            for key, value in gene_exon_metrics.items()
+            if not isinstance(value, np.ndarray)
+        }
+        | {
+            "per_track_pearson": full_metrics.keyed(
+                gene_exon_metrics["per_track_pearson"], group_ids
+            ),
+            "per_track_mse": full_metrics.keyed(
+                gene_exon_metrics["per_track_mse"], group_ids
+            ),
+        },
+        "distribution_128bp": {
+            "spearman_sampling": distribution["spearman_sampling"],
+            "spearman_points_per_track": distribution["spearman_points_per_track"],
+            "mean_per_track_spearman": full_metrics.finite_mean(
+                distribution["per_track_spearman_128bp"]
+            ),
+            "mean_per_track_top1_mse": full_metrics.finite_mean(
+                distribution["per_track_top1_mse_128bp"]
+            ),
+            "mean_per_track_top1_calibration_ratio": full_metrics.finite_mean(
+                distribution["per_track_top1_calibration_ratio_128bp"]
+            ),
+            "per_track_spearman": full_metrics.keyed(
+                distribution["per_track_spearman_128bp"], group_ids
+            ),
+            "per_track_top1_mse": full_metrics.keyed(
+                distribution["per_track_top1_mse_128bp"], group_ids
+            ),
+            "per_track_top1_calibration_ratio": full_metrics.keyed(
+                distribution["per_track_top1_calibration_ratio_128bp"], group_ids
+            ),
+            "per_track_top1_target_threshold": full_metrics.keyed(
+                distribution["per_track_top1_target_threshold_128bp"], group_ids
+            ),
+        },
+    }
     record = {
-        "schema_version": 1,
+        "schema_version": 2,
         "phase": "P6C" if args.final_test else "P6B",
         "model": args.model,
         "training_loss": args.training_loss,
@@ -326,6 +476,7 @@ def main() -> None:
             row["group_id"]: float(value) if math.isfinite(value) else None
             for row, value in zip(means_rows, per_track_pearson, strict=True)
         },
+        "full_metrics": full_metric_record,
         "intervals_sha256": sha256(intervals_path),
         "means_sha256": sha256(means_path),
         "physical_cuda_visible_devices": visible,

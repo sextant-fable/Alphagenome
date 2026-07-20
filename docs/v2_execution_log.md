@@ -2,6 +2,13 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-20 - P6B Pre-G5 Independent Audit and Reopen
+
+- Original execution result retained: all 30 registered single-seed A/B/C x paper/log1p-MSE x five-fold jobs completed without a run failure, and the original implementation selected B/paper by minimum mean paper loss.
+- Audit correction: that R6B review tested only the reduced local specification, not the complete locked research objective. It omitted formal multi-seed comparison, augmentation and gene-loss ablations, a defensible legacy-vs-v2 disposition, gene-level exon coverage Pearson, Spearman, high-signal calibration/error, gene-body/exon metrics, and local-gradient metrics. Its paper-loss-first promotion rule also conflicted with the objective's primary biological metrics.
+- State action: P6B was formally reopened. The original result, selection, checkpoint, and review remain preserved as provisional evidence; the old final-test lock is marked superseded.
+- Test embargo: chromosome X was not read. G5 remains unapproved, and both the loader and P6C reject a superseded lock.
+
 ## 2026-07-13 - Workflow Initialization
 
 - Purpose: initialize the fail-closed v2 workflow and begin the metadata-only legacy freeze.

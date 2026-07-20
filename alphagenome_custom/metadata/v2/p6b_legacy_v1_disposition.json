@@ -1,0 +1,19 @@
+{
+  "decision": "not_formally_comparable_as_a_label_scale_ablation",
+  "evidence": {
+    "legacy_freeze_summary_sha256": "508992ec259ffe8b3b21bad14e93f17675378073a410721b7fc0c4daad76d265",
+    "legacy_grouped_bigwig_inventory_sha256": "bb5e63e9e2ef8efd68be63a43f6454c81af29c29b27faca8623a9546849df4f8",
+    "legacy_raw_bigwig_inventory_sha256": "991f3dc7dc8b45a2f6783e76ff9e9188382b5689084531651cd18be06ef6f9f0",
+    "v2_group_manifest_sha256": "06bfc6109b08dc22007601d9c406cd4772701901f069f16ad1ea26b3d6134737"
+  },
+  "formal_promotion_use": false,
+  "reasons": [
+    "The legacy labels contain 11 channels while formal v2 contains 241 biologically defined channels.",
+    "The legacy source bigWig signal unit was not verified and therefore cannot be treated as a formal comparable target.",
+    "The legacy grouping includes the invalid T38 relationship that v2 explicitly separated.",
+    "A loss difference would confound signal scale, channel definition, sample composition, and grouping rather than isolate normalization."
+  ],
+  "replacement_control": "Use the registered fixed-A whole-I-V-mean versus fold-train-mean ablation on the same 241 normalized v2 tracks; retain legacy_v1 results as exploratory historical evidence only.",
+  "reviewed_at": "2026-07-20T09:12:35+00:00",
+  "schema_version": 1
+}

@@ -1,0 +1,95 @@
+{
+  "amendment_id": "P6B-A1",
+  "augmentation_ablations": [
+    {
+      "gene_weight": 0.1,
+      "id": "no_augmentation",
+      "loss": "paper",
+      "max_shift_bp": 0,
+      "model": "B",
+      "reverse_complement_probability": 0.0
+    },
+    {
+      "gene_weight": 0.0,
+      "id": "no_gene_loss",
+      "loss": "paper",
+      "max_shift_bp": 1024,
+      "model": "B",
+      "reverse_complement_probability": 0.5
+    }
+  ],
+  "base_execution_path": "alphagenome_custom/metadata/v2/p6b_execution.json",
+  "base_results_path": "alphagenome_custom/metadata/v2/p6b_cv_results.tsv",
+  "base_results_sha256": "2d67cb6af96b5d89f213d7a62d2ea9e455fb405a841c414bcab3d3c4e94366c8",
+  "base_selection_path": "alphagenome_custom/metadata/v2/p6b_selection.json",
+  "base_selection_sha256": "2967ec156db970e2a107da74259afa289a3de5f74b4e6b02dd4680dd2b364d44",
+  "base_spec_path": "alphagenome_custom/metadata/v2/p6b_matrix_spec.json",
+  "base_spec_sha256": "eafb6ea38013f937b730c0b90e150096b6141f9a73bc5fe465bd829988192e5f",
+  "chromosome_x_access": "prohibited",
+  "cv_folds": [1, 2, 3, 4, 5],
+  "development_retrain": {
+    "fold_argument": 0,
+    "max_steps": 2500,
+    "mean_column": "development_I_V_nonzero_mean",
+    "seed": 20260717,
+    "split": "alphagenome_custom/intervals/v2/development_train.tsv"
+  },
+  "formal_matrix": {
+    "losses": ["paper", "log1p_mse"],
+    "models": ["A", "B", "C"],
+    "seeds": [20260714, 20260715, 20260716],
+    "total_jobs": 90
+  },
+  "gpu_policy": {
+    "allowed_physical_indices": [2, 3],
+    "maximum_concurrent_jobs_per_gpu": 1,
+    "minimum_free_mib": 70000
+  },
+  "legacy_v1_disposition_path": "alphagenome_custom/metadata/v2/p6b_legacy_v1_disposition.json",
+  "locked_at": "2026-07-20T09:12:35+00:00",
+  "locked_before_comparative_full_metric_backfill": true,
+  "mean_scope_ablation": {
+    "fold_mean_column_template": "fold_{fold}_train_nonzero_mean",
+    "gene_weight": 0.1,
+    "id": "whole_I_V_mean",
+    "loss": "paper",
+    "max_shift_bp": 1024,
+    "model": "A",
+    "reverse_complement_probability": 0.5,
+    "whole_mean_column": "development_I_V_nonzero_mean"
+  },
+  "metrics": {
+    "contract": "v2_full_metrics_1",
+    "diagnostics": [
+      "raw_and_log1p_1bp_mse_pearson",
+      "raw_and_log1p_128bp_mse_pearson",
+      "deterministically_sampled_128bp_spearman",
+      "top1_percent_128bp_mse_and_calibration",
+      "gene_body_and_exon_log1p_1bp_metrics",
+      "gene_exon_mean_coverage_pearson_log1p",
+      "local_gradient_log1p_1bp_and_128bp_metrics"
+    ],
+    "primary_biological_score": "0.5 * mean_per_track_gene_exon_coverage_pearson_log1p + 0.5 * mean_per_track_pearson_128bp_log1p"
+  },
+  "schema_version": 1,
+  "selection": {
+    "primary_maximize": "mean_three_seed_five_fold_primary_biological_score",
+    "quaternary_minimize": "mean_three_seed_five_fold_paper_loss",
+    "secondary_maximize": "mean_three_seed_five_fold_gene_exon_coverage_pearson_log1p",
+    "tertiary_maximize": "mean_three_seed_five_fold_per_track_pearson_128bp_log1p"
+  },
+  "training": {
+    "gene_weight": 0.1,
+    "hidden_channels": 64,
+    "learning_rate": 0.0001,
+    "max_shift_bp": 1024,
+    "max_steps": 2000,
+    "reverse_complement_probability": 0.5,
+    "sequence_length": 131072,
+    "weight_decay": 0.0001
+  },
+  "validation": {
+    "policy": "all_complete_nonoverlapping_core_only_subwindows",
+    "sequence_length": 131072
+  }
+}

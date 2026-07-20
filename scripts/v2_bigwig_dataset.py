@@ -132,6 +132,8 @@ def require_final_test_access(checkpoint_sha256: str | None) -> None:
             "Chromosome X is embargoed until P6C, scoped G5 approval, and a locked checkpoint"
         )
     lock = json.loads(FINAL_LOCK_PATH.read_text())
+    if lock.get("superseded") is True:
+        raise PermissionError("Final-test lock was superseded and cannot unlock chromosome X")
     if lock.get("checkpoint_sha256") != checkpoint_sha256:
         raise PermissionError("Checkpoint SHA-256 does not match the final-test lock")
     if lock.get("test_consumed") is True:

@@ -46,6 +46,8 @@ def require_approvals() -> dict[str, object]:
     ):
         raise RuntimeError("P6C requires current phase P6C and exact scoped G4/G5")
     lock = json.loads(LOCK_PATH.read_text())
+    if lock.get("superseded") is True:
+        raise RuntimeError("Final-test lock was superseded; amended R6B must issue a new lock")
     if lock.get("test_consumed") is True:
         raise RuntimeError("Chromosome-X final test has already been consumed")
     return lock

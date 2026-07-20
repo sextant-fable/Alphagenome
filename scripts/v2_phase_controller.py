@@ -95,7 +95,7 @@ PHASE_COMMANDS = {
     "P4": module_command("run_v2_p4"),
     "P5": module_command("run_v2_p5"),
     "P6A": module_command("run_v2_p6a"),
-    "P6B": module_command("run_v2_p6b"),
+    "P6B": module_command("run_v2_p6b_amendment"),
     "P6C": module_command("run_v2_p6c"),
 }
 REVIEW_COMMANDS = {

@@ -41,6 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-shift-bp", type=int, default=1024)
     parser.add_argument("--reverse-complement-probability", type=float, default=0.5)
     parser.add_argument("--hidden-channels", type=int, default=64)
+    parser.add_argument("--mean-column")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--device", default="cuda")
     return parser.parse_args()
@@ -160,11 +161,16 @@ def main() -> None:
 
     means_path = METADATA_DIR / "track_nonzero_means_v2.tsv"
     means_rows = read_tsv(means_path)
-    mean_column = (
+    default_mean_column = (
         "development_I_V_nonzero_mean"
         if args.fold == 0
         else f"fold_{args.fold}_train_nonzero_mean"
     )
+    mean_column = args.mean_column or default_mean_column
+    if args.fold == 0 and mean_column != "development_I_V_nonzero_mean":
+        raise ValueError("fold 0 requires development_I_V_nonzero_mean")
+    if mean_column not in means_rows[0]:
+        raise ValueError(f"Unknown mean column: {mean_column}")
     fold_means = torch.tensor(
         [float(row[mean_column]) for row in means_rows],
         dtype=torch.float32,
@@ -286,6 +292,9 @@ def main() -> None:
             "sequence_length": args.sequence_length,
             "hidden_channels": args.hidden_channels,
             "mean_column": mean_column,
+            "gene_weight": args.gene_weight,
+            "max_shift_bp": args.max_shift_bp,
+            "reverse_complement_probability": args.reverse_complement_probability,
         },
         checkpoint_path,
     )
