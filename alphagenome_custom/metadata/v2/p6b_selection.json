@@ -1,0 +1,21 @@
+{
+  "chromosome_x_read": false,
+  "cv_results_path": "alphagenome_custom/metadata/v2/p6b_cv_results.tsv",
+  "cv_results_sha256": "2d67cb6af96b5d89f213d7a62d2ea9e455fb405a841c414bcab3d3c4e94366c8",
+  "schema_version": 1,
+  "selected": {
+    "folds": 5,
+    "loss": "paper",
+    "mean_five_fold_log1p_mse": 3.598759094701515,
+    "mean_five_fold_paper_loss": 16.955879977825607,
+    "mean_five_fold_per_track_pearson_128bp": 0.6608471568786247,
+    "model": "B"
+  },
+  "selected_at": "2026-07-15T16:33:34+00:00",
+  "selection_rule": {
+    "primary_minimize": "mean_five_fold_paper_loss",
+    "secondary_minimize": "mean_five_fold_log1p_mse",
+    "tertiary_maximize": "mean_five_fold_per_track_pearson_128bp"
+  },
+  "spec_sha256": "eafb6ea38013f937b730c0b90e150096b6141f9a73bc5fe465bd829988192e5f"
+}

@@ -1,0 +1,33 @@
+{
+  "amendment_id": "P6B-A1",
+  "amendment_spec_sha256": "c0bd7e436f7bc5c8be33e2e7536b36c1ec974338d46a34b7cbb6fe91da60ea8e",
+  "chromosome_x_read": false,
+  "results_path": "alphagenome_custom/metadata/v2/p6b_amendment_cv_results.tsv",
+  "results_sha256": "eadc59f7e0f38bdbd77f21dc86e75a628f0bef6a008b4e3367d3226a19d936eb",
+  "schema_version": 1,
+  "selected": {
+    "folds": 5,
+    "jobs": 15,
+    "loss": "paper",
+    "mean_exon_mse_log1p_1bp": 0.5070828507425468,
+    "mean_gene_body_mse_log1p_1bp": 0.264675347690923,
+    "mean_gene_exon_coverage_pearson_log1p": 0.6042942527485751,
+    "mean_local_gradient_mse_log1p_1bp": 0.002454821082102672,
+    "mean_log1p_mse": 3.5997652013394275,
+    "mean_paper_loss": 16.954765716942298,
+    "mean_per_track_pearson_128bp_log1p": 0.6602006994946643,
+    "mean_primary_biological_score": 0.6322474761216197,
+    "mean_spearman_128bp": 0.602149172478615,
+    "mean_top1_calibration_ratio_128bp": 0.10079692286519144,
+    "mean_top1_mse_128bp": 6927713059.926288,
+    "model": "B",
+    "seeds": 3
+  },
+  "selected_at": "2026-07-21T04:34:03+00:00",
+  "selection_rule": {
+    "primary_maximize": "mean_three_seed_five_fold_primary_biological_score",
+    "quaternary_minimize": "mean_three_seed_five_fold_paper_loss",
+    "secondary_maximize": "mean_three_seed_five_fold_gene_exon_coverage_pearson_log1p",
+    "tertiary_maximize": "mean_three_seed_five_fold_per_track_pearson_128bp_log1p"
+  }
+}

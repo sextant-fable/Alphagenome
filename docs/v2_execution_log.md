@@ -2,6 +2,24 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-21 - P6B Amendment Completion and R6B PASS
+
+- Purpose: complete the pre-registered P6B amendment required by the independent pre-G5 audit, without reading chromosome X.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller run --phase P6B --auto`.
+- Execution window: `2026-07-20T09:26:03+00:00` through `2026-07-21T05:10:10+00:00` on HY-GPU, using physical GPUs 2 and 3 without using GPUs 0 or 1. The selected development retrain used physical GPU 2.
+- Code version: the run started from `3769d54` (`Reopen P6B with complete validation matrix`). Later commits through `79463c4` changed only `README.md` and `AGENTS.md`, not execution code.
+- Inputs and split boundary: 241 uniformly reprocessed grouped RNA-seq tracks on WBcel235; blocked development folds I-V; chromosome X remained embargoed.
+- Formal matrix: 90/90 jobs completed for A/B/C x paper/log1p-MSE x five folds x three seeds (`20260714`, `20260715`, `20260716`). The original 30 jobs were retained and backfilled with the amended metrics; 60 additional seed jobs completed. Registered amendment failures: none.
+- Ablations: 15/15 jobs completed for no augmentation, no gene loss, and the whole-I-V mean comparator, each across five folds at seed `20260714`. These are single-seed directional checks, not significance tests.
+- Selection: the pre-registered biological score selected B/paper with mean score `0.6322474761`, gene-exon coverage Pearson `0.6042942527`, and 128-bp per-track Pearson `0.6602006995`. B/log1p-MSE scored `0.6190121491`, `0.5539517632`, and `0.6840725349`, respectively.
+- Paired interpretation: B/paper beat B/log1p-MSE on the primary score in 13/15 seed-fold pairs and on gene-exon Pearson in 15/15, but lost on 128-bp Pearson and log1p-MSE in 15/15. It is the winner under the locked composite objective, not across every metric.
+- Stability: B/paper seed-level primary means were `0.632253500`, `0.629022262`, and `0.635466666` (sample SD `0.003222206`); fold-level means had sample SD `0.029768863`, so fold variation dominated seed variation.
+- Ablation interpretation: relative to the exact same-seed formal baselines, disabling augmentation changed the mean primary score by `+0.001402370`, disabling gene loss by `+0.000336154`, and the whole-I-V mean changed A/paper by `-0.000343856`. Effects are small and single-seed; they do not establish that augmentation or gene loss should be removed.
+- Final development retrain: B/paper, seed `20260717`, 2,500 steps on development chromosomes I-V. Checkpoint: `runs/v2_p6b_amendment_20260720/development_selected/checkpoint.pt`; SHA-256: `b7bdd54066b102026edd29dbe6dc23bd5b59566750b7f7ba94728821ec31525b`.
+- Auditable outputs: `alphagenome_custom/metadata/v2/p6b_amendment_execution.json`, `p6b_amendment_cv_results.tsv`, `p6b_amendment_ablation_results.tsv`, `p6b_amendment_selection.json`, and `audits/P6B/review.json`.
+- Review result: R6B-amended PASS on all ten checks. The prior P6B lock remains preserved as superseded; legacy v1 is not treated as a formal label-scale ablation.
+- Test boundary: `chromosome_x_reads=0`, `test_consumed=false`, and prior exploratory chromosome-X exposure is disclosed in the lock. The controller stopped at `P6C / APPROVAL_REQUIRED`; only explicit `G5:r6c_single_chr_x_test` approval may consume the one-time final test.
+
 ## 2026-07-20 - P6B Pre-G5 Independent Audit and Reopen
 
 - Original execution result retained: all 30 registered single-seed A/B/C x paper/log1p-MSE x five-fold jobs completed without a run failure, and the original implementation selected B/paper by minimum mean paper loss.
