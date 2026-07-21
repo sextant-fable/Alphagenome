@@ -88,6 +88,30 @@ class V2TrainingComponentsTest(unittest.TestCase):
                 50 / 15,
             )
 
+    def test_block_total_cache_matches_direct_block_means(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "signal.bw"
+            with pyBigWig.open(str(path), "w") as bigwig:
+                bigwig.addHeader([("I", 20), ("X", 20)])
+                bigwig.addEntries(
+                    ["I", "I", "X", "X"],
+                    [0, 10, 0, 10],
+                    ends=[10, 20, 10, 20],
+                    values=[2.0, 4.0, 6.0, 8.0],
+                )
+            blocks = [
+                ("I", 0, 10, "I_a"),
+                ("I", 10, 20, "I_b"),
+                ("X", 0, 10, "X_a"),
+                ("X", 10, 20, "X_b"),
+            ]
+            totals = compute_v2_track_means.nonzero_totals_for_blocks(path, blocks)
+            for subset in (blocks, blocks[:3], blocks[1::2]):
+                self.assertEqual(
+                    compute_v2_track_means.mean_from_block_totals(totals, subset),
+                    compute_v2_track_means.nonzero_mean_for_blocks(path, subset),
+                )
+
     def test_scale_unscale_matches_formula_and_round_trips(self) -> None:
         target = torch.tensor([[[0.0, 2.0, 20.0], [1.0, 4.0, 40.0]]])
         means = torch.tensor([2.0, 4.0])

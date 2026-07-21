@@ -87,10 +87,18 @@ def training_blocks(path: Path) -> list[tuple[str, int, int, str]]:
 def nonzero_mean_for_blocks(
     path: Path, blocks: list[tuple[str, int, int, str]]
 ) -> float:
-    total = 0.0
-    count = 0
+    return mean_from_block_totals(nonzero_totals_for_blocks(path, blocks), blocks)
+
+
+def nonzero_totals_for_blocks(
+    path: Path, blocks: list[tuple[str, int, int, str]]
+) -> dict[tuple[str, int, int, str], tuple[float, int]]:
+    result = {}
     with pyBigWig.open(str(path)) as bigwig:
-        for chromosome, block_start, block_end, _ in blocks:
+        for block in blocks:
+            chromosome, block_start, block_end, _ = block
+            total = 0.0
+            count = 0
             for start, end, value in (
                 bigwig.intervals(chromosome, block_start, block_end) or ()
             ):
@@ -100,8 +108,18 @@ def nonzero_mean_for_blocks(
                     width = max(0, min(end, block_end) - max(start, block_start))
                     total += width * value
                     count += width
+            result[block] = (total, count)
+    return result
+
+
+def mean_from_block_totals(
+    totals: dict[tuple[str, int, int, str], tuple[float, int]],
+    blocks: list[tuple[str, int, int, str]],
+) -> float:
+    total = sum(totals[block][0] for block in blocks)
+    count = sum(totals[block][1] for block in blocks)
     if total <= 0 or count <= 0:
-        raise RuntimeError(f"Non-positive nonzero signal for registered blocks in {path}")
+        raise RuntimeError("Non-positive nonzero signal for registered blocks")
     return total / count
 
 
@@ -135,13 +153,16 @@ def main() -> None:
     for index, output in enumerate(outputs, start=1):
         print(f"track_mean\t{index}/{len(outputs)}\t{output['group_id']}", flush=True)
         path = REPO_ROOT / output["output_path"]
+        block_totals = nonzero_totals_for_blocks(path, development_blocks)
         row: dict[str, Any] = {
             "group_id": output["group_id"],
-            "development_train_nonzero_mean": f"{nonzero_mean_for_blocks(path, development_blocks):.12g}",
+            "development_train_nonzero_mean": (
+                f"{mean_from_block_totals(block_totals, development_blocks):.12g}"
+            ),
         }
         for fold in range(1, 6):
             row[f"fold_{fold}_train_nonzero_mean"] = (
-                f"{nonzero_mean_for_blocks(path, fold_blocks[fold]):.12g}"
+                f"{mean_from_block_totals(block_totals, fold_blocks[fold]):.12g}"
             )
         rows.append(row)
     write_tsv(OUTPUT_PATH, rows)
