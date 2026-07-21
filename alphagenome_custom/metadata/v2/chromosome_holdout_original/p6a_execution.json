@@ -1,0 +1,228 @@
+{
+  "commands": [
+    [
+      "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+      "-m",
+      "scripts.train_v2_model",
+      "--model",
+      "A",
+      "--fold",
+      "1",
+      "--seed",
+      "20260714",
+      "--loss",
+      "paper",
+      "--max-steps",
+      "2",
+      "--sequence-length",
+      "131072",
+      "--output-dir",
+      "runs/v2_p6a_smoke_20260714/A",
+      "--device",
+      "cuda"
+    ],
+    [
+      "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+      "-m",
+      "scripts.train_v2_model",
+      "--model",
+      "B",
+      "--fold",
+      "1",
+      "--seed",
+      "20260714",
+      "--loss",
+      "paper",
+      "--max-steps",
+      "2",
+      "--sequence-length",
+      "131072",
+      "--output-dir",
+      "runs/v2_p6a_smoke_20260714/B",
+      "--device",
+      "cuda"
+    ],
+    [
+      "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+      "-m",
+      "scripts.train_v2_model",
+      "--model",
+      "C",
+      "--fold",
+      "1",
+      "--seed",
+      "20260714",
+      "--loss",
+      "paper",
+      "--max-steps",
+      "2",
+      "--sequence-length",
+      "131072",
+      "--output-dir",
+      "runs/v2_p6a_smoke_20260714/C",
+      "--device",
+      "cuda"
+    ]
+  ],
+  "completed_at": "2026-07-15T10:36:17+00:00",
+  "phase": "P6A",
+  "resources_after": {
+    "commands": [
+      [
+        "nvidia-smi",
+        "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+        "--format=csv,noheader,nounits"
+      ],
+      [
+        "nvidia-smi",
+        "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+        "--format=csv,noheader,nounits"
+      ]
+    ],
+    "gpus": [
+      {
+        "index": 0,
+        "memory_free_mib": 55,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 81099,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+      },
+      {
+        "index": 1,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+      },
+      {
+        "index": 2,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 7,
+        "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+      },
+      {
+        "index": 3,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+      }
+    ],
+    "processes": [
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 2103240,
+        "process_name": "VLLM::EngineCore",
+        "used_memory_mib": 70584
+      },
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 930447,
+        "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+        "used_memory_mib": 10500
+      }
+    ]
+  },
+  "resources_before": {
+    "commands": [
+      [
+        "nvidia-smi",
+        "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+        "--format=csv,noheader,nounits"
+      ],
+      [
+        "nvidia-smi",
+        "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+        "--format=csv,noheader,nounits"
+      ]
+    ],
+    "gpus": [
+      {
+        "index": 0,
+        "memory_free_mib": 55,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 81099,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+      },
+      {
+        "index": 1,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+      },
+      {
+        "index": 2,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+      },
+      {
+        "index": 3,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+      }
+    ],
+    "processes": [
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 2103240,
+        "process_name": "VLLM::EngineCore",
+        "used_memory_mib": 70584
+      },
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 930447,
+        "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+        "used_memory_mib": 10500
+      }
+    ]
+  },
+  "runs": [
+    {
+      "checkpoint_path": "runs/v2_p6a_smoke_20260714/A/checkpoint.pt",
+      "checkpoint_sha256": "2b6c61a5c7a72b3354336ed7e27388997ad2ee21ab3e0f2a6a8922193d2fbc9f",
+      "log_path": "logs/v2_p6a_smoke_20260714/A.log",
+      "model": "A",
+      "run_path": "runs/v2_p6a_smoke_20260714/A/run.json"
+    },
+    {
+      "checkpoint_path": "runs/v2_p6a_smoke_20260714/B/checkpoint.pt",
+      "checkpoint_sha256": "994d1d92709df493aea622c7bc39170e9e0fbd639e34bc18d09191b7ee77d1a4",
+      "log_path": "logs/v2_p6a_smoke_20260714/B.log",
+      "model": "B",
+      "run_path": "runs/v2_p6a_smoke_20260714/B/run.json"
+    },
+    {
+      "checkpoint_path": "runs/v2_p6a_smoke_20260714/C/checkpoint.pt",
+      "checkpoint_sha256": "2aa9754750e739dc8121e02a35a27179cac5878bb9b7de392efca6fabdf8b851",
+      "log_path": "logs/v2_p6a_smoke_20260714/C.log",
+      "model": "C",
+      "run_path": "runs/v2_p6a_smoke_20260714/C/run.json"
+    }
+  ],
+  "schema_version": 1,
+  "selected_physical_gpu": 2,
+  "started_at": "2026-07-15T10:35:55+00:00",
+  "status": "completed"
+}

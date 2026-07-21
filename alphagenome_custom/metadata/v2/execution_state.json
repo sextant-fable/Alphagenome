@@ -14,9 +14,9 @@
     },
     "G3_dataset_or_cache_generation": {
       "approved": true,
-      "note": "User authorized full normalized/grouped outputs and subsequent manifest-driven loader/split artifacts; no 439/485-channel monolithic NPZ.",
-      "scope": "p3_full_outputs_and_p4_loader",
-      "updated_at": "2026-07-13T16:35:12+00:00"
+      "note": "User explicitly requires chromosomes I, II, III, IV, V, and X in every train, validation, and final-test partition; authorize manifest-driven six-chromosome block split generation without monolithic NPZ or final-test signal access.",
+      "scope": "p4_six_chromosome_block_split",
+      "updated_at": "2026-07-21T11:49:21+00:00"
     },
     "G4_gpu_experiments": {
       "approved": true,
@@ -31,7 +31,7 @@
       "updated_at": null
     }
   },
-  "current_phase": "P6C",
+  "current_phase": "P6B",
   "history": [
     {
       "detail": "Phase command started.",
@@ -620,10 +620,130 @@
       "phase": "P6C",
       "status": "APPROVAL_REQUIRED",
       "timestamp": "2026-07-21T11:44:43+00:00"
+    },
+    {
+      "detail": "scope=p4_six_chromosome_block_split; User explicitly requires chromosomes I, II, III, IV, V, and X in every train, validation, and final-test partition; authorize manifest-driven six-chromosome block split generation without monolithic NPZ or final-test signal access.",
+      "phase": "P6C",
+      "status": "G3_APPROVED",
+      "timestamp": "2026-07-21T11:49:21+00:00"
+    },
+    {
+      "detail": "Archiving chromosome-holdout evidence before six-chromosome P4 reopen.",
+      "phase": "P6C",
+      "status": "SPLIT_REVISION_RUNNING",
+      "timestamp": "2026-07-21T11:49:27+00:00"
+    },
+    {
+      "detail": "Chromosome-holdout evidence archived and final lock superseded.",
+      "phase": "P6C",
+      "status": "SPLIT_REVISION_PREPARED",
+      "timestamp": "2026-07-21T11:49:27+00:00"
+    },
+    {
+      "detail": "Six-chromosome split revision prepared; regenerate manifests and means.",
+      "phase": "P4",
+      "status": "REOPENED",
+      "timestamp": "2026-07-21T11:49:27+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P4",
+      "status": "RUNNING",
+      "timestamp": "2026-07-21T11:49:48+00:00"
+    },
+    {
+      "detail": "Operational retry after the managed sandbox denied PyTorch DataLoader multiprocessing socket creation; generated split manifests are retained, and the identical controller command will be rerun with normal host multiprocessing permissions.",
+      "phase": "P4",
+      "status": "REOPENED",
+      "timestamp": "2026-07-21T11:51:01+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P4",
+      "status": "RUNNING",
+      "timestamp": "2026-07-21T11:51:14+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P4",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-21T11:51:23+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P4",
+      "status": "PASS",
+      "timestamp": "2026-07-21T11:51:24+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P4 PASS.",
+      "phase": "P5",
+      "status": "PENDING",
+      "timestamp": "2026-07-21T11:51:24+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P5",
+      "status": "RUNNING",
+      "timestamp": "2026-07-21T11:51:45+00:00"
+    },
+    {
+      "detail": "Controlled restart at track 15/241 before any output was written: commit 561f83c preserves the exact block sums/counts and fold aggregation while scanning each development block once instead of rereading it for all five folds.",
+      "phase": "P5",
+      "status": "REOPENED",
+      "timestamp": "2026-07-21T11:58:03+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P5",
+      "status": "RUNNING",
+      "timestamp": "2026-07-21T11:58:10+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P5",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-21T12:10:27+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P5",
+      "status": "PASS",
+      "timestamp": "2026-07-21T12:10:27+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P5 PASS.",
+      "phase": "P6A",
+      "status": "PENDING",
+      "timestamp": "2026-07-21T12:10:27+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6A",
+      "status": "RUNNING",
+      "timestamp": "2026-07-21T12:12:15+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P6A",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-21T12:12:35+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P6A",
+      "status": "PASS",
+      "timestamp": "2026-07-21T12:12:35+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P6A PASS.",
+      "phase": "P6B",
+      "status": "PENDING",
+      "timestamp": "2026-07-21T12:12:35+00:00"
     }
   ],
   "schema_version": 2,
-  "status": "APPROVAL_REQUIRED",
-  "updated_at": "2026-07-21T11:44:43+00:00",
+  "status": "PENDING",
+  "updated_at": "2026-07-21T12:12:35+00:00",
   "workflow": "c_elegans_rna_seq_v2"
 }

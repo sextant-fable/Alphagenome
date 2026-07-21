@@ -1,0 +1,17 @@
+chromosome	start	end	core_start	core_end	fold	role	block_id	block_start	block_end	split_revision
+I	8061529	9110105	8061529	8847961	final	test_locked	I_block_4	8061529	9634393	six_chromosome_blocks_v1
+I	8585817	9634393	8847961	9634393	final	test_locked	I_block_4	8061529	9634393	six_chromosome_blocks_v1
+II	8165022	9213598	8165022	8951454	final	test_locked	II_block_4	8165022	9737886	six_chromosome_blocks_v1
+II	8689310	9737886	8951454	9737886	final	test_locked	II_block_4	8165022	9737886	six_chromosome_blocks_v1
+III	333180	1381756	333180	988540	final	test_locked	III_block_1	333180	1643900	six_chromosome_blocks_v1
+III	595324	1643900	988540	1643900	final	test_locked	III_block_1	333180	1643900	six_chromosome_blocks_v1
+IV	15305634	16354210	15305634	16092066	final	test_locked	IV_block_6	15305634	17271714	six_chromosome_blocks_v1
+IV	15829922	16878498	16092066	16550818	final	test_locked	IV_block_6	15305634	17271714	six_chromosome_blocks_v1
+IV	16223138	17271714	16550818	17271714	final	test_locked	IV_block_6	15305634	17271714	six_chromosome_blocks_v1
+V	18069386	19117962	18069386	18855818	final	test_locked	V_block_6	18069386	20559754	six_chromosome_blocks_v1
+V	18593674	19642250	18855818	19380106	final	test_locked	V_block_6	18069386	20559754	six_chromosome_blocks_v1
+V	19117962	20166538	19380106	19838858	final	test_locked	V_block_6	18069386	20559754	six_chromosome_blocks_v1
+V	19511178	20559754	19838858	20559754	final	test_locked	V_block_6	18069386	20559754	six_chromosome_blocks_v1
+X	9384783	10433359	9384783	10171215	final	test_locked	X_block_4	9384783	11350863	six_chromosome_blocks_v1
+X	9909071	10957647	10171215	10629967	final	test_locked	X_block_4	9384783	11350863	six_chromosome_blocks_v1
+X	10302287	11350863	10629967	11350863	final	test_locked	X_block_4	9384783	11350863	six_chromosome_blocks_v1

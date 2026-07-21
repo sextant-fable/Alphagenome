@@ -1,0 +1,51 @@
+{
+  "augmentation": {
+    "max_shift_bp": 1024,
+    "reverse_complement_probability": 0.5
+  },
+  "chromosome_x_access": "registered_train_valid_blocks_allowed",
+  "final_test_scope": "r6c_single_six_chromosome_block_test",
+  "gene_cross_track_weight": 0.1,
+  "locked_test_block_access": "prohibited_until_locked_G5_P6C",
+  "losses": [
+    "log1p_mse",
+    "scaled_poisson_multinomial_gene"
+  ],
+  "model_b_lora_alpha": 16,
+  "model_b_lora_rank": 8,
+  "model_b_lora_targets": [
+    "tower.blocks.8.mha",
+    "tower.blocks.8.mlp"
+  ],
+  "model_b_organism_index": 2,
+  "models": [
+    {
+      "base_organism_index": 0,
+      "description": "frozen AlphaGenome trunk with new dual RNA head",
+      "model_id": "A",
+      "trunk_policy": "frozen"
+    },
+    {
+      "base_organism_index": 2,
+      "description": "new C. elegans embedding plus final-tower LoRA and dual RNA head",
+      "model_id": "B",
+      "trunk_policy": "worm_embeddings_and_lora_only"
+    },
+    {
+      "base_organism_index": null,
+      "description": "residual sequence baseline trained from scratch",
+      "model_id": "C",
+      "trunk_policy": "from_scratch"
+    }
+  ],
+  "n_tracks": 241,
+  "num_segments": 8,
+  "positional_weight": 5.0,
+  "promotion_metric": "mean_five_fold_paper_loss_then_log1p_mse_then_mean_per_track_pearson",
+  "resolutions": [
+    1,
+    128
+  ],
+  "schema_version": 1,
+  "split_revision": "six_chromosome_blocks_v1"
+}

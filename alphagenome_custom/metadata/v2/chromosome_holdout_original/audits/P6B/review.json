@@ -1,0 +1,59 @@
+{
+  "checks": [
+    {
+      "check_id": "R6B.A1_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6B.A2_preregistered_amendment",
+      "evidence": "spec_sha256=c0bd7e436f7bc5c8be33e2e7536b36c1ec974338d46a34b7cbb6fe91da60ea8e",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6B.A3_complete_three_seed_matrix",
+      "evidence": "formal=90/90 errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6B.A4_complete_ablations",
+      "evidence": "ablations=15/15 configs=['no_augmentation', 'no_gene_loss', 'whole_I_V_mean']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6B.A5_full_metric_aggregation",
+      "evidence": "configs=[('A', 'log1p_mse'), ('A', 'paper'), ('B', 'log1p_mse'), ('B', 'paper'), ('C', 'log1p_mse'), ('C', 'paper')]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6B.A6_biological_primary_selection",
+      "evidence": "selected=B/paper",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6B.A7_legacy_disposition",
+      "evidence": "not_formally_comparable_as_a_label_scale_ablation",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6B.A8_development_and_final_lock",
+      "evidence": "checkpoint=runs/v2_p6b_amendment_20260720/development_selected/checkpoint.pt",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6B.A9_old_lock_preserved",
+      "evidence": "old_checkpoint=runs/v2_p6b_20260714/development_selected/checkpoint.pt",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6B.A10_test_embargo",
+      "evidence": "chromosome_x_reads=0; G5 unapproved",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P6B",
+  "review": "R6B-amended",
+  "reviewed_at": "2026-07-21T05:10:14+00:00",
+  "schema_version": 2,
+  "status": "PASS"
+}

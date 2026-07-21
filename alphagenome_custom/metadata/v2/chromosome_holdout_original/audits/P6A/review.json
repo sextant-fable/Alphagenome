@@ -1,0 +1,49 @@
+{
+  "checks": [
+    {
+      "check_id": "R6A.01_execution_record",
+      "evidence": "alphagenome_custom/metadata/v2/p6a_execution.json",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6A.02_gpu_policy",
+      "evidence": "selected=2 free=81153 busy=False",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6A.03_three_model_smokes",
+      "evidence": "models=['A', 'B', 'C'] errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6A.04_common_interface_and_budget",
+      "evidence": "A/B/C used fold 1, seed 20260714, paper loss, 131072 bp, 241 tracks, and two steps",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6A.05_finite_numerics_and_memory",
+      "evidence": "all losses/gradients finite and CUDA memory recorded",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6A.06_checkpoint_and_log_integrity",
+      "evidence": "errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6A.07_test_embargo",
+      "evidence": "all smokes bind to fold-1 training intervals; chromosome X was not read",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R6A.08_claim_scope",
+      "evidence": "smoke outputs are environment validation, not model results",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P6A",
+  "review": "R6A",
+  "reviewed_at": "2026-07-15T10:36:17+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

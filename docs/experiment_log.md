@@ -34,6 +34,23 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-21 - Six-Chromosome Split Revision P4-P6A
+
+- Run type: analysis, sanity check, and GPU smoke test
+- Purpose: Replace the superseded I-V chromosome-holdout/X-only split with leakage-buffered within-chromosome blocks so every train, validation, and final-test partition contains `I`, `II`, `III`, `IV`, `V`, and `X`.
+- Git commit: `cf3d7c1` for the split revision; `561f83c` for the equivalent single-scan P5 block-total implementation.
+- Branch: `setup/agent-maintenance`
+- Host: HY-GPU (`hy8`), non-Slurm.
+- Environment: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python`; Python `3.12.13`; PyTorch `2.11.0+cu128`. P4/P5 used CPU; P6A used physical GPU 2.
+- Commands: controller `prepare-six-chromosome-revision`, followed by controller runs for P4, P5, and P6A. Formal phase entry points were not invoked directly.
+- Input data: unchanged 241 grouped v2 bigWigs; WBcel235; split seed `20260721`; 1,048,576 bp context, 524,288 bp stride, +/-1,024 bp augmentation, 1,050,624 bp inter-block exclusion buffer, and 131,072 bp evaluation cores.
+- Output path: `alphagenome_custom/intervals/v2/`; `alphagenome_custom/metadata/v2/split_registry_v2.json`; track means and P4-P6A audit records under `alphagenome_custom/metadata/v2/`; ignored P6A logs/checkpoints under `logs/` and `runs/`.
+- Result summary: R4, R5, and R6A passed. Every fold has 64 train windows and 16 validation windows, with all six chromosomes in both roles. The final test manifest has 16 windows across all six chromosomes and remains locked. P5 computed 241 development/fold means from registered CV training blocks only. A/B/C each completed a two-step GPU 2 smoke test.
+- Verification: R4 passed 12 checks, R5 passed 11 checks, and R6A passed 8 checks. The regression suite passed 79 tests. All phase records report `locked_test_block_signal_reads=0`; no monolithic NPZ was generated.
+- Failures or warnings: The first P4 attempt was operationally interrupted when the managed sandbox denied PyTorch multiprocessing socket creation; the identical host-permission retry passed. The first serial P5 mean run was stopped at 15/241 before output write, then restarted after commit `561f83c` reduced repeated block scans without changing sums, counts, or fold membership. P6A is environment validation only.
+- Next actions: Run the preregistered six-chromosome P6B matrix on idle physical GPUs 2/3, pass R6B, then stop at the new unapproved G5 scope.
+- Claim status: verified
+
 ## 2026-07-14 - RNA-seq v2 P3A Download Failure
 
 - Run type: preprocessing

@@ -1,0 +1,17 @@
+chromosome	start	end	core_start	core_end	fold	role	block_id	block_start	block_end	split_revision
+I	5438041	6486617	5438041	6224473	3	valid	I_block_3	5438041	7010905	six_chromosome_blocks_v1
+I	5962329	7010905	6224473	7010905	3	valid	I_block_3	5438041	7010905	six_chromosome_blocks_v1
+II	294558	1343134	294558	1080990	3	valid	II_block_1	294558	1867422	six_chromosome_blocks_v1
+II	818846	1867422	1080990	1867422	3	valid	II_block_1	294558	1867422	six_chromosome_blocks_v1
+III	9778556	10827132	9778556	10433916	3	valid	III_block_5	9778556	11089276	six_chromosome_blocks_v1
+III	10040700	11089276	10433916	11089276	3	valid	III_block_5	9778556	11089276	six_chromosome_blocks_v1
+IV	3238818	4287394	3238818	4025250	3	valid	IV_block_2	3238818	5204898	six_chromosome_blocks_v1
+IV	3763106	4811682	4025250	4484002	3	valid	IV_block_2	3238818	5204898	six_chromosome_blocks_v1
+IV	4156322	5204898	4484002	5204898	3	valid	IV_block_2	3238818	5204898	six_chromosome_blocks_v1
+V	3905418	4953994	3905418	4691850	3	valid	V_block_2	3905418	6395786	six_chromosome_blocks_v1
+V	4429706	5478282	4691850	5216138	3	valid	V_block_2	3905418	6395786	six_chromosome_blocks_v1
+V	4953994	6002570	5216138	5674890	3	valid	V_block_2	3905418	6395786	six_chromosome_blocks_v1
+V	5347210	6395786	5674890	6395786	3	valid	V_block_2	3905418	6395786	six_chromosome_blocks_v1
+X	6368079	7416655	6368079	7154511	3	valid	X_block_3	6368079	8334159	six_chromosome_blocks_v1
+X	6892367	7940943	7154511	7613263	3	valid	X_block_3	6368079	8334159	six_chromosome_blocks_v1
+X	7285583	8334159	7613263	8334159	3	valid	X_block_3	6368079	8334159	six_chromosome_blocks_v1

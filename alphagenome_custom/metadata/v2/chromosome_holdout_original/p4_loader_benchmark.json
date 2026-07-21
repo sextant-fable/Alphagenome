@@ -1,0 +1,81 @@
+{
+  "cache_policy": "optional_per_worker_lru_default_disabled",
+  "device": "cpu",
+  "direct_bigwig_errors": [],
+  "direct_bigwig_verification_tracks": [
+    0,
+    120,
+    240
+  ],
+  "elapsed_seconds": 6.586388842202723,
+  "full_fold_epoch_seconds_linear_io_estimate": 339.7995206345804,
+  "full_target_bytes": 1018724352,
+  "full_window_digest": "1d26da506ea916da6e5967080c109be91a76aa4ee595fae17b618c6dcb6190bd",
+  "full_window_dtypes": {
+    "core_mask": "torch.bool",
+    "dna_sequence": "torch.float32",
+    "gene_mask": "torch.bool",
+    "target_128bp": "torch.float32",
+    "target_1bp": "torch.float32",
+    "track_mask": "torch.bool",
+    "track_strand": "torch.int8"
+  },
+  "full_window_seconds": 2.6341048111207783,
+  "full_window_shapes": {
+    "core_mask": [
+      1048576
+    ],
+    "dna_sequence": [
+      4,
+      1048576
+    ],
+    "gene_mask": [
+      2,
+      1048576
+    ],
+    "target_128bp": [
+      241,
+      8192
+    ],
+    "target_1bp": [
+      241,
+      1048576
+    ],
+    "track_mask": [
+      241,
+      1
+    ],
+    "track_strand": [
+      241
+    ]
+  },
+  "full_window_tracks": 241,
+  "group_manifest_sha256": "06bfc6109b08dc22007601d9c406cd4772701901f069f16ad1ea26b3d6134737",
+  "group_outputs_sha256": "4f261a4dcbb84f73be26ae2205e049550083b816a54561e6c983b048c6267a65",
+  "monolithic_npz_generated": false,
+  "multi_worker_digests": [
+    "20edcf9bfdd77e35aa4e5b334200f654ed0bbebe2bddea5c2bdf09a81d80fccf",
+    "fa5bcab547b718ec3960af732fd6edc4eb83a6f98daca4d561da132b054b7ff3"
+  ],
+  "multi_worker_two_window_seconds": 0.48332418082281947,
+  "open_file_descriptors_after": 4,
+  "open_file_descriptors_before": 4,
+  "peak_rss_kib_after": 2794344,
+  "peak_rss_kib_before": 535324,
+  "phase": "P4",
+  "pooling_128bp": "sum_of_128_consecutive_1bp_values",
+  "schema_version": 1,
+  "single_worker_digests": [
+    "20edcf9bfdd77e35aa4e5b334200f654ed0bbebe2bddea5c2bdf09a81d80fccf",
+    "fa5bcab547b718ec3960af732fd6edc4eb83a6f98daca4d561da132b054b7ff3"
+  ],
+  "single_worker_two_window_seconds": 0.4038439551368356,
+  "split_registry_sha256": "b6abf1d857e6e6e4beb59f4dba02cbb3f25ecc2f61425c8b078e920962c5b875",
+  "worker_determinism_track_indices": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "worker_deterministic": true
+}

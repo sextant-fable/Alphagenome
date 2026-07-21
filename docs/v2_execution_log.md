@@ -2,6 +2,14 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-21 - Six-Chromosome P4-P6A Execution
+
+- Migration: the original chromosome-holdout intervals, P4/P5/P6A/P6B reviews, overwrite-prone metadata, and unconsumed final-test lock were copied to dedicated archive directories with SHA-256 evidence. The old lock is superseded, not deleted; G5 remained unapproved.
+- R4 PASS: every train and validation fold contains `I`, `II`, `III`, `IV`, `V`, and `X`; the locked final test contains one block assignment per chromosome. Each fold has 64 train windows and 16 validation windows. The final test has 16 windows, and adjacent effective blocks have a `1,050,624 bp` exclusion buffer. Default loader construction refused the test manifest; signal reads were zero.
+- R5 PASS: 241 nonzero means were recomputed from 30 development CV blocks and 24 train blocks per fold, with zero locked-test reads. The first implementation reread the same blocks for each fold; commit `561f83c` changed this to one per-block sum/count scan followed by identical fold aggregation, covered by 79 passing tests.
+- R6A PASS: A, B, and C each completed the registered two-step smoke on physical GPU 2 with finite losses/gradients and checkpoint/log verification. GPU 3 was occupied by an unrelated CellUNetr process and was not touched. Smoke evidence is environmental only, not a model result.
+- Operational evidence: the first P4 benchmark was interrupted after the managed sandbox denied DataLoader socket creation; an append-only reopen records the cause, and the identical host-permission controller retry passed. No monolithic NPZ was created.
+
 ## 2026-07-21 - Six-Chromosome Split Revision Preregistration
 
 - User requirement: every formal train, validation, and test partition must contain WBcel235 blocks from `I`, `II`, `III`, `IV`, `V`, and sex chromosome `X`; `X` is not chromosome 10.

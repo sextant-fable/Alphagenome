@@ -1,0 +1,64 @@
+{
+  "checks": [
+    {
+      "check_id": "R5.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R5.02_leakage_safe_track_means",
+      "evidence": "tracks=241 x_read=False",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R5.03_model_space_scaling_and_dual_loss",
+      "evidence": "head_shapes={'1': [1, 241, 1024], '128': [1, 241, 8]} loss=26.312782287597656",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R5.04_gene_loss_and_augmentation_lock",
+      "evidence": "gene_weight=0.1 augmentation={'max_shift_bp': 1024, 'reverse_complement_probability': 0.5}",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R5.05_three_model_contract",
+      "evidence": "models={'A': {'base_organism_index': 0, 'description': 'frozen AlphaGenome trunk with new dual RNA head', 'model_id': 'A', 'trunk_policy': 'frozen'}, 'B': {'base_organism_index': 2, 'description': 'new C. elegans embedding plus final-tower LoRA and dual RNA head', 'model_id': 'B', 'trunk_policy': 'worm_embeddings_and_lora_only'}, 'C': {'base_organism_index': None, 'description': 'residual sequence baseline trained from scratch', 'model_id': 'C', 'trunk_policy': 'from_scratch'}}",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R5.06_real_worm_embedding",
+      "evidence": "paths=['organism_embed', 'embedder_128bp.organism_embed', 'embedder_1bp.organism_embed', 'embedder_pair.organism_embed'] index=2",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R5.07_checkpoint_freeze_and_lora_scope",
+      "evidence": "lora_modules=6 unexpected=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R5.08_cpu_forward_backward",
+      "evidence": "head={'1': [1, 241, 1024], '128': [1, 241, 8]} baseline={'1': [1, 16, 1024], '128': [1, 16, 8]}",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R5.09_unit_and_golden_tests",
+      "evidence": "unit_tests=56 return=0",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R5.10_test_embargo",
+      "evidence": "prohibited_until_locked_G5_P6C",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R5.11_manifest_hashes",
+      "evidence": "P5 audit hashes bind means and model specification",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P5",
+  "review": "R5",
+  "reviewed_at": "2026-07-15T10:33:33+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

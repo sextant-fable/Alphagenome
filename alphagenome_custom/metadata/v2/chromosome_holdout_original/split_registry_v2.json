@@ -1,0 +1,103 @@
+{
+  "cv_chromosomes": [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V"
+  ],
+  "development_train_chromosomes": [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V"
+  ],
+  "development_train_windows": 155,
+  "evaluation_core_policy": "nearest_window_center_partition_no_overlap",
+  "files": {
+    "alphagenome_custom/intervals/v2/development_train.tsv": "83e31380aa198b6b29c8b5bf6c453600b13a7e4acae387ebff6d7773abb8121c",
+    "alphagenome_custom/intervals/v2/fold_1/train.tsv": "f1260db1ff498c2fde337074024d1a9d88a939daf4c92b913f2cec15ef7684b9",
+    "alphagenome_custom/intervals/v2/fold_1/valid.tsv": "1869fab823b3a3b188d438ca78865af68269f274d4dd81d67b9940a4308abcc6",
+    "alphagenome_custom/intervals/v2/fold_2/train.tsv": "8617517c0f93a666c7ae46187662ac5840566b7f624fa8987ef9e817832aac20",
+    "alphagenome_custom/intervals/v2/fold_2/valid.tsv": "94c65eabd18ace16149d917372f76e84c0836e0c14a45d527e6f90b692e6359b",
+    "alphagenome_custom/intervals/v2/fold_3/train.tsv": "baef30a00be2175d55c0ee9421842290df79414d211c7cc949c3b845ba8e438e",
+    "alphagenome_custom/intervals/v2/fold_3/valid.tsv": "53b0229428f2179190a938f933c66866baeea92a0a4093f5e6d5ba32e38b3bde",
+    "alphagenome_custom/intervals/v2/fold_4/train.tsv": "565f6a3d39489b4b333eb33e956947aac13e9b0317348d12dd5907e1af6aedec",
+    "alphagenome_custom/intervals/v2/fold_4/valid.tsv": "902c96a97c26b2eadb3f0929cdb5b61d5f3b4c0a22b1ccefb9a83f1a7ca728db",
+    "alphagenome_custom/intervals/v2/fold_5/train.tsv": "af69ec9e5aec8f4b2942a488510c5e581c3799365939c3230ddffd5408618ad9",
+    "alphagenome_custom/intervals/v2/fold_5/valid.tsv": "1b8158961af54976d8002fa7cb097d9349a27d6c34b8ead5b776e057703c1173",
+    "alphagenome_custom/intervals/v2/test_locked.tsv": "5f398d182fad1dc63780a566b62fad23bd8ee80ccb10bda46ecab2e135e5d016"
+  },
+  "folds": [
+    {
+      "fold": 1,
+      "train_chromosomes": [
+        "II",
+        "III",
+        "IV",
+        "V"
+      ],
+      "train_windows": 127,
+      "valid_chromosome": "I",
+      "valid_windows": 28
+    },
+    {
+      "fold": 2,
+      "train_chromosomes": [
+        "I",
+        "III",
+        "IV",
+        "V"
+      ],
+      "train_windows": 126,
+      "valid_chromosome": "II",
+      "valid_windows": 29
+    },
+    {
+      "fold": 3,
+      "train_chromosomes": [
+        "I",
+        "II",
+        "IV",
+        "V"
+      ],
+      "train_windows": 129,
+      "valid_chromosome": "III",
+      "valid_windows": 26
+    },
+    {
+      "fold": 4,
+      "train_chromosomes": [
+        "I",
+        "II",
+        "III",
+        "V"
+      ],
+      "train_windows": 122,
+      "valid_chromosome": "IV",
+      "valid_windows": 33
+    },
+    {
+      "fold": 5,
+      "train_chromosomes": [
+        "I",
+        "II",
+        "III",
+        "IV"
+      ],
+      "train_windows": 116,
+      "valid_chromosome": "V",
+      "valid_windows": 39
+    }
+  ],
+  "group_manifest_sha256": "06bfc6109b08dc22007601d9c406cd4772701901f069f16ad1ea26b3d6134737",
+  "group_outputs_sha256": "4f261a4dcbb84f73be26ae2205e049550083b816a54561e6c983b048c6267a65",
+  "reference_fai_sha256": "aaa0bf6e25f337787d22d23e1e94f341cb4d9d7ec8c1ba76f667e859a0f7e3cc",
+  "schema_version": 1,
+  "stride": 524288,
+  "test_chromosome": "X",
+  "test_status": "embargoed_prior_exposure_disclosed",
+  "test_windows": 33,
+  "window_size": 1048576
+}

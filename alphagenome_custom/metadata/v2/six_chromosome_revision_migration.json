@@ -1,0 +1,194 @@
+{
+  "active_lock_sha256": "270255264a6decdc3d176ae2a1e0602a1e4bc5ffd071c9a5e1a4cc067650ce24",
+  "archived_audits": [
+    {
+      "bytes": 2086,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/audits/P4/review.json",
+      "sha256": "210a90cf7f7593086acff349727f9d7d2dc776642e0a5f1fa4999e6d00428415"
+    },
+    {
+      "bytes": 1349,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/audits/P4/review.md",
+      "sha256": "fb4e70bfba9eecd62e50b55bf69b9f298c228e7e3568d17af30112a4bec1ff32"
+    },
+    {
+      "bytes": 2369,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/audits/P5/review.json",
+      "sha256": "eadeb592f2ebfe518dec4d442f4143887c9e8bd0c3ee54d85649768ff966901d"
+    },
+    {
+      "bytes": 1632,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/audits/P5/review.md",
+      "sha256": "f65a804ecc766758038280026ea08cd1f726e98e77289e1a6aef5426808adaf2"
+    },
+    {
+      "bytes": 1377,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/audits/P6A/review.json",
+      "sha256": "5674126f4b568f6223e002ef93f20961946f4ae070f0ea3a5929e0e8b2554f6a"
+    },
+    {
+      "bytes": 834,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/audits/P6A/review.md",
+      "sha256": "f7b6cc641efd8b7ee9165373e989e696801fcc7a9342edbe8dc46813d0ec63e5"
+    },
+    {
+      "bytes": 1781,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/audits/P6B/review.json",
+      "sha256": "1ca82d8022c79261a50862a294330f232fd3800ff5a368c5edbf70bd8122e45c"
+    },
+    {
+      "bytes": 1108,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/audits/P6B/review.md",
+      "sha256": "0d99d914036f756edc9d6d8c2e9b564c2953698bccd0e67a0a4cdc8eb9540da6"
+    }
+  ],
+  "archived_intervals": [
+    {
+      "bytes": 8395,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/development_train.tsv",
+      "sha256": "83e31380aa198b6b29c8b5bf6c453600b13a7e4acae387ebff6d7773abb8121c"
+    },
+    {
+      "bytes": 5647,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/fold_1/train.tsv",
+      "sha256": "f1260db1ff498c2fde337074024d1a9d88a939daf4c92b913f2cec15ef7684b9"
+    },
+    {
+      "bytes": 1249,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/fold_1/valid.tsv",
+      "sha256": "1869fab823b3a3b188d438ca78865af68269f274d4dd81d67b9940a4308abcc6"
+    },
+    {
+      "bytes": 5572,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/fold_2/train.tsv",
+      "sha256": "8617517c0f93a666c7ae46187662ac5840566b7f624fa8987ef9e817832aac20"
+    },
+    {
+      "bytes": 1324,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/fold_2/valid.tsv",
+      "sha256": "94c65eabd18ace16149d917372f76e84c0836e0c14a45d527e6f90b692e6359b"
+    },
+    {
+      "bytes": 5687,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/fold_3/train.tsv",
+      "sha256": "baef30a00be2175d55c0ee9421842290df79414d211c7cc949c3b845ba8e438e"
+    },
+    {
+      "bytes": 1209,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/fold_3/valid.tsv",
+      "sha256": "53b0229428f2179190a938f933c66866baeea92a0a4093f5e6d5ba32e38b3bde"
+    },
+    {
+      "bytes": 5384,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/fold_4/train.tsv",
+      "sha256": "565f6a3d39489b4b333eb33e956947aac13e9b0317348d12dd5907e1af6aedec"
+    },
+    {
+      "bytes": 1512,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/fold_4/valid.tsv",
+      "sha256": "902c96a97c26b2eadb3f0929cdb5b61d5f3b4c0a22b1ccefb9a83f1a7ca728db"
+    },
+    {
+      "bytes": 5141,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/fold_5/train.tsv",
+      "sha256": "af69ec9e5aec8f4b2942a488510c5e581c3799365939c3230ddffd5408618ad9"
+    },
+    {
+      "bytes": 1755,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/fold_5/valid.tsv",
+      "sha256": "1b8158961af54976d8002fa7cb097d9349a27d6c34b8ead5b776e057703c1173"
+    },
+    {
+      "bytes": 1809,
+      "path": "alphagenome_custom/intervals/v2_chromosome_holdout_original/test_locked.tsv",
+      "sha256": "5f398d182fad1dc63780a566b62fad23bd8ee80ccb10bda46ecab2e135e5d016"
+    }
+  ],
+  "archived_metadata": [
+    {
+      "bytes": 3299,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/split_registry_v2.json",
+      "sha256": "b6abf1d857e6e6e4beb59f4dba02cbb3f25ecc2f61425c8b078e920962c5b875"
+    },
+    {
+      "bytes": 2247,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/p4_loader_benchmark.json",
+      "sha256": "07f88da54ea2bc9275af45227c54ae7a3ec073db97f47d29f44c86d88cb2e93e"
+    },
+    {
+      "bytes": 23402,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/track_nonzero_means_v2.tsv",
+      "sha256": "3734bdf7a92e53f758f087d9d3993c92de15c20feb90902b947a0cfbfb4f6beb"
+    },
+    {
+      "bytes": 585,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/track_nonzero_means_v2_summary.json",
+      "sha256": "6233bf38e64763c10e6a6b3518b0be15e71b93c09f5e569a0865c294f682ff9b"
+    },
+    {
+      "bytes": 1236,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/model_specs_v2.json",
+      "sha256": "4a57c90270481737b4233be3859f4b174823ad6db12d70ad0a9ec57207c18027"
+    },
+    {
+      "bytes": 2220,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/p5_component_audit.json",
+      "sha256": "f513f2202a0856d989b3f08c02ece41e675d995c826eec02ca3922b93a366db3"
+    },
+    {
+      "bytes": 6167,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/p6a_execution.json",
+      "sha256": "5ce74bf2121b0f4866cdbb46f90efd55c5ea0a3abf4cd144e7bddfc78a83e6e3"
+    },
+    {
+      "bytes": 1063,
+      "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/final_test_lock.json",
+      "sha256": "270255264a6decdc3d176ae2a1e0602a1e4bc5ffd071c9a5e1a4cc067650ce24"
+    }
+  ],
+  "old_split_disposition": "superseded_for_six_chromosome_split",
+  "prepared_at": "2026-07-21T11:49:27+00:00",
+  "preserved_p6b": [
+    {
+      "bytes": 3384,
+      "path": "alphagenome_custom/metadata/v2/p6b_amendment_spec.json",
+      "sha256": "c0bd7e436f7bc5c8be33e2e7536b36c1ec974338d46a34b7cbb6fe91da60ea8e"
+    },
+    {
+      "bytes": 372897,
+      "path": "alphagenome_custom/metadata/v2/p6b_amendment_execution.json",
+      "sha256": "b0d36a15220c9319aadfb4515649b13edda8d03c4adc0e3762c605ee2b065d85"
+    },
+    {
+      "bytes": 1687,
+      "path": "alphagenome_custom/metadata/v2/p6b_amendment_cv_results.tsv",
+      "sha256": "eadc59f7e0f38bdbd77f21dc86e75a628f0bef6a008b4e3367d3226a19d936eb"
+    },
+    {
+      "bytes": 1055,
+      "path": "alphagenome_custom/metadata/v2/p6b_amendment_ablation_results.tsv",
+      "sha256": "cdabf41476e264e87e1ca4b0c1a655c3d0fbe069100d98328f94ba6753fc4172"
+    },
+    {
+      "bytes": 1436,
+      "path": "alphagenome_custom/metadata/v2/p6b_amendment_selection.json",
+      "sha256": "ff434c21520914408ed432f4f2f188c9cfd225424aef8953b0222b4d1c9b6cae"
+    },
+    {
+      "bytes": 1311,
+      "path": "alphagenome_custom/metadata/v2/p6b_legacy_v1_disposition.json",
+      "sha256": "ef35f821449854d184bed264b090957827f3096fc54dc31ed6ac8f5996cac4c5"
+    }
+  ],
+  "revision_id": "six_chromosome_blocks_v1",
+  "schema_version": 1,
+  "source_g5_approved": false,
+  "source_lock_archive": {
+    "bytes": 798,
+    "path": "alphagenome_custom/metadata/v2/chromosome_holdout_original/final_test_lock_pre_revision.json",
+    "sha256": "ed7cbd9c8457d58d6a1d7e6e2ef5128cae51575770cc2e019cf32ba0604f6909"
+  },
+  "source_lock_sha256": "ed7cbd9c8457d58d6a1d7e6e2ef5128cae51575770cc2e019cf32ba0604f6909",
+  "source_phase": "P6C",
+  "source_test_consumed": false
+}

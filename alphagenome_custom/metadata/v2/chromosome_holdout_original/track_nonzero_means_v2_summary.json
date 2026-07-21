@@ -1,0 +1,17 @@
+{
+  "chromosome_x_read": false,
+  "controlled_comparison": "development_I_V_mean_vs_fold_train_only_mean",
+  "development_mean_chromosomes": [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V"
+  ],
+  "fold_mean_policy": "nonzero_mean_on_four_training_chromosomes_only",
+  "group_outputs_sha256": "4f261a4dcbb84f73be26ae2205e049550083b816a54561e6c983b048c6267a65",
+  "output_sha256": "3734bdf7a92e53f758f087d9d3993c92de15c20feb90902b947a0cfbfb4f6beb",
+  "schema_version": 1,
+  "split_registry_sha256": "b6abf1d857e6e6e4beb59f4dba02cbb3f25ecc2f61425c8b078e920962c5b875",
+  "tracks": 241
+}

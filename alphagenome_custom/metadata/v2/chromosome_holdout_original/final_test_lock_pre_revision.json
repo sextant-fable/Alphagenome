@@ -11,10 +11,7 @@
   "selection_path": "alphagenome_custom/metadata/v2/p6b_amendment_selection.json",
   "selection_sha256": "ff434c21520914408ed432f4f2f188c9cfd225424aef8953b0222b4d1c9b6cae",
   "steps": 2500,
-  "superseded": true,
-  "superseded_at": "2026-07-21T11:49:27+00:00",
-  "superseded_for_revision": "six_chromosome_blocks_v1",
-  "superseded_reason": "User-required six-chromosome within-chromosome block split replaces the I-V chromosome CV and X-only final test before G5 consumption.",
+  "superseded": false,
   "test_consumed": false,
   "test_consumed_at": null,
   "training_chromosomes": [
