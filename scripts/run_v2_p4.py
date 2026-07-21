@@ -119,6 +119,21 @@ def main() -> None:
             )
     verify_dataset.close()
 
+    x_valid_dataset = V2BigWigDataset(
+        intervals, track_indices=[0], max_io_workers=1
+    )
+    x_valid_index = next(
+        index
+        for index, interval in enumerate(x_valid_dataset.intervals)
+        if interval["chromosome"] == "X" and interval["role"] == "valid"
+    )
+    x_valid_item = x_valid_dataset[x_valid_index]
+    x_valid_role_read_verified = (
+        x_valid_item["interval_chromosome"] == "X"
+        and x_valid_dataset.intervals[x_valid_index]["role"] == "valid"
+    )
+    x_valid_dataset.close()
+
     worker_indices = list(range(min(4, n_tracks)))
     single_dataset = V2BigWigDataset(
         intervals, track_indices=worker_indices, max_io_workers=4
@@ -191,6 +206,9 @@ def main() -> None:
         "cache_policy": "optional_per_worker_lru_default_disabled",
         "pooling_128bp": "sum_of_128_consecutive_1bp_values",
         "monolithic_npz_generated": False,
+        "split_revision": registry.get("revision_id"),
+        "x_valid_role_read_verified": x_valid_role_read_verified,
+        "locked_test_block_signal_reads": 0,
         "split_registry_sha256": sha256(registry_path),
         "group_manifest_sha256": sha256(
             METADATA_DIR / "rna_seq_groups_v2_final.tsv"
@@ -201,7 +219,12 @@ def main() -> None:
     temporary.write_text(json.dumps(benchmark, indent=2, sort_keys=True) + "\n")
     temporary.replace(BENCHMARK_PATH)
     print(json.dumps(benchmark, indent=2, sort_keys=True))
-    if direct_errors or not benchmark["worker_deterministic"] or n_tracks != 241:
+    if (
+        direct_errors
+        or not benchmark["worker_deterministic"]
+        or not x_valid_role_read_verified
+        or n_tracks != 241
+    ):
         raise SystemExit(1)
 
 

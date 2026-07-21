@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 import csv
 from datetime import datetime, timezone
 import hashlib
@@ -1578,6 +1578,9 @@ def review_p4() -> dict[str, Any]:
     interval_dir = REPO_ROOT / "alphagenome_custom/intervals/v2"
     registry_path = metadata_dir / "split_registry_v2.json"
     benchmark_path = metadata_dir / "p4_loader_benchmark.json"
+    spec_path = metadata_dir / "six_chromosome_split_spec.json"
+    blocks_path = interval_dir / "blocks.tsv"
+    migration_path = metadata_dir / "six_chromosome_revision_migration.json"
     expected_paths = [
         interval_dir / f"fold_{fold}/{role}.tsv"
         for fold in range(1, 6)
@@ -1585,6 +1588,9 @@ def review_p4() -> dict[str, Any]:
     ] + [
         interval_dir / "development_train.tsv",
         interval_dir / "test_locked.tsv",
+        blocks_path,
+        spec_path,
+        migration_path,
         registry_path,
         benchmark_path,
     ]
@@ -1604,78 +1610,162 @@ def review_p4() -> dict[str, Any]:
 
     registry = json.loads(registry_path.read_text())
     benchmark = json.loads(benchmark_path.read_text())
+    spec = json.loads(spec_path.read_text())
+    migration = json.loads(migration_path.read_text())
+    blocks = read_tsv(blocks_path)
     chromosome_lengths = {}
     with (REPO_ROOT / "alphagenome_custom/reference/genome.fa.fai").open() as handle:
         for line in handle:
             name, length, *_ = line.rstrip("\n").split("\t")
             chromosome_lengths[name] = int(length)
-    cv_chromosomes = ("I", "II", "III", "IV", "V")
+    chromosomes = ("I", "II", "III", "IV", "V", "X")
+    chromosome_set = set(chromosomes)
+    expected_assignments = {
+        "cv_fold_1",
+        "cv_fold_2",
+        "cv_fold_3",
+        "cv_fold_4",
+        "cv_fold_5",
+        "test_locked",
+    }
+    window_size = 2**20
+    max_shift = 1024
+    buffer_bp = window_size + 2 * max_shift
+    revision_id = "six_chromosome_blocks_v1"
     split_errors = []
     core_errors = []
-    all_train_valid_chromosomes = set()
-    for fold, valid_chromosome in enumerate(cv_chromosomes, start=1):
-        train = read_tsv(interval_dir / f"fold_{fold}/train.tsv")
-        valid = read_tsv(interval_dir / f"fold_{fold}/valid.tsv")
-        train_chromosomes = {row["chromosome"] for row in train}
-        valid_chromosomes = {row["chromosome"] for row in valid}
-        expected_train = set(cv_chromosomes) - {valid_chromosome}
-        if train_chromosomes != expected_train or valid_chromosomes != {valid_chromosome}:
-            split_errors.append(
-                f"fold{fold}:train={sorted(train_chromosomes)} valid={sorted(valid_chromosomes)}"
+    block_errors = []
+    blocks_by_id = {row["block_id"]: row for row in blocks}
+    if len(blocks) != 36 or len(blocks_by_id) != 36:
+        block_errors.append(f"block_count={len(blocks)} unique={len(blocks_by_id)}")
+    for chromosome in chromosomes:
+        members = sorted(
+            (row for row in blocks if row["chromosome"] == chromosome),
+            key=lambda row: int(row["physical_order"]),
+        )
+        if (
+            len(members) != 6
+            or {row["assignment"] for row in members} != expected_assignments
+            or int(members[0]["block_start"])
+            != int(members[0]["outer_margin_before_bp"])
+            or int(members[-1]["block_end"])
+            + int(members[-1]["outer_margin_after_bp"])
+            != chromosome_lengths[chromosome]
+            or any(int(row["effective_bases"]) < buffer_bp for row in members)
+            or any(
+                int(row["effective_bases"]) % 131072 != 0 for row in members
             )
-        if any(
-            int(row["end"]) - int(row["start"]) != 2**20
-            or row["role"] != "train"
-            for row in train
+            or any(
+                int(second["block_start"]) - int(first["block_end"]) != buffer_bp
+                for first, second in zip(members, members[1:])
+            )
         ):
-            split_errors.append(f"fold{fold}:invalid train window")
-        valid_sorted = sorted(valid, key=lambda row: int(row["core_start"]))
-        if any(
-            int(row["end"]) - int(row["start"]) != 2**20
-            or row["role"] != "valid"
-            or not (
+            block_errors.append(f"{chromosome}:invalid assignment/size/buffer")
+
+    def validate_rows(
+        rows: list[dict[str, str]], role: str, assignments: set[str]
+    ) -> list[str]:
+        errors = []
+        for row in rows:
+            block = blocks_by_id.get(row.get("block_id"))
+            if (
+                block is None
+                or row.get("role") != role
+                or row.get("split_revision") != revision_id
+                or row.get("chromosome") != block.get("chromosome")
+                or block.get("assignment") not in assignments
+                or int(row["end"]) - int(row["start"]) != window_size
+                or int(row["start"]) < int(block["block_start"])
+                or int(row["end"]) > int(block["block_end"])
+            ):
+                errors.append(f"{row.get('chromosome')}:{row.get('start')}-{row.get('end')}")
+                continue
+            if role == "train" and (
+                int(row["start"]) - max_shift < int(block["block_start"])
+                or int(row["end"]) + max_shift > int(block["block_end"])
+            ):
+                errors.append(f"{row['block_id']}:shift_escape")
+            if role != "train" and not (
                 int(row["start"])
                 <= int(row["core_start"])
                 < int(row["core_end"])
                 <= int(row["end"])
+            ):
+                errors.append(f"{row['block_id']}:core_escape")
+        return errors
+
+    def validate_core_partitions(rows: list[dict[str, str]]) -> list[str]:
+        errors = []
+        grouped: dict[str, list[dict[str, str]]] = defaultdict(list)
+        for row in rows:
+            grouped[row["block_id"]].append(row)
+        for block_id, members in grouped.items():
+            block = blocks_by_id[block_id]
+            ordered = sorted(members, key=lambda row: int(row["core_start"]))
+            if (
+                int(ordered[0]["core_start"]) != int(block["block_start"])
+                or int(ordered[-1]["core_end"]) != int(block["block_end"])
+                or any(
+                    int(first["core_end"]) != int(second["core_start"])
+                    for first, second in zip(ordered, ordered[1:])
+                )
+            ):
+                errors.append(f"{block_id}:core_gap_or_overlap")
+        return errors
+
+    for fold in range(1, 6):
+        train = read_tsv(interval_dir / f"fold_{fold}/train.tsv")
+        valid = read_tsv(interval_dir / f"fold_{fold}/valid.tsv")
+        train_chromosomes = {row["chromosome"] for row in train}
+        valid_chromosomes = {row["chromosome"] for row in valid}
+        train_assignments = {
+            f"cv_fold_{value}" for value in range(1, 6) if value != fold
+        }
+        valid_assignments = {f"cv_fold_{fold}"}
+        if train_chromosomes != chromosome_set or valid_chromosomes != chromosome_set:
+            split_errors.append(
+                f"fold{fold}:train={sorted(train_chromosomes)} valid={sorted(valid_chromosomes)}"
             )
-            for row in valid_sorted
-        ):
-            core_errors.append(f"fold{fold}:invalid core bounds")
-        if (
-            not valid_sorted
-            or int(valid_sorted[0]["core_start"]) != 0
-            or int(valid_sorted[-1]["core_end"])
-            != chromosome_lengths[valid_chromosome]
-            or any(
-                int(first["core_end"]) != int(second["core_start"])
-                for first, second in zip(valid_sorted, valid_sorted[1:])
+        train_errors = validate_rows(train, "train", train_assignments)
+        valid_errors = validate_rows(valid, "valid", valid_assignments)
+        if train_errors or valid_errors:
+            split_errors.append(
+                f"fold{fold}:row_errors={train_errors[:3] + valid_errors[:3]}"
             )
-        ):
-            core_errors.append(f"fold{fold}:core partition gap/overlap")
-        all_train_valid_chromosomes.update(train_chromosomes | valid_chromosomes)
+        fold_core_errors = validate_core_partitions(valid)
+        if fold_core_errors:
+            core_errors.extend(f"fold{fold}:{error}" for error in fold_core_errors)
+        train_blocks = {row["block_id"] for row in train}
+        valid_blocks = {row["block_id"] for row in valid}
+        test_blocks = {
+            row["block_id"] for row in blocks if row["assignment"] == "test_locked"
+        }
+        if train_blocks & valid_blocks or train_blocks & test_blocks or valid_blocks & test_blocks:
+            split_errors.append(f"fold{fold}:block_leakage")
 
     development = read_tsv(interval_dir / "development_train.tsv")
     development_chromosomes = {row["chromosome"] for row in development}
     if (
-        development_chromosomes != set(cv_chromosomes)
+        development_chromosomes != chromosome_set
         or any(row["role"] != "train" for row in development)
-        or any(row["chromosome"] == "X" for row in development)
+        or validate_rows(
+            development,
+            "train",
+            {f"cv_fold_{fold}" for fold in range(1, 6)},
+        )
+        or {row["block_id"] for row in development}
+        & {row["block_id"] for row in blocks if row["assignment"] == "test_locked"}
         or int(registry.get("development_train_windows", -1)) != len(development)
     ):
         split_errors.append("invalid development training split")
 
     test_rows = read_tsv(interval_dir / "test_locked.tsv")
-    test_core_sorted = sorted(test_rows, key=lambda row: int(row["core_start"]))
     test_valid = (
-        {row["chromosome"] for row in test_rows} == {"X"}
+        {row["chromosome"] for row in test_rows} == chromosome_set
         and all(row["role"] == "test_locked" for row in test_rows)
-        and int(test_core_sorted[0]["core_start"]) == 0
-        and int(test_core_sorted[-1]["core_end"]) == chromosome_lengths["X"]
-        and all(
-            int(first["core_end"]) == int(second["core_start"])
-            for first, second in zip(test_core_sorted, test_core_sorted[1:])
-        )
+        and not validate_rows(test_rows, "test_locked", {"test_locked"})
+        and not validate_core_partitions(test_rows)
+        and len({row["block_id"] for row in test_rows}) == 6
     )
     registry_hash_errors = [
         relative
@@ -1718,22 +1808,33 @@ def review_p4() -> dict[str, Any]:
             check(
                 "R4.02_five_fold_split",
                 not split_errors
-                and all_train_valid_chromosomes == set(cv_chromosomes)
-                and "X" not in all_train_valid_chromosomes,
-                f"errors={split_errors} chromosomes={sorted(all_train_valid_chromosomes)}",
+                and all(
+                    set(row.get("train_chromosomes", [])) == chromosome_set
+                    and set(row.get("valid_chromosomes", [])) == chromosome_set
+                    for row in registry.get("folds", [])
+                ),
+                f"errors={split_errors} chromosomes={list(chromosomes)}",
             ),
             check(
-                "R4.03_nonoverlapping_eval_cores",
-                not core_errors and test_valid,
-                f"core_errors={core_errors} test_valid={test_valid}",
+                "R4.03_block_buffers_and_no_leakage",
+                not block_errors and not core_errors and test_valid,
+                f"block_errors={block_errors} core_errors={core_errors} test_valid={test_valid}",
             ),
             check(
                 "R4.04_split_lock_integrity",
                 not registry_hash_errors
-                and registry.get("window_size") == 2**20
+                and registry.get("schema_version") == 2
+                and registry.get("revision_id") == revision_id
+                and registry.get("window_size") == window_size
                 and registry.get("stride") == 2**19
+                and registry.get("max_shift_bp") == max_shift
+                and registry.get("exclusion_buffer_bp") == buffer_bp
+                and registry.get("evaluation_subwindow_bp") == 131072
+                and registry.get("split_spec_sha256") == sha256(spec_path)
+                and registry.get("blocks_sha256") == sha256(blocks_path)
+                and registry.get("test_chromosomes") == list(chromosomes)
                 and registry.get("test_status")
-                == "embargoed_prior_exposure_disclosed",
+                == "embargoed_six_chromosome_locked_blocks",
                 f"hash_errors={registry_hash_errors}",
             ),
             check(
@@ -1762,7 +1863,7 @@ def review_p4() -> dict[str, Any]:
             check(
                 "R4.08_test_embargo",
                 test_refused and test_valid,
-                f"default_loader_refused={test_refused} test_windows={len(test_rows)}",
+                f"default_loader_refused={test_refused} test_windows={len(test_rows)} chromosomes={list(chromosomes)}",
             ),
             check(
                 "R4.09_io_benchmark",
@@ -1781,11 +1882,25 @@ def review_p4() -> dict[str, Any]:
             check(
                 "R4.11_data_manifest_provenance",
                 benchmark.get("split_registry_sha256") == sha256(registry_path)
+                and benchmark.get("split_revision") == revision_id
+                and benchmark.get("x_valid_role_read_verified") is True
+                and benchmark.get("locked_test_block_signal_reads") == 0
                 and benchmark.get("group_manifest_sha256")
                 == sha256(metadata_dir / "rna_seq_groups_v2_final.tsv")
                 and benchmark.get("group_outputs_sha256")
                 == sha256(metadata_dir / "p3_group_outputs.tsv"),
                 "benchmark digests bind loader results to splits and P3 tracks",
+            ),
+            check(
+                "R4.12_superseded_holdout_preserved",
+                migration.get("revision_id") == revision_id
+                and migration.get("source_test_consumed") is False
+                and migration.get("old_split_disposition")
+                == "superseded_for_six_chromosome_split"
+                and bool(migration.get("archived_intervals"))
+                and bool(migration.get("archived_metadata"))
+                and bool(migration.get("archived_audits")),
+                f"archived_intervals={len(migration.get('archived_intervals', []))}",
             ),
         ]
     )
@@ -1829,7 +1944,7 @@ def review_p5() -> dict[str, Any]:
     specs = json.loads(paths["specs"].read_text())
     audit = json.loads(paths["audit"].read_text())
     mean_fields = [
-        "development_I_V_nonzero_mean",
+        "development_train_nonzero_mean",
         *(f"fold_{fold}_train_nonzero_mean" for fold in range(1, 6)),
     ]
     means_valid = (
@@ -1853,11 +1968,13 @@ def review_p5() -> dict[str, Any]:
             check(
                 "R5.02_leakage_safe_track_means",
                 means_valid
-                and means_summary.get("chromosome_x_read") is False
+                and means_summary.get("locked_test_block_signal_reads") == 0
                 and means_summary.get("fold_mean_policy")
-                == "nonzero_mean_on_four_training_chromosomes_only"
+                == "nonzero_mean_on_registered_train_blocks_only"
+                and means_summary.get("split_revision")
+                == "six_chromosome_blocks_v1"
                 and means_summary.get("output_sha256") == sha256(paths["means"]),
-                f"tracks={len(means)} x_read={means_summary.get('chromosome_x_read')}",
+                f"tracks={len(means)} test_reads={means_summary.get('locked_test_block_signal_reads')}",
             ),
             check(
                 "R5.03_model_space_scaling_and_dual_loss",
@@ -1928,13 +2045,20 @@ def review_p5() -> dict[str, Any]:
             check(
                 "R5.10_test_embargo",
                 specs.get("chromosome_x_access")
-                == "prohibited_until_locked_G5_P6C",
-                specs.get("chromosome_x_access"),
+                == "registered_train_valid_blocks_allowed"
+                and specs.get("locked_test_block_access")
+                == "prohibited_until_locked_G5_P6C"
+                and specs.get("final_test_scope")
+                == "r6c_single_six_chromosome_block_test"
+                and audit.get("locked_test_block_signal_reads") == 0,
+                f"x={specs.get('chromosome_x_access')} test={specs.get('locked_test_block_access')}",
             ),
             check(
                 "R5.11_manifest_hashes",
                 audit.get("means_sha256") == sha256(paths["means"])
-                and audit.get("model_specs_sha256") == sha256(paths["specs"]),
+                and audit.get("model_specs_sha256") == sha256(paths["specs"])
+                and audit.get("split_registry_sha256")
+                == sha256(metadata_dir / "split_registry_v2.json"),
                 "P5 audit hashes bind means and model specification",
             ),
         ]
@@ -2036,6 +2160,8 @@ def review_p6a() -> dict[str, Any]:
             check(
                 "R6A.03_three_model_smokes",
                 record.get("status") == "completed"
+                and record.get("split_revision") == "six_chromosome_blocks_v1"
+                and record.get("locked_test_block_signal_reads") == 0
                 and {run.get("model") for run in runs} == {"A", "B", "C"}
                 and len(runs) == 3
                 and not run_errors,
@@ -2059,7 +2185,7 @@ def review_p6a() -> dict[str, Any]:
             check(
                 "R6A.07_test_embargo",
                 all(run.get("intervals_sha256") == expected_intervals for run in runs),
-                "all smokes bind to fold-1 training intervals; chromosome X was not read",
+                "all smokes bind to six-chromosome fold-1 training blocks; locked test blocks were not read",
             ),
             check(
                 "R6A.08_claim_scope",
@@ -2387,7 +2513,7 @@ def review_p6b_original() -> dict[str, Any]:
     }
 
 
-def review_p6b() -> dict[str, Any]:
+def review_p6b_chromosome_holdout() -> dict[str, Any]:
     metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
     paths = {
         "spec": metadata_dir / "p6b_amendment_spec.json",
@@ -2456,7 +2582,7 @@ def review_p6b() -> dict[str, Any]:
             persisted = json.loads(job_path.read_text())
             fold = int(job["fold"])
             if (
-                persisted.get("amendment_spec_sha256") != spec_sha
+                persisted.get("spec_sha256") != spec_sha
                 or persisted.get("checkpoint_sha256") != sha256(checkpoint)
                 or validation.get("checkpoint_sha256") != persisted.get("checkpoint_sha256")
                 or validation.get("schema_version") != 2
@@ -2601,6 +2727,363 @@ def review_p6b() -> dict[str, Any]:
     }
 
 
+def review_p6b() -> dict[str, Any]:
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    paths = {
+        "spec": metadata_dir / "p6b_six_chromosome_spec.json",
+        "execution": metadata_dir / "p6b_six_chromosome_execution.json",
+        "results": metadata_dir / "p6b_six_chromosome_cv_results.tsv",
+        "ablations": metadata_dir / "p6b_six_chromosome_ablation_results.tsv",
+        "selection": metadata_dir / "p6b_six_chromosome_selection.json",
+        "lock": metadata_dir / "final_test_lock.json",
+        "means": metadata_dir / "track_nonzero_means_v2.tsv",
+        "registry": metadata_dir / "split_registry_v2.json",
+        "test": REPO_ROOT / "alphagenome_custom/intervals/v2/test_locked.tsv",
+        "migration": metadata_dir / "six_chromosome_revision_migration.json",
+        "old_lock": metadata_dir
+        / "chromosome_holdout_original/final_test_lock.json",
+    }
+    missing = [
+        str(path.relative_to(REPO_ROOT))
+        for path in paths.values()
+        if not path.is_file()
+    ]
+    checks = [check("R6B.S1_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 3,
+            "phase": "P6B",
+            "review": "R6B-six-chromosome",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    spec = json.loads(paths["spec"].read_text())
+    execution = json.loads(paths["execution"].read_text())
+    results = read_tsv(paths["results"])
+    ablations = read_tsv(paths["ablations"])
+    selection = json.loads(paths["selection"].read_text())
+    lock = json.loads(paths["lock"].read_text())
+    registry = json.loads(paths["registry"].read_text())
+    migration = json.loads(paths["migration"].read_text())
+    old_lock = json.loads(paths["old_lock"].read_text())
+    state = json.loads((metadata_dir / "execution_state.json").read_text())
+    spec_sha = sha256(paths["spec"])
+    chromosomes = {"I", "II", "III", "IV", "V", "X"}
+    formal_expected = {
+        (model, loss, seed, fold)
+        for model in ("A", "B", "C")
+        for loss in ("paper", "log1p_mse")
+        for seed in (20260714, 20260715, 20260716)
+        for fold in range(1, 6)
+    }
+    ablation_expected = {
+        (ablation, fold)
+        for ablation in (
+            "no_augmentation",
+            "no_gene_loss",
+            "development_pool_mean",
+        )
+        for fold in range(1, 6)
+    }
+    jobs = execution.get("jobs", [])
+    formal_jobs = [job for job in jobs if job.get("job_kind") == "formal"]
+    ablation_jobs = [job for job in jobs if job.get("job_kind") == "ablation"]
+    formal_observed = {
+        (job.get("model"), job.get("loss"), job.get("seed"), job.get("fold"))
+        for job in formal_jobs
+    }
+    ablation_observed = {
+        (job.get("ablation_id"), job.get("fold")) for job in ablation_jobs
+    }
+    metric_names = (
+        "primary_biological_score",
+        "gene_exon_coverage_pearson_log1p",
+        "per_track_pearson_128bp_log1p",
+        "paper_loss",
+        "log1p_mse",
+        "spearman_128bp",
+        "top1_mse_128bp",
+        "top1_calibration_ratio_128bp",
+        "gene_body_mse_log1p_1bp",
+        "exon_mse_log1p_1bp",
+        "local_gradient_mse_log1p_1bp",
+    )
+    job_errors = []
+    locked_reads = 0
+    for job in jobs:
+        try:
+            checkpoint = REPO_ROOT / job["checkpoint_path"]
+            validation_path = REPO_ROOT / job["validation_path"]
+            persisted_path = REPO_ROOT / job["job_path"]
+            validation = json.loads(validation_path.read_text())
+            persisted = json.loads(persisted_path.read_text())
+            fold = int(job["fold"])
+            locked_reads += int(
+                validation.get("locked_test_block_signal_reads") is True
+            )
+            if (
+                persisted.get("amendment_spec_sha256") != spec_sha
+                or persisted.get("checkpoint_sha256") != sha256(checkpoint)
+                or validation.get("checkpoint_sha256")
+                != persisted.get("checkpoint_sha256")
+                or validation.get("schema_version") != 2
+                or validation.get("full_metrics", {}).get("metric_contract")
+                != "v2_full_metrics_1"
+                or validation.get("intervals_sha256")
+                != sha256(
+                    REPO_ROOT
+                    / f"alphagenome_custom/intervals/v2/fold_{fold}/valid.tsv"
+                )
+                or set(validation.get("evaluated_chromosomes", [])) != chromosomes
+                or validation.get("locked_test_block_signal_reads") is not False
+                or validation.get("chromosome_x_train_valid_blocks_read") is not True
+                or float(validation.get("validation_core_coverage_fraction", 0))
+                < 0.999
+                or not all(math.isfinite(float(job[name])) for name in metric_names)
+            ):
+                raise ValueError("artifact, metric, split, or embargo mismatch")
+            run = json.loads((REPO_ROOT / job["output_dir"] / "run.json").read_text())
+            if (
+                run.get("model") != job.get("model")
+                or run.get("loss") != job.get("loss")
+                or int(run.get("fold", -1)) != fold
+                or int(run.get("seed", -1)) != int(job.get("seed", -2))
+                or run.get("mean_column") != job.get("mean_column")
+                or run.get("intervals_sha256")
+                != sha256(
+                    REPO_ROOT
+                    / f"alphagenome_custom/intervals/v2/fold_{fold}/train.tsv"
+                )
+                or run.get("means_sha256") != sha256(paths["means"])
+                or not (REPO_ROOT / job["log_path"]).is_file()
+                or (REPO_ROOT / job["log_path"]).stat().st_size == 0
+            ):
+                raise ValueError("training contract mismatch")
+            primary = validation["full_metrics"]["primary"]
+            expected_primary = 0.5 * float(
+                primary["mean_per_track_gene_exon_coverage_pearson_log1p"]
+            ) + 0.5 * float(primary["mean_per_track_pearson_128bp_log1p"])
+            if not math.isclose(
+                float(job["primary_biological_score"]),
+                expected_primary,
+                rel_tol=1e-12,
+                abs_tol=1e-12,
+            ):
+                raise ValueError("primary score mismatch")
+        except Exception as error:
+            job_errors.append(f"{job.get('job_id')}:{error}")
+
+    expected_configs = {
+        (model, loss) for model in ("A", "B", "C") for loss in ("paper", "log1p_mse")
+    }
+    result_keys = {(row["model"], row["loss"]) for row in results}
+    result_contract = all(
+        int(row["jobs"]) == 15
+        and int(row["folds"]) == 5
+        and int(row["seeds"]) == 3
+        and all(math.isfinite(float(row[f"mean_{name}"])) for name in metric_names)
+        for row in results
+    )
+    aggregation_errors = []
+    for rows, members_pool, keys in (
+        (results, formal_jobs, ("model", "loss")),
+        (ablations, ablation_jobs, ("ablation_id", "model", "loss")),
+    ):
+        for row in rows:
+            members = [
+                job
+                for job in members_pool
+                if all(job.get(key) == row[key] for key in keys)
+            ]
+            if not members:
+                aggregation_errors.append(f"missing:{'/'.join(str(row[key]) for key in keys)}")
+                continue
+            for metric in metric_names:
+                expected = sum(float(job[metric]) for job in members) / len(members)
+                if not math.isclose(
+                    float(row[f"mean_{metric}"]),
+                    expected,
+                    rel_tol=1e-12,
+                    abs_tol=1e-12,
+                ):
+                    aggregation_errors.append(
+                        f"{'/'.join(str(row[key]) for key in keys)}:{metric}"
+                    )
+    selected_row = max(
+        results,
+        key=lambda row: (
+            float(row["mean_primary_biological_score"]),
+            float(row["mean_gene_exon_coverage_pearson_log1p"]),
+            float(row["mean_per_track_pearson_128bp_log1p"]),
+            -float(row["mean_paper_loss"]),
+            row["model"],
+            row["loss"],
+        ),
+    )
+    selected = selection.get("selected", {})
+    selection_valid = (
+        selected.get("model") == selected_row["model"]
+        and selected.get("loss") == selected_row["loss"]
+        and selection.get("spec_sha256") == spec_sha
+        and selection.get("results_sha256") == sha256(paths["results"])
+        and selection.get("locked_test_block_signal_reads") == 0
+        and selection.get("selection_rule") == spec.get("selection")
+        and math.isclose(
+            float(selected.get("mean_primary_biological_score", "nan")),
+            float(selected_row["mean_primary_biological_score"]),
+            rel_tol=1e-12,
+        )
+    )
+    ablation_contract = (
+        {(row["ablation_id"], row["model"], row["loss"]) for row in ablations}
+        == {
+            ("no_augmentation", "B", "paper"),
+            ("no_gene_loss", "B", "paper"),
+            ("development_pool_mean", "A", "paper"),
+        }
+        and all(
+            int(row["jobs"]) == 5 and int(row["folds"]) == 5
+            for row in ablations
+        )
+    )
+    development = execution.get("development", {})
+    development_valid = False
+    lock_valid = False
+    try:
+        development_run = json.loads(
+            (REPO_ROOT / development["run_path"]).read_text()
+        )
+        development_checkpoint = REPO_ROOT / development["checkpoint_path"]
+        expected_development = sha256(
+            REPO_ROOT / "alphagenome_custom/intervals/v2/development_train.tsv"
+        )
+        development_valid = (
+            development.get("model") == selected_row["model"]
+            and development.get("loss") == selected_row["loss"]
+            and development.get("seed") == 20260722
+            and development.get("steps") == 2500
+            and int(development.get("physical_gpu", -1)) in {2, 3}
+            and development.get("spec_sha256") == spec_sha
+            and development.get("intervals_sha256") == expected_development
+            and development_run.get("model") == selected_row["model"]
+            and development_run.get("loss") == selected_row["loss"]
+            and development_run.get("fold") == 0
+            and development_run.get("seed") == 20260722
+            and development_run.get("mean_column")
+            == "development_train_nonzero_mean"
+            and development_run.get("intervals_sha256") == expected_development
+            and development_run.get("means_sha256") == sha256(paths["means"])
+            and sha256(development_checkpoint)
+            == development.get("checkpoint_sha256")
+        )
+        lock_checkpoint = REPO_ROOT / lock["checkpoint_path"]
+        lock_valid = (
+            lock.get("schema_version") == 3
+            and lock.get("superseded") is False
+            and lock.get("test_consumed") is False
+            and lock.get("test_consumed_at") is None
+            and lock.get("model") == selected_row["model"]
+            and lock.get("loss") == selected_row["loss"]
+            and lock.get("checkpoint_sha256") == sha256(lock_checkpoint)
+            and lock.get("checkpoint_sha256")
+            == development.get("checkpoint_sha256")
+            and lock.get("selection_sha256") == sha256(paths["selection"])
+            and lock.get("spec_sha256") == spec_sha
+            and lock.get("split_revision") == "six_chromosome_blocks_v1"
+            and lock.get("split_registry_sha256") == sha256(paths["registry"])
+            and lock.get("means_sha256") == sha256(paths["means"])
+            and lock.get("test_intervals_sha256") == sha256(paths["test"])
+            and set(lock.get("training_chromosomes", [])) == chromosomes
+            and set(lock.get("final_test_chromosomes", [])) == chromosomes
+            and lock.get("final_test_scope")
+            == "r6c_single_six_chromosome_block_test"
+        )
+    except Exception:
+        development_valid = False
+        lock_valid = False
+    g5 = state.get("approvals", {}).get("G5_final_test", {})
+    checks.extend(
+        [
+            check(
+                "R6B.S2_preregistered_revision",
+                spec.get("locked_before_training") is True
+                and spec.get("formal_matrix", {}).get("total_jobs") == 90
+                and spec.get("metrics", {}).get("contract") == "v2_full_metrics_1"
+                and spec.get("split_revision") == "six_chromosome_blocks_v1"
+                and spec.get("locked_test_block_access") == "prohibited"
+                and registry.get("revision_id") == spec.get("split_revision")
+                and execution.get("revision_id") == spec.get("revision_id")
+                and execution.get("split_registry_sha256") == sha256(paths["registry"])
+                and execution.get("means_sha256") == sha256(paths["means"]),
+                f"spec_sha256={spec_sha}",
+            ),
+            check(
+                "R6B.S3_complete_matrix",
+                execution.get("status") == "completed"
+                and execution.get("jobs_expected") == 105
+                and formal_observed == formal_expected
+                and ablation_observed == ablation_expected
+                and not execution.get("failures")
+                and not job_errors,
+                f"formal={len(formal_observed)}/90 ablations={len(ablation_observed)}/15 errors={job_errors[:5]}",
+            ),
+            check(
+                "R6B.S4_gpu_policy",
+                bool(execution.get("selected_physical_gpus"))
+                and set(execution.get("selected_physical_gpus", [])).issubset({2, 3}),
+                f"selected={execution.get('selected_physical_gpus')}",
+            ),
+            check(
+                "R6B.S5_metrics_and_aggregation",
+                result_keys == expected_configs
+                and len(results) == 6
+                and result_contract
+                and not aggregation_errors
+                and ablation_contract,
+                f"configs={sorted(result_keys)} aggregation_errors={aggregation_errors[:5]}",
+            ),
+            check(
+                "R6B.S6_selection_and_development",
+                selection_valid and development_valid,
+                f"selected={selected.get('model')}/{selected.get('loss')}",
+            ),
+            check(
+                "R6B.S7_final_lock",
+                lock_valid and execution.get("lock_sha256") == sha256(paths["lock"]),
+                f"checkpoint={lock.get('checkpoint_path')}",
+            ),
+            check(
+                "R6B.S8_test_embargo",
+                locked_reads == 0
+                and execution.get("locked_test_block_signal_reads") == 0
+                and g5.get("approved") is not True,
+                f"locked_reads={locked_reads}; G5 unapproved",
+            ),
+            check(
+                "R6B.S9_old_evidence_preserved",
+                old_lock.get("superseded") is True
+                and old_lock.get("test_consumed") is False
+                and old_lock.get("superseded_for_revision")
+                == "six_chromosome_blocks_v1"
+                and migration.get("old_split_disposition")
+                == "superseded_for_six_chromosome_split",
+                f"old_checkpoint={old_lock.get('checkpoint_path')}",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 3,
+        "phase": "P6B",
+        "review": "R6B-six-chromosome",
+        "reviewed_at": utc_now(),
+        "status": "PASS"
+        if all(item["status"] == "PASS" for item in checks)
+        else "FAIL",
+        "checks": checks,
+    }
+
+
 def review_p6c() -> dict[str, Any]:
     metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
     paths = {
@@ -2671,6 +3154,15 @@ def review_p6c() -> dict[str, Any]:
     registered_test_sha = split_registry.get("files", {}).get(relative_test)
     current_test_sha = sha256(paths["test_intervals"])
     current_means_sha = sha256(paths["means"])
+    split_contract = (
+        split_registry.get("revision_id") == "six_chromosome_blocks_v1"
+        and split_registry.get("cv_chromosomes")
+        == ["I", "II", "III", "IV", "V", "X"]
+        and split_registry.get("test_chromosomes")
+        == ["I", "II", "III", "IV", "V", "X"]
+        and split_registry.get("final_test_scope")
+        == "r6c_single_six_chromosome_block_test"
+    )
     full_metric_sections = {
         "raw_1bp",
         "raw_128bp_sum",
@@ -2713,8 +3205,10 @@ def review_p6c() -> dict[str, Any]:
         and summary_data.get("non_rna_runs_excluded") == 3
         and summary_data.get("grouped_tracks") == 241
         and summary_data.get("monolithic_npz_generated") is False
-        and summary_data.get("cv_chromosomes") == ["I", "II", "III", "IV", "V"]
-        and summary_data.get("test_chromosome") == "X"
+        and summary_data.get("cv_chromosomes")
+        == ["I", "II", "III", "IV", "V", "X"]
+        and summary_data.get("test_chromosomes")
+        == ["I", "II", "III", "IV", "V", "X"]
         and len(summary_validation.get("matrix", [])) == 6
         and len(summary_validation.get("ablations", [])) == 3
         and summary_validation.get("formal_jobs") == 90
@@ -2738,12 +3232,17 @@ def review_p6c() -> dict[str, Any]:
         and report.get("checkpoint_sha256") == lock.get("checkpoint_sha256")
         and report.get("final_test_execution_id") == execution_id
         and report.get("intervals_sha256") == current_test_sha == registered_test_sha
+        and split_contract
         and report.get("means_sha256") == current_means_sha
         and current_means_sha == means_summary.get("output_sha256")
-        and report.get("chromosome_x_read") is True
-        and report.get("mean_column") == "development_I_V_nonzero_mean"
+        and report.get("evaluated_chromosomes")
+        == ["I", "II", "III", "IV", "V", "X"]
+        and report.get("locked_test_block_signal_reads") is True
+        and report.get("chromosome_x_train_valid_blocks_read") is False
+        and report.get("mean_column") == "development_train_nonzero_mean"
+        and means_summary.get("locked_test_block_signal_reads") == 0
         and int(report.get("validation_subwindows", 0)) > 0
-        and float(report.get("validation_core_coverage_fraction", 0)) >= 0.98
+        and float(report.get("validation_core_coverage_fraction", 0)) >= 0.999
         and math.isfinite(float(mean_metrics.get("paper_loss", "nan")))
         and math.isfinite(float(mean_metrics.get("log1p_mse", "nan")))
         and math.isfinite(float(report.get("mean_per_track_pearson_128bp", "nan")))
@@ -2766,6 +3265,16 @@ def review_p6c() -> dict[str, Any]:
         and lock.get("final_document_path")
         == str(paths["document"].relative_to(REPO_ROOT))
         and lock.get("final_document_sha256") == sha256(paths["document"])
+        and lock.get("schema_version") == 3
+        and lock.get("split_revision") == "six_chromosome_blocks_v1"
+        and lock.get("split_registry_sha256") == sha256(paths["split_registry"])
+        and lock.get("means_sha256") == current_means_sha
+        and lock.get("test_intervals_sha256") == current_test_sha
+        and lock.get("training_chromosomes") == ["I", "II", "III", "IV", "V", "X"]
+        and lock.get("final_test_chromosomes")
+        == ["I", "II", "III", "IV", "V", "X"]
+        and lock.get("final_test_scope")
+        == "r6c_single_six_chromosome_block_test"
         and lock.get("legacy_chr_x_prior_exposure_disclosed") is True
     )
     checks.extend(
@@ -2815,13 +3324,13 @@ def review_p6c() -> dict[str, Any]:
             check(
                 "R6C.07_scoped_final_approval",
                 g5.get("approved") is True
-                and g5.get("scope") == "r6c_single_chr_x_test",
+                and g5.get("scope") == "r6c_single_six_chromosome_block_test",
                 f"scope={g5.get('scope')} approved_at={g5.get('updated_at')}",
             ),
             check(
                 "R6C.08_prior_exposure_disclosure",
                 lock.get("legacy_chr_x_prior_exposure_disclosed") is True,
-                "legacy chr X exposure remains disclosed; v2 test was read once after lock",
+                "legacy chr X exposure remains disclosed; six-chromosome v2 test was read once after lock",
             ),
             check(
                 "R6C.09_final_synthesis",
@@ -2837,7 +3346,7 @@ def review_p6c() -> dict[str, Any]:
         ]
     )
     return {
-        "schema_version": 1,
+        "schema_version": 3,
         "phase": "P6C",
         "review": "R6C",
         "reviewed_at": utc_now(),

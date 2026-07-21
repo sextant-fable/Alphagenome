@@ -29,6 +29,7 @@ WEIGHTS_PATH = REPO_ROOT / "weights/alphagenome_pytorch/model_all_folds.safetens
 MEANS_PATH = METADATA_DIR / "track_nonzero_means_v2.tsv"
 AUDIT_PATH = METADATA_DIR / "p5_component_audit.json"
 MODEL_SPEC_PATH = METADATA_DIR / "model_specs_v2.json"
+SPLIT_REGISTRY_PATH = METADATA_DIR / "split_registry_v2.json"
 
 
 def sha256(path: Path) -> str:
@@ -162,7 +163,10 @@ def main() -> None:
         "model_b_lora_alpha": 16,
         "model_b_organism_index": 2,
         "promotion_metric": "mean_five_fold_paper_loss_then_log1p_mse_then_mean_per_track_pearson",
-        "chromosome_x_access": "prohibited_until_locked_G5_P6C",
+        "split_revision": "six_chromosome_blocks_v1",
+        "chromosome_x_access": "registered_train_valid_blocks_allowed",
+        "locked_test_block_access": "prohibited_until_locked_G5_P6C",
+        "final_test_scope": "r6c_single_six_chromosome_block_test",
     }
     MODEL_SPEC_PATH.write_text(
         json.dumps(model_specs, indent=2, sort_keys=True) + "\n"
@@ -206,6 +210,8 @@ def main() -> None:
         "means_path": str(MEANS_PATH.relative_to(REPO_ROOT)),
         "means_sha256": sha256(MEANS_PATH),
         "model_specs_sha256": sha256(MODEL_SPEC_PATH),
+        "split_registry_sha256": sha256(SPLIT_REGISTRY_PATH),
+        "locked_test_block_signal_reads": 0,
         "scale_implementation": "alphagenome_pytorch.heads.targets_scaling",
         "loss_implementation": "alphagenome_pytorch.losses.multinomial_loss_on_scaled_prediction_and_target",
     }

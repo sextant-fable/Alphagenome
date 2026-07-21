@@ -34,7 +34,7 @@ class FinalTestGateTest(unittest.TestCase):
                     "approvals": {
                         "G5_final_test": {
                             "approved": True,
-                            "scope": "r6c_single_chr_x_test",
+                            "scope": "r6c_single_six_chromosome_block_test",
                         }
                     },
                 },
@@ -139,11 +139,16 @@ class FinalTestGateTest(unittest.TestCase):
             checkpoint.write_bytes(b"checkpoint")
             selection.write_text("{}\n")
             test_intervals.write_text("chromosome\tstart\tend\nX\t0\t128\n")
-            means.write_text("group_id\tdevelopment_I_V_nonzero_mean\nG1\t1\n")
+            means.write_text("group_id\tdevelopment_train_nonzero_mean\nG1\t1\n")
             relative_test = str(test_intervals.relative_to(root))
             write_json(
                 split_registry,
-                {"files": {relative_test: sha256(test_intervals)}},
+                {
+                    "revision_id": "six_chromosome_blocks_v1",
+                    "test_chromosomes": ["I", "II", "III", "IV", "V", "X"],
+                    "final_test_scope": "r6c_single_six_chromosome_block_test",
+                    "files": {relative_test: sha256(test_intervals)},
+                },
             )
             write_json(
                 means_summary,
@@ -157,6 +162,14 @@ class FinalTestGateTest(unittest.TestCase):
                 "checkpoint_sha256": sha256(checkpoint),
                 "selection_path": str(selection.relative_to(root)),
                 "selection_sha256": sha256(selection),
+                "schema_version": 3,
+                "split_revision": "six_chromosome_blocks_v1",
+                "split_registry_sha256": sha256(split_registry),
+                "means_sha256": sha256(means),
+                "test_intervals_sha256": sha256(test_intervals),
+                "training_chromosomes": ["I", "II", "III", "IV", "V", "X"],
+                "final_test_chromosomes": ["I", "II", "III", "IV", "V", "X"],
+                "final_test_scope": "r6c_single_six_chromosome_block_test",
             }
             with (
                 mock.patch.object(run_v2_p6c, "REPO_ROOT", root),
@@ -170,6 +183,10 @@ class FinalTestGateTest(unittest.TestCase):
                 self.assertEqual(
                     observed["test_intervals_sha256"], sha256(test_intervals)
                 )
+                invalid_lock = dict(lock)
+                invalid_lock["final_test_scope"] = "r6c_single_chr_x_test"
+                with self.assertRaisesRegex(RuntimeError, "does not bind"):
+                    run_v2_p6c.validate_locked_inputs(invalid_lock)
                 checkpoint.write_bytes(b"changed")
                 with self.assertRaisesRegex(RuntimeError, "checkpoint SHA-256"):
                     run_v2_p6c.validate_locked_inputs(lock)

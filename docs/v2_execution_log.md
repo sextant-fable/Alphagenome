@@ -2,6 +2,16 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-21 - Six-Chromosome Split Revision Preregistration
+
+- User requirement: every formal train, validation, and test partition must contain WBcel235 blocks from `I`, `II`, `III`, `IV`, `V`, and sex chromosome `X`; `X` is not chromosome 10.
+- Disposition: preserve the chromosome-holdout P4-P6B evidence, but supersede its I-V leave-one-chromosome-out promotion decision, development checkpoint, and X-only final-test lock before any G5 consumption. P1-P3 provenance, 482 uniform RNA-seq reprocessings, and 241 grouped tracks remain reusable if their hashes match.
+- Preregistered split: on each chromosome, deterministically permute five CV block labels and one locked-test label with seed `20260721`. Each fold trains on four CV blocks and validates on the fifth; all six chromosomes therefore occur in both roles. Development training uses all five CV blocks, and final test uses one locked block per chromosome.
+- Leakage boundary: adjacent effective blocks are separated by `1,050,624 bp`, equal to the `1,048,576 bp` context window plus two `1,024 bp` augmentation margins. Effective block sizes are multiples of `131,072 bp`, so valid/test core coverage is complete without overlapping metric subwindows. Training shifts are constrained to remain inside their registered block.
+- Expected geometry: 36 effective blocks total; each fold has 64 one-megabase training windows and 16 validation windows, with `10,878,976` eligible validation bases. The final test has 16 windows across six chromosomes and the same eligible-base total.
+- Gates: P4 uses the revised `G3:p4_six_chromosome_block_split` scope. The standing GPU 2/3 G4 remains applicable to P6A/P6B. The old X-only G5 is invalid; the revised final scope is `G5:r6c_single_six_chromosome_block_test` and remains unapproved until revised R6B PASS.
+- Preregistered P6B: A/B/C x paper/log1p-MSE x five folds x three seeds (90 formal jobs), plus 15 five-fold single-seed augmentation, gene-loss, and development-pool-mean ablations. Training budgets and biological promotion metrics remain identical to the amended chromosome-holdout comparison.
+
 ## 2026-07-21 - P6C Pre-G5 Gate Audit
 
 - Purpose: independently verify the one-time chromosome-X entry point after the amended R6B lock and before requesting G5. No chromosome-X BigWig was opened.

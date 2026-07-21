@@ -1,0 +1,98 @@
+{
+  "ablation_matrix": [
+    {
+      "gene_weight": 0.1,
+      "id": "no_augmentation",
+      "loss": "paper",
+      "max_shift_bp": 0,
+      "model": "B",
+      "reverse_complement_probability": 0.0
+    },
+    {
+      "gene_weight": 0.0,
+      "id": "no_gene_loss",
+      "loss": "paper",
+      "max_shift_bp": 1024,
+      "model": "B",
+      "reverse_complement_probability": 0.5
+    },
+    {
+      "gene_weight": 0.1,
+      "id": "development_pool_mean",
+      "loss": "paper",
+      "max_shift_bp": 1024,
+      "mean_column": "development_train_nonzero_mean",
+      "model": "A",
+      "reverse_complement_probability": 0.5
+    }
+  ],
+  "cv_folds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "development_retrain": {
+    "fold_argument": 0,
+    "max_steps": 2500,
+    "mean_column": "development_train_nonzero_mean",
+    "seed": 20260722,
+    "split": "alphagenome_custom/intervals/v2/development_train.tsv"
+  },
+  "formal_matrix": {
+    "losses": [
+      "paper",
+      "log1p_mse"
+    ],
+    "models": [
+      "A",
+      "B",
+      "C"
+    ],
+    "seeds": [
+      20260714,
+      20260715,
+      20260716
+    ],
+    "total_jobs": 90
+  },
+  "gpu_policy": {
+    "allowed_physical_indices": [
+      2,
+      3
+    ],
+    "maximum_concurrent_jobs_per_gpu": 1,
+    "minimum_free_mib": 70000
+  },
+  "locked_before_training": true,
+  "locked_test_block_access": "prohibited",
+  "metrics": {
+    "contract": "v2_full_metrics_1",
+    "primary_biological_score": "0.5 * mean_per_track_gene_exon_coverage_pearson_log1p + 0.5 * mean_per_track_pearson_128bp_log1p"
+  },
+  "revision_id": "P6B-SIXCHR-1",
+  "schema_version": 1,
+  "selection": {
+    "primary_maximize": "mean_three_seed_five_fold_primary_biological_score",
+    "quaternary_minimize": "mean_three_seed_five_fold_paper_loss",
+    "secondary_maximize": "mean_three_seed_five_fold_gene_exon_coverage_pearson_log1p",
+    "tertiary_maximize": "mean_three_seed_five_fold_per_track_pearson_128bp_log1p"
+  },
+  "split_registry_path": "alphagenome_custom/metadata/v2/split_registry_v2.json",
+  "split_revision": "six_chromosome_blocks_v1",
+  "training": {
+    "gene_weight": 0.1,
+    "hidden_channels": 64,
+    "learning_rate": 0.0001,
+    "max_shift_bp": 1024,
+    "max_steps": 2000,
+    "reverse_complement_probability": 0.5,
+    "sequence_length": 131072,
+    "weight_decay": 0.0001
+  },
+  "validation": {
+    "policy": "all_complete_nonoverlapping_core_only_subwindows_within_six_chromosome_valid_blocks",
+    "sequence_length": 131072
+  }
+}

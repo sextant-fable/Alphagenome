@@ -470,10 +470,15 @@ class AugmentedV2Dataset(torch.utils.data.Dataset):
     def __getitem__(self, index: int) -> dict[str, Any]:
         row = self.dataset.intervals[index]
         chromosome_length = self.dataset.fai[row["chromosome"]][0]
-        minimum = max(-self.max_shift_bp, -int(row["start"]))
+        block_start = int(row.get("block_start", 0))
+        block_end = int(row.get("block_end", chromosome_length))
+        minimum = max(
+            -self.max_shift_bp,
+            block_start - int(row["start"]),
+        )
         maximum = min(
             self.max_shift_bp,
-            chromosome_length - int(row["end"]),
+            block_end - int(row["end"]),
         )
         generator = torch.Generator()
         generator.manual_seed(

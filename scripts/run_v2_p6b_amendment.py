@@ -135,10 +135,14 @@ def completed_job(job: dict[str, Any], spec_sha: str) -> dict[str, Any] | None:
         validation = read_json(validation_path)
         if (
             record.get("status") != "completed"
-            or record.get("amendment_spec_sha256") != spec_sha
+            or record.get("spec_sha256", record.get("amendment_spec_sha256"))
+            != spec_sha
             or record.get("checkpoint_sha256") != base.sha256(checkpoint_path)
             or validation.get("checkpoint_sha256") != record.get("checkpoint_sha256")
-            or validation.get("chromosome_x_read") is not False
+            or validation.get(
+                "locked_test_block_signal_reads", validation.get("chromosome_x_read")
+            )
+            is not False
         ):
             return None
         validation_summary(validation)
@@ -171,6 +175,7 @@ def run_job(job: dict[str, Any], gpu: int, spec: dict[str, Any], spec_sha: str) 
         "schema_version": 1,
         "status": "completed",
         "physical_gpu": gpu,
+        "spec_sha256": spec_sha,
         "amendment_spec_sha256": spec_sha,
         "checkpoint_sha256": base.sha256(checkpoint_path),
         "elapsed_seconds": time.monotonic() - started,
@@ -263,7 +268,14 @@ def ablation_jobs(spec: dict[str, Any]) -> list[dict[str, Any]]:
     return jobs
 
 
-def run_queue(jobs: list[dict[str, Any]], gpus: list[int], spec: dict[str, Any], spec_sha: str, execution: dict[str, Any]) -> list[dict[str, Any]]:
+def run_queue(
+    jobs: list[dict[str, Any]],
+    gpus: list[int],
+    spec: dict[str, Any],
+    spec_sha: str,
+    execution: dict[str, Any],
+    execution_path: Path = EXECUTION_PATH,
+) -> list[dict[str, Any]]:
     pending: queue.Queue[dict[str, Any]] = queue.Queue()
     for job in jobs:
         pending.put(job)
@@ -283,7 +295,7 @@ def run_queue(jobs: list[dict[str, Any]], gpus: list[int], spec: dict[str, Any],
                 with lock:
                     failures.append({"job_id": job["job_id"], "physical_gpu": gpu, "error": repr(error)})
                     execution["failures"] = failures
-                    base.atomic_json(EXECUTION_PATH, execution)
+                    base.atomic_json(execution_path, execution)
                 return
             else:
                 with lock:
@@ -291,7 +303,7 @@ def run_queue(jobs: list[dict[str, Any]], gpus: list[int], spec: dict[str, Any],
                     execution["jobs"] = sorted(
                         execution.get("jobs", []) + [record], key=lambda row: row["job_id"]
                     )
-                    base.atomic_json(EXECUTION_PATH, execution)
+                    base.atomic_json(execution_path, execution)
             finally:
                 pending.task_done()
 

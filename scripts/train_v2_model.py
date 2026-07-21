@@ -162,13 +162,13 @@ def main() -> None:
     means_path = METADATA_DIR / "track_nonzero_means_v2.tsv"
     means_rows = read_tsv(means_path)
     default_mean_column = (
-        "development_I_V_nonzero_mean"
+        "development_train_nonzero_mean"
         if args.fold == 0
         else f"fold_{args.fold}_train_nonzero_mean"
     )
     mean_column = args.mean_column or default_mean_column
-    if args.fold == 0 and mean_column != "development_I_V_nonzero_mean":
-        raise ValueError("fold 0 requires development_I_V_nonzero_mean")
+    if args.fold == 0 and mean_column != "development_train_nonzero_mean":
+        raise ValueError("fold 0 requires development_train_nonzero_mean")
     if mean_column not in means_rows[0]:
         raise ValueError(f"Unknown mean column: {mean_column}")
     fold_means = torch.tensor(

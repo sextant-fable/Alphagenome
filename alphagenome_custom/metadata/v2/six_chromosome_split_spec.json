@@ -1,0 +1,41 @@
+{
+  "assignment_policy": "seeded_per_chromosome_permutation_of_six_equal_effective_blocks",
+  "block_labels": [
+    "cv_fold_1",
+    "cv_fold_2",
+    "cv_fold_3",
+    "cv_fold_4",
+    "cv_fold_5",
+    "test_locked"
+  ],
+  "chromosomes": [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "X"
+  ],
+  "development_policy": "all_five_cv_blocks_from_each_chromosome_excluding_test_locked",
+  "effective_block_alignment_bp": 131072,
+  "effective_fold_ratio": {
+    "test": 1,
+    "train": 4,
+    "valid": 1
+  },
+  "evaluation_core_policy": "partition_each_effective_block_across_overlapping_context_windows",
+  "evaluation_subwindow_bp": 131072,
+  "exclusion_buffer_bp": 1050624,
+  "final_test_scope": "r6c_single_six_chromosome_block_test",
+  "locked_at": "2026-07-21",
+  "max_shift_bp": 1024,
+  "minimum_effective_block_bp": 1050624,
+  "old_split_disposition": "superseded_for_six_chromosome_split",
+  "revision_id": "six_chromosome_blocks_v1",
+  "schema_version": 1,
+  "seed": 20260721,
+  "stride_bp": 524288,
+  "test_access_policy": "role_based_locked_blocks_only_not_chromosome_based",
+  "training_window_policy": "overlap_by_stride_only_within_one_effective_block_and_allow_shift_only_inside_that_block",
+  "window_size_bp": 1048576
+}

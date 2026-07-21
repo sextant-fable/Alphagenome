@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import unittest
+from unittest import mock
 
 from scripts import run_v2_p3a
 from scripts import v2_subprocess
@@ -65,6 +66,50 @@ class V2PhaseControllerTest(unittest.TestCase):
         self.assertTrue(
             any(value == "P4" for value in controller.REVIEW_COMMANDS["P4"])
         )
+        state = controller.initial_state()
+        state["current_phase"] = "P4"
+        self.assertEqual(
+            controller.missing_approvals(state, "P4"),
+            ["G3:p4_six_chromosome_block_split"],
+        )
+
+    def test_revised_p4_scope_can_be_recorded_for_p6c_migration(self) -> None:
+        controller.validate_approval_scope(
+            "G3", "p4_six_chromosome_block_split", "P6C"
+        )
+        controller.validate_approval_scope(
+            "G3", "p4_six_chromosome_block_split", "P4"
+        )
+
+    def test_six_chromosome_migration_refuses_without_new_g3_scope(self) -> None:
+        state = controller.initial_state()
+        state["current_phase"] = "P6C"
+        state["status"] = "APPROVAL_REQUIRED"
+        with mock.patch.object(controller, "save_state"):
+            self.assertEqual(controller.prepare_six_chromosome_revision(state), 2)
+        self.assertEqual(state["current_phase"], "P6C")
+        self.assertEqual(state["status"], "APPROVAL_REQUIRED")
+        self.assertIn("G3:p4_six_chromosome_block_split", state["history"][-1]["detail"])
+
+    def test_six_chromosome_migration_reopens_p4_after_archival(self) -> None:
+        state = controller.initial_state()
+        state["current_phase"] = "P6C"
+        state["status"] = "APPROVAL_REQUIRED"
+        state["approvals"][controller.GATE_KEYS["G3"]] = {
+            "approved": True,
+            "scope": "p4_six_chromosome_block_split",
+            "note": "test",
+            "updated_at": "test",
+        }
+        with (
+            mock.patch.object(controller, "save_state"),
+            mock.patch.object(controller, "run_command", return_value=0) as run,
+        ):
+            self.assertEqual(controller.prepare_six_chromosome_revision(state), 0)
+        run.assert_called_once_with(controller.SIX_CHROMOSOME_MIGRATION_COMMAND)
+        self.assertEqual(state["current_phase"], "P4")
+        self.assertEqual(state["status"], "PENDING")
+        self.assertEqual(state["history"][-1]["status"], "REOPENED")
 
     def test_p5_components_and_review_are_registered(self) -> None:
         self.assertTrue(
@@ -84,7 +129,8 @@ class V2PhaseControllerTest(unittest.TestCase):
 
     def test_p6b_formal_matrix_and_review_are_registered(self) -> None:
         self.assertTrue(
-            "scripts.run_v2_p6b_amendment" in controller.PHASE_COMMANDS["P6B"]
+            "scripts.run_v2_p6b_six_chromosome"
+            in controller.PHASE_COMMANDS["P6B"]
         )
         self.assertTrue(
             any(value == "P6B" for value in controller.REVIEW_COMMANDS["P6B"])
@@ -101,10 +147,30 @@ class V2PhaseControllerTest(unittest.TestCase):
     def test_final_test_scope_cannot_be_approved_early(self) -> None:
         with self.assertRaisesRegex(ValueError, "only in P6C"):
             controller.validate_approval_scope(
-                "G5", "r6c_single_chr_x_test", "P3A"
+                "G5", "r6c_single_six_chromosome_block_test", "P3A"
             )
         controller.validate_approval_scope(
-            "G5", "r6c_single_chr_x_test", "P6C"
+            "G5", "r6c_single_six_chromosome_block_test", "P6C"
+        )
+
+    def test_old_chr_x_scope_does_not_authorize_revised_final_test(self) -> None:
+        state = controller.initial_state()
+        state["current_phase"] = "P6C"
+        state["approvals"][controller.GATE_KEYS["G4"]] = {
+            "approved": True,
+            "scope": "r6_gpu_auto_available_2_3",
+            "note": "test",
+            "updated_at": "test",
+        }
+        state["approvals"][controller.GATE_KEYS["G5"]] = {
+            "approved": True,
+            "scope": "r6c_single_chr_x_test",
+            "note": "historical scope",
+            "updated_at": "test",
+        }
+        self.assertEqual(
+            controller.missing_approvals(state, "P6C"),
+            ["G5:r6c_single_six_chromosome_block_test"],
         )
 
     def test_all_controller_entries_use_repository_module_execution(self) -> None:

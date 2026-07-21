@@ -228,13 +228,13 @@ def main() -> None:
     means_path = METADATA_DIR / "track_nonzero_means_v2.tsv"
     means_rows = read_tsv(means_path)
     default_mean_column = (
-        "development_I_V_nonzero_mean"
+        "development_train_nonzero_mean"
         if args.final_test
         else f"fold_{args.fold}_train_nonzero_mean"
     )
     mean_column = args.mean_column or default_mean_column
-    if args.final_test and mean_column != "development_I_V_nonzero_mean":
-        raise ValueError("final test requires development_I_V_nonzero_mean")
+    if args.final_test and mean_column != "development_train_nonzero_mean":
+        raise ValueError("final test requires development_train_nonzero_mean")
     if mean_column not in means_rows[0]:
         raise ValueError(f"Unknown mean column: {mean_column}")
     fold_means = torch.tensor(
@@ -509,7 +509,11 @@ def main() -> None:
         "means_sha256": sha256(means_path),
         "physical_cuda_visible_devices": visible,
         "cuda_device_name": torch.cuda.get_device_name(0),
-        "chromosome_x_read": args.final_test,
+        "evaluated_chromosomes": sorted(chromosomes),
+        "locked_test_block_signal_reads": args.final_test,
+        "chromosome_x_train_valid_blocks_read": (
+            "X" in chromosomes and not args.final_test
+        ),
         "final_test_execution_id": (
             args.final_test_execution_id if args.final_test else None
         ),

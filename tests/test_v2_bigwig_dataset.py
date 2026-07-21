@@ -31,6 +31,58 @@ class V2BigWigDatasetTest(unittest.TestCase):
         )
         self.assertEqual(sum(end - start for start, end in cores), length)
 
+    def test_six_chromosome_blocks_are_aligned_buffered_and_complete(self) -> None:
+        chromosomes = {
+            "I": 15072434,
+            "II": 15279421,
+            "III": 13783801,
+            "IV": 17493829,
+            "V": 20924180,
+            "X": 17718942,
+        }
+        spec = {
+            "block_labels": [
+                "cv_fold_1",
+                "cv_fold_2",
+                "cv_fold_3",
+                "cv_fold_4",
+                "cv_fold_5",
+                "test_locked",
+            ],
+            "exclusion_buffer_bp": build_v2_splits.EXCLUSION_BUFFER_BP,
+            "minimum_effective_block_bp": build_v2_splits.EXCLUSION_BUFFER_BP,
+            "seed": 20260721,
+        }
+        blocks = build_v2_splits.split_blocks(chromosomes, spec)
+        self.assertEqual(len(blocks), 36)
+        for chromosome in build_v2_splits.CHROMOSOMES:
+            members = sorted(
+                (row for row in blocks if row["chromosome"] == chromosome),
+                key=lambda row: row["physical_order"],
+            )
+            self.assertEqual(
+                {row["assignment"] for row in members}, set(spec["block_labels"])
+            )
+            self.assertTrue(
+                all(
+                    row["effective_bases"]
+                    % build_v2_splits.EVALUATION_SUBWINDOW_BP
+                    == 0
+                    for row in members
+                )
+            )
+            self.assertTrue(
+                all(
+                    second["block_start"] - first["block_end"]
+                    == build_v2_splits.EXCLUSION_BUFFER_BP
+                    for first, second in zip(members, members[1:])
+                )
+            )
+            self.assertEqual(
+                members[-1]["block_end"] + members[-1]["outer_margin_after_bp"],
+                chromosomes[chromosome],
+            )
+
     def test_loader_matches_bigwig_sum_pooling_and_gene_strands(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -101,14 +153,14 @@ class V2BigWigDatasetTest(unittest.TestCase):
             self.assertEqual(int(item["core_mask"].sum()), 128)
             dataset.close()
 
-    def test_chromosome_x_is_refused_without_final_lock(self) -> None:
+    def test_locked_test_role_is_refused_without_final_lock(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             intervals = Path(directory) / "test.tsv"
             write_tsv(
                 intervals,
                 [
                     {
-                        "chromosome": "X",
+                        "chromosome": "I",
                         "start": 0,
                         "end": 128,
                         "core_start": 0,

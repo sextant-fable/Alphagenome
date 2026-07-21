@@ -614,10 +614,16 @@
       "phase": "P6C",
       "status": "APPROVAL_REQUIRED",
       "timestamp": "2026-07-21T05:10:14+00:00"
+    },
+    {
+      "detail": "Missing scoped approval for split revision: G3:p4_six_chromosome_block_split.",
+      "phase": "P6C",
+      "status": "APPROVAL_REQUIRED",
+      "timestamp": "2026-07-21T11:44:43+00:00"
     }
   ],
   "schema_version": 2,
   "status": "APPROVAL_REQUIRED",
-  "updated_at": "2026-07-21T05:10:14+00:00",
+  "updated_at": "2026-07-21T11:44:43+00:00",
   "workflow": "c_elegans_rna_seq_v2"
 }

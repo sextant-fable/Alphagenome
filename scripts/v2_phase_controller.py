@@ -46,9 +46,13 @@ APPROVAL_SCOPES = {
         "p3b_full_normalized_outputs",
         "p4_dynamic_loader_split_pilot",
         "p3_full_outputs_and_p4_loader",
+        "p4_six_chromosome_block_split",
     },
     "G4": {"r6_gpu_experiment_matrix", "r6_gpu_auto_available_2_3"},
-    "G5": {"r6c_single_chr_x_test"},
+    "G5": {
+        "r6c_single_chr_x_test",
+        "r6c_single_six_chromosome_block_test",
+    },
 }
 APPROVAL_SCOPE_PHASES = {
     "p3a_five_run_pilot": {"P3A"},
@@ -60,8 +64,12 @@ APPROVAL_SCOPE_PHASES = {
     "r6_gpu_experiment_matrix": {"P6A"},
     "p3_full_rna_streaming_482": {"P3A"},
     "p3_full_outputs_and_p4_loader": {"P3A"},
+    # The approval is recorded while the superseded P6C state is still active,
+    # then remains bound to P4 after the controlled archival transition.
+    "p4_six_chromosome_block_split": {"P4", "P6C"},
     "r6_gpu_auto_available_2_3": {"P3A"},
     "r6c_single_chr_x_test": {"P6C"},
+    "r6c_single_six_chromosome_block_test": {"P6C"},
 }
 PHASE_REQUIRED_APPROVALS = {
     "P3A": (
@@ -74,12 +82,12 @@ PHASE_REQUIRED_APPROVALS = {
         ("G2", "v2_manifest_candidate_hierarchy"),
         ("G3", "p3_full_outputs_and_p4_loader"),
     ),
-    "P4": (("G3", "p3_full_outputs_and_p4_loader"),),
+    "P4": (("G3", "p4_six_chromosome_block_split"),),
     "P6A": (("G4", "r6_gpu_auto_available_2_3"),),
     "P6B": (("G4", "r6_gpu_auto_available_2_3"),),
     "P6C": (
         ("G4", "r6_gpu_auto_available_2_3"),
-        ("G5", "r6c_single_chr_x_test"),
+        ("G5", "r6c_single_six_chromosome_block_test"),
     ),
 }
 def module_command(module: str, *arguments: str) -> list[str]:
@@ -95,13 +103,16 @@ PHASE_COMMANDS = {
     "P4": module_command("run_v2_p4"),
     "P5": module_command("run_v2_p5"),
     "P6A": module_command("run_v2_p6a"),
-    "P6B": module_command("run_v2_p6b_amendment"),
+    "P6B": module_command("run_v2_p6b_six_chromosome"),
     "P6C": module_command("run_v2_p6c"),
 }
 REVIEW_COMMANDS = {
     phase: module_command("review_v2_phase", "--phase", phase)
     for phase in PHASES
 }
+SIX_CHROMOSOME_MIGRATION_COMMAND = module_command(
+    "prepare_v2_six_chromosome_revision"
+)
 
 
 def utc_now() -> str:
@@ -304,6 +315,70 @@ def run_phase(state: dict[str, Any], phase: str) -> int:
     return 0
 
 
+def prepare_six_chromosome_revision(state: dict[str, Any]) -> int:
+    """Archive the old holdout lineage and reopen the controlled P4 revision."""
+    scope = "p4_six_chromosome_block_split"
+    if state.get("current_phase") != "P6C":
+        raise SystemExit(
+            "Six-chromosome revision preparation is only available from P6C"
+        )
+    if state.get("approvals", {}).get(GATE_KEYS["G5"], {}).get("approved") is True:
+        raise SystemExit(
+            "Cannot revise the split after a final-test approval has been recorded"
+        )
+    if not approval_satisfies(state, "G3", scope):
+        state["status"] = "APPROVAL_REQUIRED"
+        append_history(
+            state,
+            "P6C",
+            "APPROVAL_REQUIRED",
+            f"Missing scoped approval for split revision: G3:{scope}.",
+        )
+        save_state(state)
+        return 2
+    if state.get("status") in {"RUNNING", "REVIEWING", "COMPLETE"}:
+        raise SystemExit(
+            f"Cannot prepare six-chromosome revision while status={state['status']}"
+        )
+
+    state["status"] = "RUNNING"
+    append_history(
+        state,
+        "P6C",
+        "SPLIT_REVISION_RUNNING",
+        "Archiving chromosome-holdout evidence before six-chromosome P4 reopen.",
+    )
+    save_state(state)
+    code = run_command(SIX_CHROMOSOME_MIGRATION_COMMAND)
+    if code != 0:
+        state["status"] = "FAIL"
+        append_history(
+            state,
+            "P6C",
+            "SPLIT_REVISION_FAIL",
+            f"Revision preparation exited with code {code}.",
+        )
+        save_state(state)
+        return 1
+
+    append_history(
+        state,
+        "P6C",
+        "SPLIT_REVISION_PREPARED",
+        "Chromosome-holdout evidence archived and final lock superseded.",
+    )
+    state["current_phase"] = "P4"
+    state["status"] = "PENDING"
+    append_history(
+        state,
+        "P4",
+        "REOPENED",
+        "Six-chromosome split revision prepared; regenerate manifests and means.",
+    )
+    save_state(state)
+    return 0
+
+
 def run_until_boundary(state: dict[str, Any], first_phase: str) -> int:
     phase = first_phase
     while True:
@@ -327,6 +402,7 @@ def parse_args() -> argparse.Namespace:
     reopen_parser = subparsers.add_parser("reopen")
     reopen_parser.add_argument("--phase", required=True, choices=PHASES)
     reopen_parser.add_argument("--reason", required=True)
+    subparsers.add_parser("prepare-six-chromosome-revision")
     approve_parser = subparsers.add_parser("approve")
     approve_parser.add_argument("--gate", required=True, choices=sorted(GATE_KEYS))
     approve_parser.add_argument("--scope", required=True)
@@ -354,6 +430,8 @@ def main() -> None:
         save_state(state)
         print(json.dumps(state, indent=2, sort_keys=True))
         return
+    if args.command == "prepare-six-chromosome-revision":
+        raise SystemExit(prepare_six_chromosome_revision(state))
     if args.command in {"approve", "revoke"}:
         approved = args.command == "approve"
         if approved:
@@ -374,7 +452,11 @@ def main() -> None:
             f"scope={args.scope if approved else 'all'}; {args.note}",
         )
         if approved and state["status"] == "APPROVAL_REQUIRED":
-            state["status"] = "PENDING"
+            state["status"] = (
+                "PENDING"
+                if not missing_approvals(state, state["current_phase"])
+                else "APPROVAL_REQUIRED"
+            )
         save_state(state)
         print(json.dumps(state, indent=2, sort_keys=True))
         return

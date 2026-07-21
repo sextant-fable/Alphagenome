@@ -338,6 +338,8 @@ class V2TrainingComponentsTest(unittest.TestCase):
                     "chromosome": "I",
                     "start": "100",
                     "end": "356",
+                    "block_start": "80",
+                    "block_end": "380",
                     "role": "train",
                 }
             ]
@@ -378,12 +380,12 @@ class V2TrainingComponentsTest(unittest.TestCase):
         first = augmented[0]["shift_bp"]
         second = augmented[0]["shift_bp"]
         self.assertEqual(first, second)
-        self.assertGreaterEqual(first, -100)
-        self.assertLessEqual(first, 144)
+        self.assertGreaterEqual(first, -20)
+        self.assertLessEqual(first, 24)
         augmented.set_epoch(1)
         third = augmented[0]["shift_bp"]
-        self.assertGreaterEqual(third, -100)
-        self.assertLessEqual(third, 144)
+        self.assertGreaterEqual(third, -20)
+        self.assertLessEqual(third, 24)
         self.assertNotEqual(first, third)
 
 

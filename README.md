@@ -18,15 +18,16 @@ The repository contains two distinct research lineages:
   evidence and must not be presented as a paper-faithful AlphaGenome
   reproduction. See [the v1 freeze record](docs/legacy_v1_freeze.md).
 - **v2 is the active workflow.** It provides provenance and review gates from
-  source reprocessing through blocked cross-validation and a separately
-  approved chromosome-X evaluation. See the
+  source reprocessing through six-chromosome blocked cross-validation and a
+  separately approved six-chromosome locked-block evaluation. See the
   [execution plan](docs/v2_execution_plan.md) and
   [append-only execution log](docs/v2_execution_log.md).
 
-As recorded on 2026-07-20, v2 phase P6B was reopened for a fuller validation
-matrix. Chromosome X remains behind the separate G5 approval boundary. Check
-the live machine-readable state rather than inferring progress from output
-files:
+As recorded on 2026-07-21, the former chromosome-holdout split and its P6B
+selection were superseded by a preregistered within-chromosome block split.
+The revised workflow must rerun from P4 before it can request the new G5 scope.
+Check the live machine-readable state rather than inferring progress from
+output files:
 
 ```bash
 python -m scripts.v2_phase_controller status
@@ -57,10 +58,11 @@ The tracked processing details and read-back checks are in
   biological groups after uniform reprocessing.
 - Loader: manifest-driven bigWig access at 1 bp and 128 bp resolution; v2 does
   not build a monolithic NPZ dataset.
-- Development splits: five leave-one-chromosome-out folds across chromosomes
-  I-V.
-- Final test: chromosome X is locked until one selected checkpoint and a
-  separate, one-time G5 approval are recorded.
+- Development splits: five blocked folds. Every train and validation fold
+  contains non-overlapping blocks from chromosomes I, II, III, IV, V, and X.
+- Final test: one locked block from each of I, II, III, IV, V, and X. These
+  blocks remain inaccessible until one selected checkpoint and the separate,
+  one-time G5 scope `r6c_single_six_chromosome_block_test` are recorded.
 - Model comparison: frozen-trunk head (A), worm embedding plus LoRA (B), and a
   matched from-scratch sequence model (C).
 
@@ -135,8 +137,8 @@ The phases cover the legacy freeze, provenance, manifest review, pilot and
 full reprocessing, dynamic loading, model/loss contracts, GPU smoke tests,
 blocked cross-validation, and the one-time final test. Approval gates protect
 large downloads or realignment (G1), scientific manifest acceptance (G2),
-large generated data (G3), GPU experiments (G4), and chromosome-X access
-(G5).
+large generated data (G3), GPU experiments (G4), and one-time access to the
+six-chromosome locked test blocks (G5).
 
 Inspect controller options with:
 
@@ -170,8 +172,9 @@ those commands to HY-GPU. More detail on which assets belong on each host is in
 - Keep failed and superseded runs in the append-only record when they explain
   the research history.
 - Stage files explicitly. In this repository, do not use `git add .`.
-- Treat chromosome X as previously exposed in the legacy project and still
-  protected by the v2 one-time final-test gate.
+- Treat chromosome X as previously exposed in the legacy project. The revised
+  v2 final-test gate protects one locked block on each of the six nuclear
+  chromosomes, including X.
 
 For repository-specific operational rules, read [AGENTS.md](AGENTS.md) before
 changing code, data, workflow state, or experiment records.

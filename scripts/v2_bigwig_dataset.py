@@ -127,20 +127,20 @@ def final_test_records(
     if not (
         state.get("current_phase") == "P6C"
         and gate.get("approved") is True
-        and gate.get("scope") == "r6c_single_chr_x_test"
+        and gate.get("scope") == "r6c_single_six_chromosome_block_test"
         and checkpoint_sha256
         and execution_id
         and FINAL_LOCK_PATH.is_file()
         and FINAL_CLAIM_PATH.is_file()
     ):
         raise PermissionError(
-            "Chromosome X is embargoed until P6C, scoped G5 approval, a locked "
+            "Final-test blocks are embargoed until P6C, scoped G5 approval, a locked "
             "checkpoint, and an exclusive execution claim"
         )
     lock = json.loads(FINAL_LOCK_PATH.read_text())
     claim = json.loads(FINAL_CLAIM_PATH.read_text())
     if lock.get("superseded") is True:
-        raise PermissionError("Final-test lock was superseded and cannot unlock chromosome X")
+        raise PermissionError("Final-test lock was superseded and cannot unlock test blocks")
     if lock.get("checkpoint_sha256") != checkpoint_sha256:
         raise PermissionError("Checkpoint SHA-256 does not match the final-test lock")
     if not (
@@ -160,7 +160,7 @@ def require_final_test_access(
         lock.get("test_status") == "running"
         and lock.get("test_execution_id") == execution_id
     ):
-        raise PermissionError("The one-time chromosome-X test entry has already been consumed")
+        raise PermissionError("The one-time final-test entry has already been consumed")
 
 
 def require_final_test_read_access(
@@ -173,7 +173,7 @@ def require_final_test_read_access(
         and lock.get("test_execution_id") == execution_id
     ):
         raise PermissionError(
-            "Chromosome X cannot be read before the claimed final-test entry is consumed"
+            "Locked test blocks cannot be read before the claimed final-test entry is consumed"
         )
 
 
@@ -204,7 +204,7 @@ class V2BigWigDataset(Dataset):
         self.intervals = read_tsv(self.intervals_path)
         if not self.intervals:
             raise ValueError("Interval manifest is empty")
-        if any(row["chromosome"] == "X" for row in self.intervals):
+        if any(row["role"] == "test_locked" for row in self.intervals):
             require_final_test_access(
                 final_test_checkpoint_sha256, final_test_execution_id
             )
@@ -291,7 +291,7 @@ class V2BigWigDataset(Dataset):
     ) -> dict[str, Any]:
         row = self.intervals[index]
         chromosome = row["chromosome"]
-        if chromosome == "X":
+        if row["role"] == "test_locked":
             require_final_test_read_access(
                 self.final_test_checkpoint_sha256, self.final_test_execution_id
             )
@@ -309,6 +309,13 @@ class V2BigWigDataset(Dataset):
             raise ValueError("Invalid subwindow crop")
         start = int(row["start"]) + shift_bp + crop_offset_bp
         end = start + crop_length
+        block_start = int(row.get("block_start", 0))
+        block_end = int(row.get("block_end", self.fai[chromosome][0]))
+        if start < block_start or end > block_end:
+            raise ValueError(
+                f"Window {chromosome}:{start}-{end} escapes split block "
+                f"{block_start}-{block_end}"
+            )
         chromosome_length = self.fai[chromosome][0]
         if start < 0 or end > chromosome_length:
             raise ValueError(

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compute leakage-safe nonzero means for each I-V training fold."""
+"""Compute leakage-safe nonzero means from registered training blocks only."""
 
 from __future__ import annotations
 
@@ -19,7 +19,8 @@ GROUP_OUTPUTS = METADATA_DIR / "p3_group_outputs.tsv"
 SPLIT_REGISTRY = METADATA_DIR / "split_registry_v2.json"
 OUTPUT_PATH = METADATA_DIR / "track_nonzero_means_v2.tsv"
 SUMMARY_PATH = METADATA_DIR / "track_nonzero_means_v2_summary.json"
-CV_CHROMOSOMES = ("I", "II", "III", "IV", "V")
+INTERVAL_DIR = REPO_ROOT / "alphagenome_custom/intervals/v2"
+CHROMOSOMES = ("I", "II", "III", "IV", "V", "X")
 
 
 def read_tsv(path: Path) -> list[dict[str, str]]:
@@ -36,8 +37,9 @@ def sha256(path: Path) -> str:
 
 
 def nonzero_totals(
-    path: Path, chromosomes: tuple[str, ...] = CV_CHROMOSOMES
+    path: Path, chromosomes: tuple[str, ...] = CHROMOSOMES
 ) -> dict[str, tuple[float, int]]:
+    """Compatibility helper for per-chromosome diagnostics and unit tests."""
     result = {}
     with pyBigWig.open(str(path)) as bigwig:
         for chromosome in chromosomes:
@@ -45,7 +47,9 @@ def nonzero_totals(
             count = 0
             for start, end, value in bigwig.intervals(chromosome) or ():
                 if not math.isfinite(value) or value < 0:
-                    raise RuntimeError(f"Invalid signal in {path} at {chromosome}:{start}-{end}")
+                    raise RuntimeError(
+                        f"Invalid signal in {path} at {chromosome}:{start}-{end}"
+                    )
                 if value > 0:
                     width = end - start
                     total += width * value
@@ -61,6 +65,43 @@ def mean_for_chromosomes(
     count = sum(totals[chromosome][1] for chromosome in chromosomes)
     if total <= 0 or count <= 0:
         raise RuntimeError(f"Non-positive nonzero signal for chromosomes {chromosomes}")
+    return total / count
+
+
+def training_blocks(path: Path) -> list[tuple[str, int, int, str]]:
+    rows = read_tsv(path)
+    blocks = {
+        (
+            row["chromosome"],
+            int(row["block_start"]),
+            int(row["block_end"]),
+            row["block_id"],
+        )
+        for row in rows
+    }
+    if not blocks or any(row["role"] != "train" for row in rows):
+        raise RuntimeError(f"Expected non-empty train-only manifest: {path}")
+    return sorted(blocks)
+
+
+def nonzero_mean_for_blocks(
+    path: Path, blocks: list[tuple[str, int, int, str]]
+) -> float:
+    total = 0.0
+    count = 0
+    with pyBigWig.open(str(path)) as bigwig:
+        for chromosome, block_start, block_end, _ in blocks:
+            for start, end, value in (
+                bigwig.intervals(chromosome, block_start, block_end) or ()
+            ):
+                if not math.isfinite(value) or value < 0:
+                    raise RuntimeError(f"Invalid signal in {path} at {chromosome}:{start}-{end}")
+                if value > 0:
+                    width = max(0, min(end, block_end) - max(start, block_start))
+                    total += width * value
+                    count += width
+    if total <= 0 or count <= 0:
+        raise RuntimeError(f"Non-positive nonzero signal for registered blocks in {path}")
     return total / count
 
 
@@ -80,31 +121,42 @@ def main() -> None:
     registry = json.loads(SPLIT_REGISTRY.read_text())
     if len(outputs) != 241:
         raise RuntimeError(f"Expected 241 group outputs, got {len(outputs)}")
-    fold_train = {
-        int(row["fold"]): row["train_chromosomes"] for row in registry["folds"]
+    if (
+        registry.get("revision_id") != "six_chromosome_blocks_v1"
+        or registry.get("test_chromosomes") != list(CHROMOSOMES)
+    ):
+        raise RuntimeError("Track means require the six-chromosome block split")
+    development_blocks = training_blocks(INTERVAL_DIR / "development_train.tsv")
+    fold_blocks = {
+        fold: training_blocks(INTERVAL_DIR / f"fold_{fold}/train.tsv")
+        for fold in range(1, 6)
     }
     rows = []
     for index, output in enumerate(outputs, start=1):
         print(f"track_mean\t{index}/{len(outputs)}\t{output['group_id']}", flush=True)
         path = REPO_ROOT / output["output_path"]
-        totals = nonzero_totals(path)
         row: dict[str, Any] = {
             "group_id": output["group_id"],
-            "development_I_V_nonzero_mean": f"{mean_for_chromosomes(totals, CV_CHROMOSOMES):.12g}",
+            "development_train_nonzero_mean": f"{nonzero_mean_for_blocks(path, development_blocks):.12g}",
         }
         for fold in range(1, 6):
             row[f"fold_{fold}_train_nonzero_mean"] = (
-                f"{mean_for_chromosomes(totals, fold_train[fold]):.12g}"
+                f"{nonzero_mean_for_blocks(path, fold_blocks[fold]):.12g}"
             )
         rows.append(row)
     write_tsv(OUTPUT_PATH, rows)
     summary = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "split_revision": registry["revision_id"],
         "tracks": len(rows),
-        "development_mean_chromosomes": list(CV_CHROMOSOMES),
-        "fold_mean_policy": "nonzero_mean_on_four_training_chromosomes_only",
-        "controlled_comparison": "development_I_V_mean_vs_fold_train_only_mean",
-        "chromosome_x_read": False,
+        "development_mean_chromosomes": list(CHROMOSOMES),
+        "fold_mean_policy": "nonzero_mean_on_registered_train_blocks_only",
+        "controlled_comparison": "development_pool_train_blocks_vs_fold_train_blocks",
+        "locked_test_block_signal_reads": 0,
+        "development_block_count": len(development_blocks),
+        "fold_train_block_counts": {
+            str(fold): len(fold_blocks[fold]) for fold in range(1, 6)
+        },
         "group_outputs_sha256": sha256(GROUP_OUTPUTS),
         "split_registry_sha256": sha256(SPLIT_REGISTRY),
         "output_sha256": sha256(OUTPUT_PATH),

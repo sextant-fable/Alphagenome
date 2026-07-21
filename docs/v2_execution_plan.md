@@ -15,11 +15,11 @@ The canonical state is `alphagenome_custom/metadata/v2/execution_state.json`. Ph
 3. `P2/R2`: resolve duplicate content, the invalid T38 grouping, ontology, replicate context, inclusion, and exclusion decisions.
 4. `P3A/R3A`: run five representative accessions as an automatic checkpoint and measure integrity, mapping, scale, I/O, runtime, disk use, and agreement with the provided signals.
 5. `P3B/R3`: on R3A PASS, stream all 482 verified RNA-seq runs under the same full-processing approval, retaining normalized/grouped bigWigs while cleaning per-run FASTQ/BAM/bedGraph intermediates. Technical runs are pooled by raw coverage mass within biological units; true biological units are then averaged equally. The three reused provided signals are regenerated and retained as a separate source-study group rather than merged across studies.
-6. `P4/R4`: implement manifest-driven BigWig loading, five autosomal validation folds, and a locked chromosome-X test embargo.
+6. `P4/R4`: implement manifest-driven BigWig loading and five within-chromosome blocked folds. Every train and validation fold contains disjoint blocks from `I`, `II`, `III`, `IV`, `V`, and `X`; a separate locked block from each chromosome forms the one-time final test.
 7. `P5/R5`: implement model-space two-resolution count loss, gene loss, augmentation, and genuine C. elegans organism adaptation.
 8. `P6A/R6A`: run the approved GPU smoke/pilot and validate environment, numerics, resource use, logging, and checkpoint reload.
-9. `P6B/R6B`: run the pre-registered ablations and fair A/B/C blocked-CV comparison without reading chromosome X; select and lock one checkpoint.
-10. `P6C/R6C`: after a separate final-test approval, read chromosome X once, permanently close the test entry point, and issue the final report.
+9. `P6B/R6B`: run the pre-registered ablations and fair A/B/C blocked-CV comparison without reading any locked test block; select and lock one checkpoint.
+10. `P6C/R6C`: after a separate final-test approval, read the six locked chromosome blocks once, permanently close the test entry point, and issue the final report.
 
 ## Mandatory Approval Boundaries
 
@@ -27,10 +27,12 @@ The canonical state is `alphagenome_custom/metadata/v2/execution_state.json`. Ph
 - `G2`: scientific approval of the final sample/group manifests.
 - `G3`: large normalized data or cache generation.
 - `G4`: any GPU smoke test or formal experiment.
-- `G5`: the single final chromosome-X evaluation.
+- `G5`: the single final six-chromosome locked-block evaluation.
 
-Approvals are records with an exact scope, note, and timestamp rather than reusable booleans. The user-approved `p3_full_rna_streaming_482` scope covers both P3A and P3B, and `p3_full_outputs_and_p4_loader` continues through P4 without a monolithic NPZ. The standing G4 scope permits later phases to select available GPU 2/3 but does not authorize G5. Passing an automated review does not override the one-time chromosome-X boundary.
+Approvals are records with an exact scope, note, and timestamp rather than reusable booleans. The user-approved `p3_full_rna_streaming_482` scope covers both P3A and P3B. The revised P4 scope is `p4_six_chromosome_block_split` and still prohibits a monolithic NPZ. The standing G4 scope permits later phases to select available GPU 2/3 but does not authorize G5. The old `r6c_single_chr_x_test` scope cannot authorize the revised workflow; only `r6c_single_six_chromosome_block_test` can unlock the final blocks after R6B.
+
+The controller records `p4_six_chromosome_block_split` while the superseded P6C state is still active, then runs `prepare-six-chromosome-revision` to archive the holdout evidence and reopen P4. The same scoped record remains required for P4 itself; it grants neither G4 nor G5.
 
 ## Completion Standard
 
-Completion requires an auditable v2 provenance chain, a common and justified RNA-seq scale, deterministic on-demand loading, locked blocked cross-validation, corrected AlphaGenome-style losses, fair comparison of frozen-head, worm-embedding/LoRA, and from-scratch models, and one immutable final-test report.
+Completion requires an auditable v2 provenance chain, a common and justified RNA-seq scale, deterministic on-demand loading, leakage-buffered `I`/`II`/`III`/`IV`/`V`/`X` coverage in train, validation, and test, corrected AlphaGenome-style losses, fair comparison of frozen-head, worm-embedding/LoRA, and from-scratch models on that split, and one immutable six-chromosome final-test report.

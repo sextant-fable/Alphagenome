@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the separately approved one-time chromosome-X evaluation."""
+"""Run the separately approved one-time six-chromosome block evaluation."""
 
 from __future__ import annotations
 
@@ -73,6 +73,13 @@ def validate_locked_inputs(lock: dict[str, object]) -> dict[str, str]:
         raise RuntimeError("Locked selection SHA-256 mismatch before final-test claim")
 
     split_registry = json.loads(SPLIT_REGISTRY_PATH.read_text())
+    if not (
+        split_registry.get("revision_id") == "six_chromosome_blocks_v1"
+        and split_registry.get("test_chromosomes") == ["I", "II", "III", "IV", "V", "X"]
+        and split_registry.get("final_test_scope")
+        == "r6c_single_six_chromosome_block_test"
+    ):
+        raise RuntimeError("Final test requires the locked six-chromosome split")
     relative_test = str(TEST_INTERVALS_PATH.relative_to(REPO_ROOT))
     observed_test = sha256(TEST_INTERVALS_PATH)
     if split_registry.get("files", {}).get(relative_test) != observed_test:
@@ -83,6 +90,20 @@ def validate_locked_inputs(lock: dict[str, object]) -> dict[str, str]:
         raise RuntimeError("Development means no longer match their preregistered summary")
     if means_summary.get("split_registry_sha256") != sha256(SPLIT_REGISTRY_PATH):
         raise RuntimeError("Development means were not derived from the current split registry")
+    if not (
+        lock.get("schema_version") == 3
+        and lock.get("split_revision") == split_registry.get("revision_id")
+        and lock.get("split_registry_sha256") == sha256(SPLIT_REGISTRY_PATH)
+        and lock.get("means_sha256") == observed_means
+        and lock.get("test_intervals_sha256") == observed_test
+        and lock.get("training_chromosomes")
+        == ["I", "II", "III", "IV", "V", "X"]
+        and lock.get("final_test_chromosomes")
+        == ["I", "II", "III", "IV", "V", "X"]
+        and lock.get("final_test_scope")
+        == "r6c_single_six_chromosome_block_test"
+    ):
+        raise RuntimeError("Final-test lock does not bind the six-chromosome inputs")
     return {
         "checkpoint_sha256": observed_checkpoint,
         "selection_sha256": observed_selection,
@@ -118,9 +139,9 @@ def build_final_summary(
     p4_path = METADATA_DIR / "p4_loader_benchmark.json"
     p5_path = METADATA_DIR / "p5_component_audit.json"
     p6a_path = METADATA_DIR / "p6a_execution.json"
-    p6b_execution_path = METADATA_DIR / "p6b_amendment_execution.json"
-    p6b_results_path = METADATA_DIR / "p6b_amendment_cv_results.tsv"
-    p6b_ablations_path = METADATA_DIR / "p6b_amendment_ablation_results.tsv"
+    p6b_execution_path = METADATA_DIR / "p6b_six_chromosome_execution.json"
+    p6b_results_path = METADATA_DIR / "p6b_six_chromosome_cv_results.tsv"
+    p6b_ablations_path = METADATA_DIR / "p6b_six_chromosome_ablation_results.tsv"
     p6b_review_path = METADATA_DIR / "audits/P6B/review.json"
     selection_path = repository_path(lock["selection_path"], "selection")
     sample_manifest_path = METADATA_DIR / "rna_seq_samples_v2.tsv"
@@ -198,7 +219,7 @@ def build_final_summary(
             "dynamic_loader_tracks": p4["full_window_tracks"],
             "monolithic_npz_generated": p4["monolithic_npz_generated"],
             "cv_chromosomes": split_registry["cv_chromosomes"],
-            "test_chromosome": split_registry["test_chromosome"],
+            "test_chromosomes": split_registry["test_chromosomes"],
             "test_windows": split_registry["test_windows"],
         },
         "method_contract": {
@@ -206,7 +227,7 @@ def build_final_summary(
             "scale_implementation": p5["scale_implementation"],
             "worm_embedding_rows": p5["worm_embedding_rows"],
             "lora_trainable_parameters": p5["lora_trainable_parameters"],
-            "blocked_cv": "five-fold leave-one-chromosome-out over I-V",
+            "blocked_cv": "five-fold within-chromosome block validation over I-V,X",
             "model_classes": ["A", "B", "C"],
             "formal_seeds": 3,
         },
@@ -238,11 +259,11 @@ def build_final_summary(
             "no_post_test_tuning": True,
         },
         "limitations": [
-            "Chromosome X was viewed in legacy exploratory work, so it is not a fully pristine test set; this v2 checkpoint used it only in the claimed final execution.",
+            "Chromosome X was viewed in legacy exploratory work, so its locked test block is not fully pristine; every final test block remains one-time-use within the revised v2 workflow.",
             "All 485 source runs were class C before reprocessing; 482 RNA-seq runs were uniformly rebuilt and three non-RNA runs were excluded.",
             "The augmentation and gene-loss ablations used one seed across five folds and are directional rather than high-power estimates.",
-            "The selected B/paper objective improved the preregistered biological primary score but did not dominate every secondary metric.",
-            "The one-time chromosome-X result must be reported regardless of outcome and cannot be used for further tuning in this study cycle.",
+            f"The selected {selection['selected']['model']}/{selection['selected']['loss']} configuration won the preregistered biological primary score but need not dominate every secondary metric.",
+            "The one-time six-chromosome locked-block result must be reported regardless of outcome and cannot be used for further tuning in this study cycle.",
         ],
         "reproduction": {
             "phase_command": command,
@@ -287,7 +308,8 @@ def write_final_document(summary: dict[str, object]) -> None:
         f"{data['normalization_target_total']} ({data['normalization_interpretation']}).",
         "",
         "The model reads these tracks on demand. No monolithic v2 NPZ was generated. "
-        "Chromosomes I-V define blocked development CV; chromosome X was consumed once "
+        "Each of I, II, III, IV, V, and X contributes leakage-buffered train, "
+        "validation, and locked final-test blocks. The final blocks were consumed once "
         "by the locked final execution.",
         "",
         "## Model Selection",
@@ -337,14 +359,14 @@ def require_approvals() -> tuple[dict[str, object], dict[str, object]]:
         and g4.get("approved") is True
         and g4.get("scope") == "r6_gpu_auto_available_2_3"
         and g5.get("approved") is True
-        and g5.get("scope") == "r6c_single_chr_x_test"
+        and g5.get("scope") == "r6c_single_six_chromosome_block_test"
     ):
         raise RuntimeError("P6C requires current phase P6C and exact scoped G4/G5")
     lock = json.loads(LOCK_PATH.read_text())
     if lock.get("superseded") is True:
         raise RuntimeError("Final-test lock was superseded; amended R6B must issue a new lock")
     if lock.get("test_consumed") is True:
-        raise RuntimeError("Chromosome-X final test has already been consumed")
+        raise RuntimeError("Six-chromosome final test has already been consumed")
     return lock, state
 
 
@@ -365,6 +387,7 @@ def main() -> None:
         "execution_id": execution_id,
         "claimed_at": utc_now(),
         "g5_approved_at": g5.get("updated_at"),
+        "g5_scope": g5.get("scope"),
         "checkpoint_path": lock["checkpoint_path"],
         "checkpoint_sha256": lock["checkpoint_sha256"],
         "selection_path": lock["selection_path"],
