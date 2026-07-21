@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 from datetime import datetime, timezone
+import fcntl
 import hashlib
 import json
 import math
@@ -23,6 +24,7 @@ from scripts.v2_bigwig_dataset import V2BigWigDataset
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 METADATA_DIR = REPO_ROOT / "alphagenome_custom/metadata/v2"
+FINAL_CLAIM_PATH = METADATA_DIR / "final_test_claim.json"
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,6 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--final-test", action="store_true")
+    parser.add_argument("--final-test-execution-id")
     return parser.parse_args()
 
 
@@ -59,25 +62,40 @@ def atomic_json(path: Path, payload: dict[str, object]) -> None:
     temporary.replace(path)
 
 
-def consume_final_test(checkpoint_sha256: str) -> None:
+def consume_final_test(
+    checkpoint_sha256: str, execution_id: str, physical_gpu: int
+) -> None:
     lock_path = METADATA_DIR / "final_test_lock.json"
-    lock = json.loads(lock_path.read_text())
-    if (
-        lock.get("superseded") is True
-        or
-        lock.get("checkpoint_sha256") != checkpoint_sha256
-        or lock.get("test_consumed") is True
-    ):
-        raise RuntimeError("Final-test lock is mismatched or already consumed")
-    lock["test_consumed"] = True
-    lock["test_consumed_at"] = datetime.now(timezone.utc).replace(
-        microsecond=0
-    ).isoformat()
-    lock["test_status"] = "running"
-    atomic_json(lock_path, lock)
+    with FINAL_CLAIM_PATH.open() as claim_handle:
+        fcntl.flock(claim_handle.fileno(), fcntl.LOCK_EX)
+        claim = json.load(claim_handle)
+        if not (
+            claim.get("status") == "claimed"
+            and claim.get("execution_id") == execution_id
+            and claim.get("checkpoint_sha256") == checkpoint_sha256
+            and claim.get("physical_gpu") == physical_gpu
+        ):
+            raise RuntimeError("Final-test claim is mismatched or inactive")
+        lock = json.loads(lock_path.read_text())
+        if (
+            lock.get("superseded") is True
+            or lock.get("checkpoint_sha256") != checkpoint_sha256
+            or lock.get("test_consumed") is True
+        ):
+            raise RuntimeError("Final-test lock is mismatched or already consumed")
+        lock["test_consumed"] = True
+        lock["test_consumed_at"] = datetime.now(timezone.utc).replace(
+            microsecond=0
+        ).isoformat()
+        lock["test_status"] = "running"
+        lock["test_execution_id"] = execution_id
+        lock["test_physical_gpu"] = physical_gpu
+        atomic_json(lock_path, lock)
 
 
-def finalize_final_test(checkpoint_sha256: str, report_path: Path) -> None:
+def finalize_final_test(
+    checkpoint_sha256: str, execution_id: str, report_path: Path
+) -> None:
     lock_path = METADATA_DIR / "final_test_lock.json"
     lock = json.loads(lock_path.read_text())
     if (
@@ -86,6 +104,7 @@ def finalize_final_test(checkpoint_sha256: str, report_path: Path) -> None:
         lock.get("checkpoint_sha256") != checkpoint_sha256
         or lock.get("test_consumed") is not True
         or lock.get("test_status") != "running"
+        or lock.get("test_execution_id") != execution_id
     ):
         raise RuntimeError("Final-test lock changed during evaluation")
     lock["test_status"] = "completed"
@@ -201,6 +220,10 @@ def main() -> None:
         raise RuntimeError("Evaluation must use exactly one physical GPU 2 or 3")
     if (args.fold == 0) != args.final_test:
         raise RuntimeError("fold 0 is reserved exclusively for the one-time final test")
+    if args.final_test != bool(args.final_test_execution_id):
+        raise RuntimeError(
+            "--final-test and --final-test-execution-id must be provided together"
+        )
 
     means_path = METADATA_DIR / "track_nonzero_means_v2.tsv"
     means_rows = read_tsv(means_path)
@@ -246,6 +269,9 @@ def main() -> None:
         intervals_path,
         max_io_workers=16,
         final_test_checkpoint_sha256=checkpoint_sha if args.final_test else None,
+        final_test_execution_id=(
+            args.final_test_execution_id if args.final_test else None
+        ),
     )
     subwindows, eligible_bases = core_subwindows(
         dataset.intervals, args.sequence_length
@@ -277,7 +303,9 @@ def main() -> None:
     prediction_128_chunks: list[np.ndarray] = []
     target_128_chunks: list[np.ndarray] = []
     if args.final_test:
-        consume_final_test(checkpoint_sha)
+        consume_final_test(
+            checkpoint_sha, str(args.final_test_execution_id), int(visible)
+        )
     model.eval()
     metric_sums: dict[str, float] = {}
     count_128 = 0
@@ -482,12 +510,17 @@ def main() -> None:
         "physical_cuda_visible_devices": visible,
         "cuda_device_name": torch.cuda.get_device_name(0),
         "chromosome_x_read": args.final_test,
+        "final_test_execution_id": (
+            args.final_test_execution_id if args.final_test else None
+        ),
     }
     output_path = REPO_ROOT / args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
     if args.final_test:
-        finalize_final_test(checkpoint_sha, output_path)
+        finalize_final_test(
+            checkpoint_sha, str(args.final_test_execution_id), output_path
+        )
     print(json.dumps(record, indent=2, sort_keys=True))
 
 
