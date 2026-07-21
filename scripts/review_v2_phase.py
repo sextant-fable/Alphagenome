@@ -52,6 +52,15 @@ def sha256(path: Path) -> str:
     return file_hashes(path)[0]
 
 
+def repository_file(value: object) -> Path:
+    raw = Path(str(value))
+    path = raw.resolve() if raw.is_absolute() else (REPO_ROOT / raw).resolve()
+    path.relative_to(REPO_ROOT.resolve())
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    return path
+
+
 def check(check_id: str, passed: bool, evidence: str) -> dict[str, Any]:
     return {
         "check_id": check_id,
@@ -2598,8 +2607,12 @@ def review_p6c() -> dict[str, Any]:
         "execution": metadata_dir / "p6c_execution.json",
         "claim": metadata_dir / "final_test_claim.json",
         "report": metadata_dir / "final_test_report.json",
+        "summary": metadata_dir / "v2_final_report.json",
+        "document": REPO_ROOT / "docs/v2_final_report.md",
         "lock": metadata_dir / "final_test_lock.json",
-        "selection": metadata_dir / "p6b_selection.json",
+        "split_registry": metadata_dir / "split_registry_v2.json",
+        "means": metadata_dir / "track_nonzero_means_v2.tsv",
+        "means_summary": metadata_dir / "track_nonzero_means_v2_summary.json",
         "test_intervals": REPO_ROOT
         / "alphagenome_custom/intervals/v2/test_locked.tsv",
     }
@@ -2621,21 +2634,112 @@ def review_p6c() -> dict[str, Any]:
     execution = json.loads(paths["execution"].read_text())
     claim = json.loads(paths["claim"].read_text())
     report = json.loads(paths["report"].read_text())
+    summary = json.loads(paths["summary"].read_text())
     lock = json.loads(paths["lock"].read_text())
-    selection = json.loads(paths["selection"].read_text())
+    try:
+        selection_path = repository_file(lock.get("selection_path"))
+    except (FileNotFoundError, ValueError):
+        checks.append(
+            check(
+                "R6C.02_locked_selection_path",
+                False,
+                f"invalid={lock.get('selection_path')}",
+            )
+        )
+        return {
+            "schema_version": 1,
+            "phase": "P6C",
+            "review": "R6C",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    selection = json.loads(selection_path.read_text())
+    split_registry = json.loads(paths["split_registry"].read_text())
+    means_summary = json.loads(paths["means_summary"].read_text())
     state = json.loads(
         (REPO_ROOT / "alphagenome_custom/metadata/v2/execution_state.json").read_text()
     )
     g5 = state.get("approvals", {}).get("G5_final_test", {})
     log_path = REPO_ROOT / execution.get("log_path", "missing")
     mean_metrics = report.get("mean_metrics", {})
+    full_metrics = report.get("full_metrics", {})
+    full_primary = full_metrics.get("primary", {})
+    distribution = full_metrics.get("distribution_128bp", {})
+    execution_id = execution.get("execution_id")
+    relative_test = str(paths["test_intervals"].relative_to(REPO_ROOT))
+    registered_test_sha = split_registry.get("files", {}).get(relative_test)
+    current_test_sha = sha256(paths["test_intervals"])
+    current_means_sha = sha256(paths["means"])
+    full_metric_sections = {
+        "raw_1bp",
+        "raw_128bp_sum",
+        "log1p_1bp",
+        "log1p_128bp_sum",
+        "gene_body_log1p_1bp",
+        "exon_log1p_1bp",
+        "local_gradient_log1p_1bp",
+        "local_gradient_log1p_128bp",
+        "gene_exon_coverage",
+        "distribution_128bp",
+    }
+    full_metrics_valid = (
+        full_metrics.get("metric_contract") == "v2_full_metrics_1"
+        and full_metric_sections.issubset(full_metrics)
+        and math.isfinite(
+            float(
+                full_primary.get(
+                    "mean_per_track_gene_exon_coverage_pearson_log1p", "nan"
+                )
+            )
+        )
+        and math.isfinite(
+            float(full_primary.get("mean_per_track_pearson_128bp_log1p", "nan"))
+        )
+        and math.isfinite(float(distribution.get("mean_per_track_spearman", "nan")))
+        and math.isfinite(float(distribution.get("mean_per_track_top1_mse", "nan")))
+        and math.isfinite(
+            float(distribution.get("mean_per_track_top1_calibration_ratio", "nan"))
+        )
+    )
+    summary_data = summary.get("data_lineage", {})
+    summary_validation = summary.get("formal_validation", {})
+    summary_final = summary.get("final_test", {})
+    summary_valid = (
+        summary.get("status") == "completed_one_time_final_test"
+        and summary.get("execution_id") == execution_id
+        and summary_data.get("input_samples") == 485
+        and summary_data.get("rna_seq_runs_reprocessed") == 482
+        and summary_data.get("non_rna_runs_excluded") == 3
+        and summary_data.get("grouped_tracks") == 241
+        and summary_data.get("monolithic_npz_generated") is False
+        and summary_data.get("cv_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and summary_data.get("test_chromosome") == "X"
+        and len(summary_validation.get("matrix", [])) == 6
+        and len(summary_validation.get("ablations", [])) == 3
+        and summary_validation.get("formal_jobs") == 90
+        and summary_validation.get("ablation_jobs") == 15
+        and isinstance(summary_validation.get("registered_failures"), list)
+        and summary_validation.get("selected") == selection.get("selected")
+        and summary_final.get("report_sha256") == sha256(paths["report"])
+        and summary_final.get("checkpoint_sha256") == lock.get("checkpoint_sha256")
+        and summary_final.get("test_consumed_once") is True
+        and summary_final.get("no_post_test_tuning") is True
+        and summary_final.get("primary_metrics") == full_primary
+        and len(summary.get("limitations", [])) >= 5
+        and summary.get("reproduction", {}).get("phase_command")
+        == execution.get("command")
+    )
     report_valid = (
         report.get("phase") == "P6C"
         and report.get("fold") == 0
         and report.get("model") == lock.get("model")
         and report.get("training_loss") == lock.get("loss")
         and report.get("checkpoint_sha256") == lock.get("checkpoint_sha256")
-        and report.get("intervals_sha256") == sha256(paths["test_intervals"])
+        and report.get("final_test_execution_id") == execution_id
+        and report.get("intervals_sha256") == current_test_sha == registered_test_sha
+        and report.get("means_sha256") == current_means_sha
+        and current_means_sha == means_summary.get("output_sha256")
         and report.get("chromosome_x_read") is True
         and report.get("mean_column") == "development_I_V_nonzero_mean"
         and int(report.get("validation_subwindows", 0)) > 0
@@ -2643,6 +2747,7 @@ def review_p6c() -> dict[str, Any]:
         and math.isfinite(float(mean_metrics.get("paper_loss", "nan")))
         and math.isfinite(float(mean_metrics.get("log1p_mse", "nan")))
         and math.isfinite(float(report.get("mean_per_track_pearson_128bp", "nan")))
+        and full_metrics_valid
     )
     lock_valid = (
         lock.get("test_consumed") is True
@@ -2651,7 +2756,16 @@ def review_p6c() -> dict[str, Any]:
         and lock.get("final_report_path")
         == str(paths["report"].relative_to(REPO_ROOT))
         and lock.get("final_report_sha256") == sha256(paths["report"])
-        and lock.get("selection_sha256") == sha256(paths["selection"])
+        and lock.get("selection_sha256") == sha256(selection_path)
+        and lock.get("test_execution_id") == execution_id
+        and int(lock.get("test_physical_gpu", -1))
+        == int(execution.get("physical_gpu", -2))
+        and lock.get("final_summary_path")
+        == str(paths["summary"].relative_to(REPO_ROOT))
+        and lock.get("final_summary_sha256") == sha256(paths["summary"])
+        and lock.get("final_document_path")
+        == str(paths["document"].relative_to(REPO_ROOT))
+        and lock.get("final_document_sha256") == sha256(paths["document"])
         and lock.get("legacy_chr_x_prior_exposure_disclosed") is True
     )
     checks.extend(
@@ -2659,24 +2773,34 @@ def review_p6c() -> dict[str, Any]:
             check(
                 "R6C.02_single_claim",
                 claim.get("status") == "completed"
+                and claim.get("execution_id") == execution_id
                 and claim.get("checkpoint_sha256") == lock.get("checkpoint_sha256")
+                and claim.get("selection_sha256") == sha256(selection_path)
+                and claim.get("test_intervals_sha256") == current_test_sha
+                and claim.get("means_sha256") == current_means_sha
                 and int(claim.get("physical_gpu", -1)) in {2, 3},
-                f"claimed_at={claim.get('claimed_at')} gpu={claim.get('physical_gpu')}",
+                f"execution_id={claim.get('execution_id')} gpu={claim.get('physical_gpu')}",
             ),
             check(
                 "R6C.03_execution_and_gpu",
                 execution.get("status") == "completed"
                 and int(execution.get("physical_gpu", -1)) in {2, 3}
+                and report.get("physical_cuda_visible_devices")
+                == str(execution.get("physical_gpu"))
+                and "--final-test" in execution.get("command", [])
+                and execution_id in execution.get("command", [])
                 and log_path.is_file()
                 and log_path.stat().st_size > 0,
-                f"status={execution.get('status')} gpu={execution.get('physical_gpu')}",
+                f"execution_id={execution_id} status={execution.get('status')} gpu={execution.get('physical_gpu')}",
             ),
             check(
                 "R6C.04_locked_checkpoint_only",
                 report.get("checkpoint_sha256") == lock.get("checkpoint_sha256")
                 and selection.get("selected", {}).get("model") == lock.get("model")
-                and selection.get("selected", {}).get("loss") == lock.get("loss"),
-                f"checkpoint={lock.get('checkpoint_path')}",
+                and selection.get("selected", {}).get("loss") == lock.get("loss")
+                and lock.get("selection_path")
+                == str(selection_path.relative_to(REPO_ROOT)),
+                f"checkpoint={lock.get('checkpoint_path')} selection={lock.get('selection_path')}",
             ),
             check(
                 "R6C.05_final_metrics",
@@ -2692,12 +2816,23 @@ def review_p6c() -> dict[str, Any]:
                 "R6C.07_scoped_final_approval",
                 g5.get("approved") is True
                 and g5.get("scope") == "r6c_single_chr_x_test",
-                f"scope={g5.get('scope')}",
+                f"scope={g5.get('scope')} approved_at={g5.get('updated_at')}",
             ),
             check(
                 "R6C.08_prior_exposure_disclosure",
                 lock.get("legacy_chr_x_prior_exposure_disclosed") is True,
                 "legacy chr X exposure remains disclosed; v2 test was read once after lock",
+            ),
+            check(
+                "R6C.09_final_synthesis",
+                summary_valid,
+                f"samples={summary_data.get('input_samples')} tracks={summary_data.get('grouped_tracks')} formal_jobs={summary_validation.get('formal_jobs')}",
+            ),
+            check(
+                "R6C.10_auditable_documents",
+                paths["document"].stat().st_size > 0
+                and claim.get("final_summary_sha256") == sha256(paths["summary"]),
+                f"summary={paths['summary'].relative_to(REPO_ROOT)} document={paths['document'].relative_to(REPO_ROOT)}",
             ),
         ]
     )

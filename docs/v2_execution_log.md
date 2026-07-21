@@ -2,6 +2,17 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-21 - P6C Pre-G5 Gate Audit
+
+- Purpose: independently verify the one-time chromosome-X entry point after the amended R6B lock and before requesting G5. No chromosome-X BigWig was opened.
+- Findings corrected: R6C still referenced the superseded `p6b_selection.json` instead of the selection path bound into the amended lock; the evaluator did not require an exclusive claim or unique execution ID; and direct loader use could read chromosome X after G5 without first consuming the one-time lock.
+- Gate hardening: P6C now validates the locked checkpoint, amended selection, preregistered test intervals, development means, and split-registry SHA-256 values before creating a claim. The claim is created with `O_EXCL`, records one execution ID and physical GPU 2/3, and is serialized during consumption with a file lock.
+- Read boundary: a chromosome-X dataset requires the matching claim at construction and requires the same execution ID in `test_consumed=true / test_status=running` state before every signal read. A concurrent or repeated consumer is refused before signal access.
+- Failure semantics: a failure after first signal access remains permanently consumed and becomes `failed_after_consumption`; a successful run binds the metric report, final synthesis, human-readable report, checkpoint, claim, GPU, and execution ID by SHA-256.
+- Final synthesis: successful P6C execution will automatically summarize the 485-source lineage, 482 uniformly reprocessed RNA-seq runs, 241 grouped tracks, blocked split, six A/B/C-loss configurations, three ablations, registered failures, selected checkpoint, final metrics, limitations, and exact reproduction command.
+- Verification: 68 v2 unit tests passed; all scripts and v2 tests compiled; `git diff --check` passed. A metadata-only summary dry-run returned 485 samples, 241 tracks, six matrix rows, three ablations, and zero registered P6B failures. Locked hashes matched checkpoint `b7bdd540...25b`, amended selection `ff434c21...6cae`, test intervals `5f398d18...016`, means `3734bdf7...beb`, and split registry `b6abf1d8...875`.
+- Current boundary: G5 is still unapproved, `test_consumed=false`, no final-test claim exists, and the controller remains `P6C / APPROVAL_REQUIRED`.
+
 ## 2026-07-21 - P6B Amendment Completion and R6B PASS
 
 - Purpose: complete the pre-registered P6B amendment required by the independent pre-G5 audit, without reading chromosome X.

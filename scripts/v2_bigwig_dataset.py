@@ -30,6 +30,7 @@ DEFAULT_TRACKS = REPO_ROOT / "alphagenome_custom/metadata/v2/p3_group_outputs.ts
 DEFAULT_GROUPS = REPO_ROOT / "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv"
 STATE_PATH = REPO_ROOT / "alphagenome_custom/metadata/v2/execution_state.json"
 FINAL_LOCK_PATH = REPO_ROOT / "alphagenome_custom/metadata/v2/final_test_lock.json"
+FINAL_CLAIM_PATH = REPO_ROOT / "alphagenome_custom/metadata/v2/final_test_claim.json"
 DNA_TO_INDEX = {ord("A"): 0, ord("C"): 1, ord("G"): 2, ord("T"): 3}
 
 
@@ -118,7 +119,9 @@ def interval_mask(
     return mask
 
 
-def require_final_test_access(checkpoint_sha256: str | None) -> None:
+def final_test_records(
+    checkpoint_sha256: str | None, execution_id: str | None
+) -> tuple[dict[str, Any], dict[str, Any]]:
     state = json.loads(STATE_PATH.read_text())
     gate = state.get("approvals", {}).get("G5_final_test", {})
     if not (
@@ -126,18 +129,52 @@ def require_final_test_access(checkpoint_sha256: str | None) -> None:
         and gate.get("approved") is True
         and gate.get("scope") == "r6c_single_chr_x_test"
         and checkpoint_sha256
+        and execution_id
         and FINAL_LOCK_PATH.is_file()
+        and FINAL_CLAIM_PATH.is_file()
     ):
         raise PermissionError(
-            "Chromosome X is embargoed until P6C, scoped G5 approval, and a locked checkpoint"
+            "Chromosome X is embargoed until P6C, scoped G5 approval, a locked "
+            "checkpoint, and an exclusive execution claim"
         )
     lock = json.loads(FINAL_LOCK_PATH.read_text())
+    claim = json.loads(FINAL_CLAIM_PATH.read_text())
     if lock.get("superseded") is True:
         raise PermissionError("Final-test lock was superseded and cannot unlock chromosome X")
     if lock.get("checkpoint_sha256") != checkpoint_sha256:
         raise PermissionError("Checkpoint SHA-256 does not match the final-test lock")
-    if lock.get("test_consumed") is True:
+    if not (
+        claim.get("status") == "claimed"
+        and claim.get("execution_id") == execution_id
+        and claim.get("checkpoint_sha256") == checkpoint_sha256
+    ):
+        raise PermissionError("Final-test execution claim is missing or mismatched")
+    return lock, claim
+
+
+def require_final_test_access(
+    checkpoint_sha256: str | None, execution_id: str | None
+) -> None:
+    lock, _ = final_test_records(checkpoint_sha256, execution_id)
+    if lock.get("test_consumed") is True and not (
+        lock.get("test_status") == "running"
+        and lock.get("test_execution_id") == execution_id
+    ):
         raise PermissionError("The one-time chromosome-X test entry has already been consumed")
+
+
+def require_final_test_read_access(
+    checkpoint_sha256: str | None, execution_id: str | None
+) -> None:
+    lock, _ = final_test_records(checkpoint_sha256, execution_id)
+    if not (
+        lock.get("test_consumed") is True
+        and lock.get("test_status") == "running"
+        and lock.get("test_execution_id") == execution_id
+    ):
+        raise PermissionError(
+            "Chromosome X cannot be read before the claimed final-test entry is consumed"
+        )
 
 
 class V2BigWigDataset(Dataset):
@@ -156,6 +193,7 @@ class V2BigWigDataset(Dataset):
         max_io_workers: int = 16,
         cache_size: int = 0,
         final_test_checkpoint_sha256: str | None = None,
+        final_test_execution_id: str | None = None,
     ) -> None:
         self.intervals_path = Path(intervals_path)
         self.track_manifest_path = Path(track_manifest_path)
@@ -167,7 +205,11 @@ class V2BigWigDataset(Dataset):
         if not self.intervals:
             raise ValueError("Interval manifest is empty")
         if any(row["chromosome"] == "X" for row in self.intervals):
-            require_final_test_access(final_test_checkpoint_sha256)
+            require_final_test_access(
+                final_test_checkpoint_sha256, final_test_execution_id
+            )
+        self.final_test_checkpoint_sha256 = final_test_checkpoint_sha256
+        self.final_test_execution_id = final_test_execution_id
         outputs = read_tsv(self.track_manifest_path)
         groups = {row["group_id"]: row for row in read_tsv(self.group_manifest_path)}
         if track_indices is None:
@@ -247,7 +289,13 @@ class V2BigWigDataset(Dataset):
         crop_offset_bp: int = 0,
         crop_length_bp: int | None = None,
     ) -> dict[str, Any]:
-        full_width = int(self.intervals[index]["end"]) - int(self.intervals[index]["start"])
+        row = self.intervals[index]
+        chromosome = row["chromosome"]
+        if chromosome == "X":
+            require_final_test_read_access(
+                self.final_test_checkpoint_sha256, self.final_test_execution_id
+            )
+        full_width = int(row["end"]) - int(row["start"])
         crop_length = full_width if crop_length_bp is None else int(crop_length_bp)
         is_full_window = crop_offset_bp == 0 and crop_length == full_width
         if shift_bp == 0 and is_full_window and index in self._cache:
@@ -255,8 +303,6 @@ class V2BigWigDataset(Dataset):
             self._cache[index] = item
             return item
         self._ensure_handles()
-        row = self.intervals[index]
-        chromosome = row["chromosome"]
         if shift_bp and row["role"] != "train":
             raise ValueError("Random shifts are allowed only for training intervals")
         if crop_offset_bp < 0 or crop_length <= 0 or crop_offset_bp + crop_length > full_width:
