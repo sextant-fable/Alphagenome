@@ -4,6 +4,7 @@ import json
 import unittest
 
 from scripts import build_v2_splits
+from scripts import evaluate_v2_model
 from scripts import run_v2_p6b_six_chromosome
 
 
@@ -73,7 +74,7 @@ class SixChromosomeSplitTest(unittest.TestCase):
 
     def test_train_windows_and_eval_cores_stay_inside_one_block(self) -> None:
         block_start = 5 * build_v2_splits.EXCLUSION_BUFFER_BP
-        block_end = block_start + 2 * build_v2_splits.WINDOW_SIZE + 2 * build_v2_splits.MAX_SHIFT_BP
+        block_end = block_start + 16 * build_v2_splits.EVALUATION_SUBWINDOW_BP
         length = block_end + build_v2_splits.WINDOW_SIZE
         block = {
             "block_id": "I_block_1",
@@ -81,7 +82,7 @@ class SixChromosomeSplitTest(unittest.TestCase):
             "block_end": block_end,
         }
         train = build_v2_splits.interval_rows(
-            "I", length, 1, "train", block, "six_chromosome_blocks_v1"
+            "I", length, 1, "train", block, "six_chromosome_blocks_v2"
         )
         self.assertTrue(train)
         self.assertTrue(
@@ -92,16 +93,39 @@ class SixChromosomeSplitTest(unittest.TestCase):
             )
         )
         valid = build_v2_splits.interval_rows(
-            "I", length, 1, "valid", block, "six_chromosome_blocks_v1"
+            "I", length, 1, "valid", block, "six_chromosome_blocks_v2"
         )
         ordered = sorted(valid, key=lambda row: int(row["core_start"]))
+        self.assertEqual(
+            len(ordered),
+            (block_end - block_start) // build_v2_splits.EVALUATION_SUBWINDOW_BP,
+        )
         self.assertEqual(int(ordered[0]["core_start"]), block_start)
         self.assertEqual(int(ordered[-1]["core_end"]), block_end)
+        self.assertTrue(
+            all(
+                int(row["core_end"]) - int(row["core_start"])
+                == build_v2_splits.EVALUATION_SUBWINDOW_BP
+                and int(row["start"]) <= int(row["core_start"])
+                and int(row["core_end"]) <= int(row["end"])
+                and (int(row["core_start"]) - int(row["start"])) % 128 == 0
+                for row in ordered
+            )
+        )
         self.assertTrue(
             all(
                 int(first["core_end"]) == int(second["core_start"])
                 for first, second in zip(ordered, ordered[1:])
             )
+        )
+        subwindows, eligible = evaluate_v2_model.core_subwindows(
+            valid, build_v2_splits.EVALUATION_SUBWINDOW_BP
+        )
+        self.assertEqual(len(subwindows), len(valid))
+        self.assertEqual(eligible, block_end - block_start)
+        self.assertEqual(
+            len(subwindows) * build_v2_splits.EVALUATION_SUBWINDOW_BP,
+            eligible,
         )
 
     def test_p6b_matrix_is_preregistered_and_excludes_test_manifests(self) -> None:

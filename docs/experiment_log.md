@@ -34,6 +34,23 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-22 - Six-Chromosome P6B Invalidated Core-Coverage Attempt
+
+- Run type: training and evaluation, controlled invalidation
+- Purpose: Start the preregistered six-chromosome P6B matrix after R4/R5/R6A passed, then verify the first completed full-validation artifact before allowing the matrix to continue.
+- Git commit: `f2e52dd` at run start.
+- Branch: `setup/agent-maintenance`
+- Host: HY-GPU (`hy8`), non-Slurm; physical GPUs 2 and 3.
+- Environment: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python`; PyTorch `2.11.0+cu128`.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller run --phase P6B`.
+- Input data: `six_chromosome_blocks_v1`; 241 grouped tracks; fold 1; model A; seed `20260714`; paper and log1p-MSE objectives.
+- Output path: ignored `runs/v2_p6b_six_chromosome_20260721/` and `logs/v2_p6b_six_chromosome_20260721/`; execution record `alphagenome_custom/metadata/v2/p6b_six_chromosome_execution.json`.
+- Result summary: Invalidated before comparative use. One A/paper job completed training and validation, one A/log1p-MSE job reached validation, and one B/paper job started before the controller was interrupted. The completed artifact reported `validation_core_coverage_fraction=0.8435322914705329`, contradicting the registered complete-core objective.
+- Verification: The effective validation blocks are divisible into 83 x 131,072 bp cores, but the v1 nearest-window partition produced only 70 complete metric subwindows. GPU processes exited after the controlled interrupt. `locked_test_block_signal_reads=0`; G5 remained unapproved.
+- Failures or warnings: This is a split/evaluation geometry defect, not a model result. No metric, checkpoint, or ranking from this attempt may be reused. The v1 code rounded absolute core coordinates to 128 bp and dropped incomplete fragments at each window boundary.
+- Next actions: Archive v1 evidence, introduce `six_chromosome_blocks_v2` with one complete context-relative 131,072 bp core per manifest row, rerun R4-R6B from fresh run paths, and require coverage >=0.999 in R6B.
+- Claim status: verified
+
 ## 2026-07-21 - Six-Chromosome Split Revision P4-P6A
 
 - Run type: analysis, sanity check, and GPU smoke test

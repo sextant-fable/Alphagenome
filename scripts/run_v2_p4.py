@@ -52,6 +52,11 @@ def batch_digest(batch: dict[str, object]) -> str:
 
 def main() -> None:
     subprocess.run(
+        v2_subprocess.module_command("archive_v2_incomplete_core_revision"),
+        cwd=REPO_ROOT,
+        check=True,
+    )
+    subprocess.run(
         v2_subprocess.module_command("build_v2_splits"),
         cwd=REPO_ROOT,
         check=True,

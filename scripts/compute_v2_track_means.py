@@ -140,7 +140,7 @@ def main() -> None:
     if len(outputs) != 241:
         raise RuntimeError(f"Expected 241 group outputs, got {len(outputs)}")
     if (
-        registry.get("revision_id") != "six_chromosome_blocks_v1"
+        registry.get("revision_id") != "six_chromosome_blocks_v2"
         or registry.get("test_chromosomes") != list(CHROMOSOMES)
     ):
         raise RuntimeError("Track means require the six-chromosome block split")

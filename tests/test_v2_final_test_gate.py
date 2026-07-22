@@ -144,7 +144,7 @@ class FinalTestGateTest(unittest.TestCase):
             write_json(
                 split_registry,
                 {
-                    "revision_id": "six_chromosome_blocks_v1",
+                    "revision_id": "six_chromosome_blocks_v2",
                     "test_chromosomes": ["I", "II", "III", "IV", "V", "X"],
                     "final_test_scope": "r6c_single_six_chromosome_block_test",
                     "files": {relative_test: sha256(test_intervals)},
@@ -163,7 +163,7 @@ class FinalTestGateTest(unittest.TestCase):
                 "selection_path": str(selection.relative_to(root)),
                 "selection_sha256": sha256(selection),
                 "schema_version": 3,
-                "split_revision": "six_chromosome_blocks_v1",
+                "split_revision": "six_chromosome_blocks_v2",
                 "split_registry_sha256": sha256(split_registry),
                 "means_sha256": sha256(means),
                 "test_intervals_sha256": sha256(test_intervals),

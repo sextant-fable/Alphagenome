@@ -1572,15 +1572,17 @@ def review_p3b() -> dict[str, Any]:
 
 
 def review_p4() -> dict[str, Any]:
+    from scripts.evaluate_v2_model import core_subwindows
     from scripts.v2_bigwig_dataset import V2BigWigDataset
 
     metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
     interval_dir = REPO_ROOT / "alphagenome_custom/intervals/v2"
     registry_path = metadata_dir / "split_registry_v2.json"
     benchmark_path = metadata_dir / "p4_loader_benchmark.json"
-    spec_path = metadata_dir / "six_chromosome_split_spec.json"
+    spec_path = metadata_dir / "six_chromosome_split_v2_spec.json"
     blocks_path = interval_dir / "blocks.tsv"
     migration_path = metadata_dir / "six_chromosome_revision_migration.json"
+    core_migration_path = metadata_dir / "six_chromosome_core_coverage_revision.json"
     expected_paths = [
         interval_dir / f"fold_{fold}/{role}.tsv"
         for fold in range(1, 6)
@@ -1591,6 +1593,7 @@ def review_p4() -> dict[str, Any]:
         blocks_path,
         spec_path,
         migration_path,
+        core_migration_path,
         registry_path,
         benchmark_path,
     ]
@@ -1612,6 +1615,7 @@ def review_p4() -> dict[str, Any]:
     benchmark = json.loads(benchmark_path.read_text())
     spec = json.loads(spec_path.read_text())
     migration = json.loads(migration_path.read_text())
+    core_migration = json.loads(core_migration_path.read_text())
     blocks = read_tsv(blocks_path)
     chromosome_lengths = {}
     with (REPO_ROOT / "alphagenome_custom/reference/genome.fa.fai").open() as handle:
@@ -1631,7 +1635,7 @@ def review_p4() -> dict[str, Any]:
     window_size = 2**20
     max_shift = 1024
     buffer_bp = window_size + 2 * max_shift
-    revision_id = "six_chromosome_blocks_v1"
+    revision_id = "six_chromosome_blocks_v2"
     split_errors = []
     core_errors = []
     block_errors = []
@@ -1705,6 +1709,13 @@ def review_p4() -> dict[str, Any]:
             if (
                 int(ordered[0]["core_start"]) != int(block["block_start"])
                 or int(ordered[-1]["core_end"]) != int(block["block_end"])
+                or len(ordered)
+                != int(block["effective_bases"]) // 131072
+                or any(
+                    int(row["core_end"]) - int(row["core_start"]) != 131072
+                    or (int(row["core_start"]) - int(row["start"])) % 128 != 0
+                    for row in ordered
+                )
                 or any(
                     int(first["core_end"]) != int(second["core_start"])
                     for first, second in zip(ordered, ordered[1:])
@@ -1712,6 +1723,22 @@ def review_p4() -> dict[str, Any]:
             ):
                 errors.append(f"{block_id}:core_gap_or_overlap")
         return errors
+
+    def validate_metric_coverage(rows: list[dict[str, str]]) -> list[str]:
+        try:
+            subwindows, eligible_bases = core_subwindows(rows, 131072)
+        except (RuntimeError, ValueError) as error:
+            return [str(error)]
+        core_bases = sum(
+            int(row["core_end"]) - int(row["core_start"]) for row in rows
+        )
+        if eligible_bases != core_bases:
+            return [f"eligible={eligible_bases} core={core_bases}"]
+        if len(subwindows) * 131072 != core_bases:
+            return [f"subwindows={len(subwindows)} core={core_bases}"]
+        if len(subwindows) != len(rows):
+            return [f"subwindows={len(subwindows)} rows={len(rows)}"]
+        return []
 
     for fold in range(1, 6):
         train = read_tsv(interval_dir / f"fold_{fold}/train.tsv")
@@ -1735,6 +1762,11 @@ def review_p4() -> dict[str, Any]:
         fold_core_errors = validate_core_partitions(valid)
         if fold_core_errors:
             core_errors.extend(f"fold{fold}:{error}" for error in fold_core_errors)
+        fold_metric_errors = validate_metric_coverage(valid)
+        if fold_metric_errors:
+            core_errors.extend(
+                f"fold{fold}:metric:{error}" for error in fold_metric_errors
+            )
         train_blocks = {row["block_id"] for row in train}
         valid_blocks = {row["block_id"] for row in valid}
         test_blocks = {
@@ -1760,11 +1792,13 @@ def review_p4() -> dict[str, Any]:
         split_errors.append("invalid development training split")
 
     test_rows = read_tsv(interval_dir / "test_locked.tsv")
+    test_metric_errors = validate_metric_coverage(test_rows)
     test_valid = (
         {row["chromosome"] for row in test_rows} == chromosome_set
         and all(row["role"] == "test_locked" for row in test_rows)
         and not validate_rows(test_rows, "test_locked", {"test_locked"})
         and not validate_core_partitions(test_rows)
+        and not test_metric_errors
         and len({row["block_id"] for row in test_rows}) == 6
     )
     registry_hash_errors = [
@@ -1816,9 +1850,9 @@ def review_p4() -> dict[str, Any]:
                 f"errors={split_errors} chromosomes={list(chromosomes)}",
             ),
             check(
-                "R4.03_block_buffers_and_no_leakage",
+                "R4.03_block_buffers_no_leakage_and_full_metric_coverage",
                 not block_errors and not core_errors and test_valid,
-                f"block_errors={block_errors} core_errors={core_errors} test_valid={test_valid}",
+                f"block_errors={block_errors} core_errors={core_errors} test_metric_errors={test_metric_errors} test_valid={test_valid}",
             ),
             check(
                 "R4.04_split_lock_integrity",
@@ -1893,7 +1927,7 @@ def review_p4() -> dict[str, Any]:
             ),
             check(
                 "R4.12_superseded_holdout_preserved",
-                migration.get("revision_id") == revision_id
+                migration.get("revision_id") == "six_chromosome_blocks_v1"
                 and migration.get("source_test_consumed") is False
                 and migration.get("old_split_disposition")
                 == "superseded_for_six_chromosome_split"
@@ -1901,6 +1935,27 @@ def review_p4() -> dict[str, Any]:
                 and bool(migration.get("archived_metadata"))
                 and bool(migration.get("archived_audits")),
                 f"archived_intervals={len(migration.get('archived_intervals', []))}",
+            ),
+            check(
+                "R4.13_incomplete_core_revision_preserved",
+                core_migration.get("source_revision")
+                == "six_chromosome_blocks_v1"
+                and core_migration.get("target_revision") == revision_id
+                and core_migration.get("source_completed_jobs") == 1
+                and core_migration.get("source_locked_test_block_signal_reads") == 0
+                and min(
+                    (
+                        float(value)
+                        for value in core_migration.get(
+                            "observed_validation_core_coverage_fractions", []
+                        )
+                    ),
+                    default=1.0,
+                )
+                < 0.999
+                and bool(core_migration.get("archived_intervals"))
+                and bool(core_migration.get("archived_metadata")),
+                f"source_jobs={core_migration.get('source_completed_jobs')} coverage={core_migration.get('observed_validation_core_coverage_fractions')}",
             ),
         ]
     )
@@ -1972,7 +2027,7 @@ def review_p5() -> dict[str, Any]:
                 and means_summary.get("fold_mean_policy")
                 == "nonzero_mean_on_registered_train_blocks_only"
                 and means_summary.get("split_revision")
-                == "six_chromosome_blocks_v1"
+                == "six_chromosome_blocks_v2"
                 and means_summary.get("output_sha256") == sha256(paths["means"]),
                 f"tracks={len(means)} test_reads={means_summary.get('locked_test_block_signal_reads')}",
             ),
@@ -2160,7 +2215,7 @@ def review_p6a() -> dict[str, Any]:
             check(
                 "R6A.03_three_model_smokes",
                 record.get("status") == "completed"
-                and record.get("split_revision") == "six_chromosome_blocks_v1"
+                and record.get("split_revision") == "six_chromosome_blocks_v2"
                 and record.get("locked_test_block_signal_reads") == 0
                 and {run.get("model") for run in runs} == {"A", "B", "C"}
                 and len(runs) == 3
@@ -2730,16 +2785,19 @@ def review_p6b_chromosome_holdout() -> dict[str, Any]:
 def review_p6b() -> dict[str, Any]:
     metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
     paths = {
-        "spec": metadata_dir / "p6b_six_chromosome_spec.json",
-        "execution": metadata_dir / "p6b_six_chromosome_execution.json",
-        "results": metadata_dir / "p6b_six_chromosome_cv_results.tsv",
-        "ablations": metadata_dir / "p6b_six_chromosome_ablation_results.tsv",
-        "selection": metadata_dir / "p6b_six_chromosome_selection.json",
+        "spec": metadata_dir / "p6b_six_chromosome_v2_spec.json",
+        "execution": metadata_dir / "p6b_six_chromosome_v2_execution.json",
+        "results": metadata_dir / "p6b_six_chromosome_v2_cv_results.tsv",
+        "ablations": metadata_dir / "p6b_six_chromosome_v2_ablation_results.tsv",
+        "selection": metadata_dir / "p6b_six_chromosome_v2_selection.json",
         "lock": metadata_dir / "final_test_lock.json",
         "means": metadata_dir / "track_nonzero_means_v2.tsv",
         "registry": metadata_dir / "split_registry_v2.json",
         "test": REPO_ROOT / "alphagenome_custom/intervals/v2/test_locked.tsv",
         "migration": metadata_dir / "six_chromosome_revision_migration.json",
+        "core_migration": metadata_dir / "six_chromosome_core_coverage_revision.json",
+        "invalid_execution": metadata_dir
+        / "six_chromosome_blocks_v1_incomplete_core/p6b_six_chromosome_execution.json",
         "old_lock": metadata_dir
         / "chromosome_holdout_original/final_test_lock.json",
     }
@@ -2766,6 +2824,8 @@ def review_p6b() -> dict[str, Any]:
     lock = json.loads(paths["lock"].read_text())
     registry = json.loads(paths["registry"].read_text())
     migration = json.loads(paths["migration"].read_text())
+    core_migration = json.loads(paths["core_migration"].read_text())
+    invalid_execution = json.loads(paths["invalid_execution"].read_text())
     old_lock = json.loads(paths["old_lock"].read_text())
     state = json.loads((metadata_dir / "execution_state.json").read_text())
     spec_sha = sha256(paths["spec"])
@@ -2990,7 +3050,7 @@ def review_p6b() -> dict[str, Any]:
             == development.get("checkpoint_sha256")
             and lock.get("selection_sha256") == sha256(paths["selection"])
             and lock.get("spec_sha256") == spec_sha
-            and lock.get("split_revision") == "six_chromosome_blocks_v1"
+            and lock.get("split_revision") == "six_chromosome_blocks_v2"
             and lock.get("split_registry_sha256") == sha256(paths["registry"])
             and lock.get("means_sha256") == sha256(paths["means"])
             and lock.get("test_intervals_sha256") == sha256(paths["test"])
@@ -3008,9 +3068,14 @@ def review_p6b() -> dict[str, Any]:
             check(
                 "R6B.S2_preregistered_revision",
                 spec.get("locked_before_training") is True
+                and spec.get("revision_id") == "P6B-SIXCHR-2"
                 and spec.get("formal_matrix", {}).get("total_jobs") == 90
                 and spec.get("metrics", {}).get("contract") == "v2_full_metrics_1"
-                and spec.get("split_revision") == "six_chromosome_blocks_v1"
+                and spec.get("metrics", {}).get(
+                    "minimum_validation_core_coverage_fraction"
+                )
+                == 0.999
+                and spec.get("split_revision") == "six_chromosome_blocks_v2"
                 and spec.get("locked_test_block_access") == "prohibited"
                 and registry.get("revision_id") == spec.get("split_revision")
                 and execution.get("revision_id") == spec.get("revision_id")
@@ -3069,6 +3134,28 @@ def review_p6b() -> dict[str, Any]:
                 and migration.get("old_split_disposition")
                 == "superseded_for_six_chromosome_split",
                 f"old_checkpoint={old_lock.get('checkpoint_path')}",
+            ),
+            check(
+                "R6B.S10_incomplete_core_attempt_excluded",
+                core_migration.get("source_revision")
+                == "six_chromosome_blocks_v1"
+                and core_migration.get("target_revision")
+                == "six_chromosome_blocks_v2"
+                and core_migration.get("source_completed_jobs") == 1
+                and core_migration.get("source_locked_test_block_signal_reads") == 0
+                and min(
+                    (
+                        float(value)
+                        for value in core_migration.get(
+                            "observed_validation_core_coverage_fractions", []
+                        )
+                    ),
+                    default=1.0,
+                )
+                < 0.999
+                and invalid_execution.get("status") == "running"
+                and spec.get("invalid_v1_jobs_reusable") is False,
+                f"source_status={core_migration.get('source_execution_status')} coverage={core_migration.get('observed_validation_core_coverage_fractions')}",
             ),
         ]
     )
@@ -3155,7 +3242,7 @@ def review_p6c() -> dict[str, Any]:
     current_test_sha = sha256(paths["test_intervals"])
     current_means_sha = sha256(paths["means"])
     split_contract = (
-        split_registry.get("revision_id") == "six_chromosome_blocks_v1"
+        split_registry.get("revision_id") == "six_chromosome_blocks_v2"
         and split_registry.get("cv_chromosomes")
         == ["I", "II", "III", "IV", "V", "X"]
         and split_registry.get("test_chromosomes")
@@ -3266,7 +3353,7 @@ def review_p6c() -> dict[str, Any]:
         == str(paths["document"].relative_to(REPO_ROOT))
         and lock.get("final_document_sha256") == sha256(paths["document"])
         and lock.get("schema_version") == 3
-        and lock.get("split_revision") == "six_chromosome_blocks_v1"
+        and lock.get("split_revision") == "six_chromosome_blocks_v2"
         and lock.get("split_registry_sha256") == sha256(paths["split_registry"])
         and lock.get("means_sha256") == current_means_sha
         and lock.get("test_intervals_sha256") == current_test_sha

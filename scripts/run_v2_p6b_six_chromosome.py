@@ -15,17 +15,17 @@ from scripts import v2_subprocess
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 METADATA_DIR = REPO_ROOT / "alphagenome_custom/metadata/v2"
-SPEC_PATH = METADATA_DIR / "p6b_six_chromosome_spec.json"
-EXECUTION_PATH = METADATA_DIR / "p6b_six_chromosome_execution.json"
-RESULTS_PATH = METADATA_DIR / "p6b_six_chromosome_cv_results.tsv"
-ABLATION_RESULTS_PATH = METADATA_DIR / "p6b_six_chromosome_ablation_results.tsv"
-SELECTION_PATH = METADATA_DIR / "p6b_six_chromosome_selection.json"
+SPEC_PATH = METADATA_DIR / "p6b_six_chromosome_v2_spec.json"
+EXECUTION_PATH = METADATA_DIR / "p6b_six_chromosome_v2_execution.json"
+RESULTS_PATH = METADATA_DIR / "p6b_six_chromosome_v2_cv_results.tsv"
+ABLATION_RESULTS_PATH = METADATA_DIR / "p6b_six_chromosome_v2_ablation_results.tsv"
+SELECTION_PATH = METADATA_DIR / "p6b_six_chromosome_v2_selection.json"
 LOCK_PATH = METADATA_DIR / "final_test_lock.json"
 SPLIT_REGISTRY_PATH = METADATA_DIR / "split_registry_v2.json"
 MEANS_PATH = METADATA_DIR / "track_nonzero_means_v2.tsv"
 TEST_INTERVALS_PATH = REPO_ROOT / "alphagenome_custom/intervals/v2/test_locked.tsv"
-RUN_ROOT = Path("runs/v2_p6b_six_chromosome_20260721")
-LOG_ROOT = Path("logs/v2_p6b_six_chromosome_20260721")
+RUN_ROOT = Path("runs/v2_p6b_six_chromosome_corefix_20260722")
+LOG_ROOT = Path("logs/v2_p6b_six_chromosome_corefix_20260722")
 
 
 def utc_now() -> str:
@@ -169,7 +169,7 @@ def main() -> None:
     g5 = state.get("approvals", {}).get("G5_final_test", {})
     if not (
         spec.get("locked_before_training") is True
-        and spec.get("split_revision") == "six_chromosome_blocks_v1"
+        and spec.get("split_revision") == "six_chromosome_blocks_v2"
         and spec.get("locked_test_block_access") == "prohibited"
         and split_registry.get("revision_id") == spec.get("split_revision")
         and g5.get("approved") is not True

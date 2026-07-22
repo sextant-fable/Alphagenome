@@ -38,6 +38,20 @@ class V2TrainingComponentsTest(unittest.TestCase):
         self.assertEqual(windows[0], (0, 0))
         self.assertEqual(windows[6], (1, 2 * 131072))
 
+    def test_validation_subwindows_use_context_relative_alignment(self) -> None:
+        block_start = 2814553
+        intervals = [
+            {
+                "start": str(block_start),
+                "end": str(block_start + 2**20),
+                "core_start": str(block_start),
+                "core_end": str(block_start + 131072),
+            }
+        ]
+        windows, eligible = evaluate_v2_model.core_subwindows(intervals, 131072)
+        self.assertEqual(windows, [(0, 0)])
+        self.assertEqual(eligible, 131072)
+
     def test_pearson_accumulator_matches_exact_correlation(self) -> None:
         x = torch.tensor([[1.0, 2.0, 3.0]], dtype=torch.float64).numpy()
         y = torch.tensor([[2.0, 4.0, 6.0]], dtype=torch.float64).numpy()

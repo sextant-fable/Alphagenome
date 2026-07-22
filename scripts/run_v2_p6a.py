@@ -40,8 +40,8 @@ def main() -> None:
     selected = v2_gpu_resources.select_available(
         resources_before, count=1, minimum_free_mib=70_000
     )[0]
-    run_root = REPO_ROOT / "runs/v2_p6a_six_chromosome_20260721"
-    log_root = REPO_ROOT / "logs/v2_p6a_six_chromosome_20260721"
+    run_root = REPO_ROOT / "runs/v2_p6a_six_chromosome_corefix_20260722"
+    log_root = REPO_ROOT / "logs/v2_p6a_six_chromosome_corefix_20260722"
     run_root.mkdir(parents=True, exist_ok=True)
     log_root.mkdir(parents=True, exist_ok=True)
     commands = []
@@ -71,7 +71,7 @@ def main() -> None:
     record = {
         "schema_version": 1,
         "phase": "P6A",
-        "split_revision": "six_chromosome_blocks_v1",
+        "split_revision": "six_chromosome_blocks_v2",
         "locked_test_block_signal_reads": 0,
         "status": "running",
         "started_at": utc_now(),

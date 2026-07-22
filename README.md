@@ -23,9 +23,11 @@ The repository contains two distinct research lineages:
   [execution plan](docs/v2_execution_plan.md) and
   [append-only execution log](docs/v2_execution_log.md).
 
-As recorded on 2026-07-21, the former chromosome-holdout split and its P6B
-selection were superseded by a preregistered within-chromosome block split.
-The revised workflow must rerun from P4 before it can request the new G5 scope.
+As recorded on 2026-07-22, the former chromosome-holdout split and the initial
+incomplete-core six-chromosome attempt were superseded. The active
+`six_chromosome_blocks_v2` split retains the same biological blocks while
+requiring complete 131,072 bp validation/test core coverage. The revised
+workflow must pass again from P4 before it can request the new G5 scope.
 Check the live machine-readable state rather than inferring progress from
 output files:
 

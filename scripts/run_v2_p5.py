@@ -163,7 +163,7 @@ def main() -> None:
         "model_b_lora_alpha": 16,
         "model_b_organism_index": 2,
         "promotion_metric": "mean_five_fold_paper_loss_then_log1p_mse_then_mean_per_track_pearson",
-        "split_revision": "six_chromosome_blocks_v1",
+        "split_revision": "six_chromosome_blocks_v2",
         "chromosome_x_access": "registered_train_valid_blocks_allowed",
         "locked_test_block_access": "prohibited_until_locked_G5_P6C",
         "final_test_scope": "r6c_single_six_chromosome_block_test",

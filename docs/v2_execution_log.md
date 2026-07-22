@@ -2,6 +2,14 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-22 - P6B Core-Coverage Failure and v2 Correction
+
+- Controlled stop: the first completed `six_chromosome_blocks_v1` formal job measured `validation_core_coverage_fraction=0.8435322914705329`. The controller was interrupted before the matrix could produce a comparative result; one completed job and two partial jobs are retained as invalid/incomplete evidence. Locked-test signal reads remained zero.
+- Root cause: effective blocks were multiples of `131,072 bp`, but nearest-window core boundaries were not. The evaluator accepted only complete subwindows inside each irregular core, silently omitting 13 of the 83 intended metric cores in fold 1.
+- Corrected split: `six_chromosome_blocks_v2` reuses the exact chromosome block assignments, train windows, seed, buffers, data, models, losses, folds, seeds, and budgets. Only valid/test manifest geometry changes: every effective block is tiled by complete, contiguous `131,072 bp` cores, and each core receives a containing `1,048,576 bp` context row with a 128-bp-aligned relative crop offset.
+- Dry-run evidence: every fold and the locked test contain 83 metric rows/subwindows over `10,878,976 bp`, for coverage `1.0`; all contain `I`, `II`, `III`, `IV`, `V`, and `X`. The v2 P6B specification rejects every v1 job and uses independent `corefix_20260722` run/log paths.
+- Review amendment: R4 now verifies exact core length, count, continuity, context containment, and relative 128-bp alignment. R6B retains the >=0.999 coverage gate and separately verifies that the invalid v1 attempt was archived and excluded.
+
 ## 2026-07-21 - Six-Chromosome P4-P6A Execution
 
 - Migration: the original chromosome-holdout intervals, P4/P5/P6A/P6B reviews, overwrite-prone metadata, and unconsumed final-test lock were copied to dedicated archive directories with SHA-256 evidence. The old lock is superseded, not deleted; G5 remained unapproved.

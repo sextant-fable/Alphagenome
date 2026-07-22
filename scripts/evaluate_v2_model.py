@@ -121,11 +121,27 @@ def core_subwindows(
     result = []
     eligible_bases = 0
     for index, row in enumerate(intervals):
-        core_start = ((int(row["core_start"]) + 127) // 128) * 128
-        core_end = (int(row["core_end"]) // 128) * 128
-        eligible_bases += max(0, core_end - core_start)
-        for start in range(core_start, core_end - sequence_length + 1, sequence_length):
-            result.append((index, start - int(row["start"])))
+        window_start = int(row["start"])
+        window_end = int(row["end"])
+        core_start = int(row["core_start"])
+        core_end = int(row["core_end"])
+        core_length = core_end - core_start
+        crop_offset = core_start - window_start
+        if not (
+            window_start <= core_start < core_end <= window_end
+            and crop_offset % 128 == 0
+            and core_length % 128 == 0
+        ):
+            raise ValueError(
+                "Evaluation core must be a 128-bp-aligned crop relative to its "
+                f"context window: {window_start}-{window_end}, "
+                f"{core_start}-{core_end}"
+            )
+        eligible_bases += core_length
+        for offset in range(
+            crop_offset, crop_offset + core_length - sequence_length + 1, sequence_length
+        ):
+            result.append((index, offset))
     if not result:
         raise RuntimeError("No complete core-only validation subwindows")
     return result, eligible_bases
@@ -488,7 +504,9 @@ def main() -> None:
         "checkpoint_path": args.checkpoint,
         "checkpoint_sha256": checkpoint_sha,
         "sequence_length": args.sequence_length,
-        "validation_policy": "all_complete_nonoverlapping_core_only_131072bp_subwindows",
+        "validation_policy": (
+            "all_complete_nonoverlapping_context_relative_core_only_131072bp_subwindows"
+        ),
         "validation_subwindows": len(subwindows),
         "validation_bases": len(subwindows) * args.sequence_length,
         "eligible_aligned_core_bases": eligible_bases,

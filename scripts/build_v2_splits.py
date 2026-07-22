@@ -17,7 +17,7 @@ METADATA_DIR = REPO_ROOT / "alphagenome_custom/metadata/v2"
 FAI_PATH = REPO_ROOT / "alphagenome_custom/reference/genome.fa.fai"
 GROUP_MANIFEST = METADATA_DIR / "rna_seq_groups_v2_final.tsv"
 GROUP_OUTPUTS = METADATA_DIR / "p3_group_outputs.tsv"
-SPEC_PATH = METADATA_DIR / "six_chromosome_split_spec.json"
+SPEC_PATH = METADATA_DIR / "six_chromosome_split_v2_spec.json"
 BLOCKS_PATH = OUTPUT_DIR / "blocks.tsv"
 CHROMOSOMES = ("I", "II", "III", "IV", "V", "X")
 CV_FOLDS = tuple(range(1, 6))
@@ -89,6 +89,42 @@ def eval_cores(
                 f"window {window_start}-{window_end}"
             )
     return cores
+
+
+def aligned_eval_contexts(
+    block_start: int, block_end: int
+) -> list[tuple[int, int, int, int]]:
+    """Pair every aligned metric core with a containing context window."""
+    block_size = block_end - block_start
+    if block_size % EVALUATION_SUBWINDOW_BP:
+        raise RuntimeError(
+            f"Evaluation block {block_start}-{block_end} is not divisible by "
+            f"{EVALUATION_SUBWINDOW_BP}"
+        )
+    if block_size < WINDOW_SIZE:
+        raise RuntimeError(
+            f"Evaluation block {block_start}-{block_end} cannot fit a context window"
+        )
+    flank = (WINDOW_SIZE - EVALUATION_SUBWINDOW_BP) // 2
+    contexts = []
+    for core_start in range(block_start, block_end, EVALUATION_SUBWINDOW_BP):
+        core_end = core_start + EVALUATION_SUBWINDOW_BP
+        window_start = min(
+            max(core_start - flank, block_start),
+            block_end - WINDOW_SIZE,
+        )
+        window_end = window_start + WINDOW_SIZE
+        if not (
+            block_start <= window_start <= core_start
+            and core_end <= window_end <= block_end
+            and (core_start - window_start) % 128 == 0
+        ):
+            raise RuntimeError(
+                f"Aligned core {core_start}-{core_end} has invalid context "
+                f"{window_start}-{window_end}"
+            )
+        contexts.append((window_start, window_end, core_start, core_end))
+    return contexts
 
 
 def write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -177,23 +213,16 @@ def interval_rows(
 ) -> list[dict[str, Any]]:
     block_start = int(block["block_start"])
     block_end = int(block["block_end"])
-    shift_margin = MAX_SHIFT_BP if role == "train" else 0
-    windows = make_windows(
-        length,
-        interval_start=block_start,
-        interval_end=block_end,
-        shift_margin=shift_margin,
-    )
-    cores = (
-        eval_cores(
-            windows,
+    if role in {"valid", "test_locked"}:
+        contexts = aligned_eval_contexts(block_start, block_end)
+    else:
+        windows = make_windows(
             length,
             interval_start=block_start,
             interval_end=block_end,
+            shift_margin=MAX_SHIFT_BP,
         )
-        if role in {"valid", "test_locked"}
-        else windows
-    )
+        contexts = [(*window, *window) for window in windows]
     return [
         {
             "chromosome": chromosome,
@@ -208,7 +237,7 @@ def interval_rows(
             "block_end": block_end,
             "split_revision": revision_id,
         }
-        for (start, end), (core_start, core_end) in zip(windows, cores, strict=True)
+        for start, end, core_start, core_end in contexts
     ]
 
 
@@ -219,7 +248,7 @@ def main() -> None:
         raise RuntimeError(f"Missing preregistered split specification: {SPEC_PATH}")
     spec = json.loads(SPEC_PATH.read_text())
     expected = {
-        "revision_id": "six_chromosome_blocks_v1",
+        "revision_id": "six_chromosome_blocks_v2",
         "chromosomes": list(CHROMOSOMES),
         "window_size_bp": WINDOW_SIZE,
         "stride_bp": STRIDE,

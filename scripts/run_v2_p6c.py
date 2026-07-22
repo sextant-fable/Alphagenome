@@ -74,7 +74,7 @@ def validate_locked_inputs(lock: dict[str, object]) -> dict[str, str]:
 
     split_registry = json.loads(SPLIT_REGISTRY_PATH.read_text())
     if not (
-        split_registry.get("revision_id") == "six_chromosome_blocks_v1"
+        split_registry.get("revision_id") == "six_chromosome_blocks_v2"
         and split_registry.get("test_chromosomes") == ["I", "II", "III", "IV", "V", "X"]
         and split_registry.get("final_test_scope")
         == "r6c_single_six_chromosome_block_test"
@@ -139,9 +139,9 @@ def build_final_summary(
     p4_path = METADATA_DIR / "p4_loader_benchmark.json"
     p5_path = METADATA_DIR / "p5_component_audit.json"
     p6a_path = METADATA_DIR / "p6a_execution.json"
-    p6b_execution_path = METADATA_DIR / "p6b_six_chromosome_execution.json"
-    p6b_results_path = METADATA_DIR / "p6b_six_chromosome_cv_results.tsv"
-    p6b_ablations_path = METADATA_DIR / "p6b_six_chromosome_ablation_results.tsv"
+    p6b_execution_path = METADATA_DIR / "p6b_six_chromosome_v2_execution.json"
+    p6b_results_path = METADATA_DIR / "p6b_six_chromosome_v2_cv_results.tsv"
+    p6b_ablations_path = METADATA_DIR / "p6b_six_chromosome_v2_ablation_results.tsv"
     p6b_review_path = METADATA_DIR / "audits/P6B/review.json"
     selection_path = repository_path(lock["selection_path"], "selection")
     sample_manifest_path = METADATA_DIR / "rna_seq_samples_v2.tsv"

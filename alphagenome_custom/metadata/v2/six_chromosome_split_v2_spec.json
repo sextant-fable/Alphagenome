@@ -1,0 +1,42 @@
+{
+  "assignment_policy": "reuse_v1_seeded_per_chromosome_permutation_of_six_equal_effective_blocks",
+  "block_labels": [
+    "cv_fold_1",
+    "cv_fold_2",
+    "cv_fold_3",
+    "cv_fold_4",
+    "cv_fold_5",
+    "test_locked"
+  ],
+  "chromosomes": [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "X"
+  ],
+  "correction_reason": "v1 nearest-window core boundaries omitted 15.65% of eligible validation bases despite aligned block sizes",
+  "development_policy": "all_five_cv_blocks_from_each_chromosome_excluding_test_locked",
+  "effective_block_alignment_bp": 131072,
+  "effective_fold_ratio": {
+    "test": 1,
+    "train": 4,
+    "valid": 1
+  },
+  "evaluation_core_policy": "one_complete_aligned_131072bp_core_per_context_row_covering_every_effective_block_base",
+  "evaluation_subwindow_bp": 131072,
+  "exclusion_buffer_bp": 1050624,
+  "final_test_scope": "r6c_single_six_chromosome_block_test",
+  "locked_at": "2026-07-22",
+  "max_shift_bp": 1024,
+  "minimum_effective_block_bp": 1050624,
+  "old_split_disposition": "six_chromosome_blocks_v1_invalidated_for_incomplete_metric_core_coverage",
+  "revision_id": "six_chromosome_blocks_v2",
+  "schema_version": 2,
+  "seed": 20260721,
+  "stride_bp": 524288,
+  "test_access_policy": "role_based_locked_blocks_only_not_chromosome_based",
+  "training_window_policy": "reuse_v1_overlapping_train_windows_and_constrain_shift_inside_one_effective_block",
+  "window_size_bp": 1048576
+}
