@@ -34,6 +34,24 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-22 - Six-Chromosome P6B Core-Coverage-Corrected Matrix
+
+- Run type: training and evaluation, formal blocked cross-validation
+- Purpose: Re-run the preregistered six-chromosome P6B matrix after correcting the v1 context-core geometry defect. This run may produce no final-test result and must stop for separate G5 authorization after R6B.
+- Git snapshot: the controller began at `2026-07-22T02:45:37+00:00` from the working tree; the exact core-coverage correction was committed as `741e37c` (`Fix complete six-chromosome validation coverage`) one minute later. The start-time commit was not independently captured, so it is not reconstructed here.
+- Branch: `setup/agent-maintenance`
+- Host: HY-GPU (`hy8`), non-Slurm; physical GPUs 2 and 3 only.
+- Environment: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python`; Python `3.12.13`; PyTorch `2.11.0+cu128`.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller run --phase P6B --auto`.
+- Controller phase and approval scope: P6B; `G4:r6_gpu_auto_available_2_3`. G5 remains unapproved.
+- Input data: 241 uniformly reprocessed grouped RNA-seq tracks; WBcel235; `six_chromosome_blocks_v2`; P6B spec SHA-256 `7f50967e1e53427b5b0ac6630c1b19c9b7344a79e67b60cfb36cb0c1a9289a05`; split registry SHA-256 `aa783dd6ca799887c0785a2ddeb7985c980a2bfc1ff5548486e3bcd6d99bd91d`; fold-train means SHA-256 `a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669`.
+- Output path: ignored `runs/v2_p6b_six_chromosome_corefix_20260722/` and `logs/v2_p6b_six_chromosome_corefix_20260722/`; live execution record `alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_execution.json`.
+- Result summary at record time: running. Four of 105 jobs completed: A and B, paper and log1p-MSE, fold 1, seed `20260714`. Model C paper/log1p-MSE fold-1 jobs are running. No model selection, development retraining, or final-test operation has occurred.
+- Verification at record time: every completed job evaluates 83 complete context-relative 131,072 bp subwindows over 10,878,976 eligible bases on I, II, III, IV, V, and X; each records `validation_core_coverage_fraction=1.0` and `locked_test_block_signal_reads=false`. The execution record reports zero failures and zero locked-test signal reads.
+- Failures or warnings: The preceding v1 core-coverage attempt is permanently invalidated and archived. This current record is progress evidence only; four jobs are insufficient for any comparative or biological conclusion.
+- Next actions: Allow the registered 90 formal plus 15 ablation jobs to finish, run R6B, lock exactly one development checkpoint if R6B passes, then require the separate `G5:r6c_single_six_chromosome_block_test` authorization before one final locked-block evaluation.
+- Claim status: verified for recorded execution state; no model conclusion.
+
 ## 2026-07-22 - Six-Chromosome P6B Invalidated Core-Coverage Attempt
 
 - Run type: training and evaluation, controlled invalidation
