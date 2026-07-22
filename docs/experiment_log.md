@@ -34,6 +34,24 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-22 - Six-Chromosome P6B External Process Interruption and Resume
+
+- Run type: training and evaluation, operational recovery
+- Purpose: preserve evidence from an externally interrupted P6B controller and resume the identical preregistered matrix without accepting partial jobs or reading locked final-test blocks.
+- Git commit: `c7745bd9fdb24c6ed13efced98ae006cdd57b219` at interruption audit time.
+- Branch: `setup/agent-maintenance`.
+- Host: HY-GPU (`hy8`), non-Slurm; physical GPUs 2 and 3 only.
+- Environment: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python`.
+- Command: controller reopen followed by `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller run --phase P6B --auto`.
+- Input data: unchanged six-chromosome v2 spec, split registry, fold means, 241 grouped tracks, seeds, folds, models, losses, and training budgets.
+- Output path: live `runs/v2_p6b_six_chromosome_corefix_20260722/` and `logs/v2_p6b_six_chromosome_corefix_20260722/`; interruption snapshots under matching `external_interrupt_20260722T045155Z/` directories and `alphagenome_custom/metadata/v2/p6b_external_interrupt_20260722T045155Z/`.
+- Result summary before recovery: eight completed jobs were present and hash-verifiable; the execution record had zero failures and zero locked-test reads. `B/paper/seed20260714/fold2` stopped at validation subwindow 21/83 after training, and `B/log1p_mse/seed20260714/fold2` stopped at training step 1345/2000.
+- Verification: both project GPU processes were absent, physical GPUs 2/3 were idle, and neither log had changed after `2026-07-22T04:51:55+00:00`; the stale execution record still said `running`. Snapshot hashes and partial-job dispositions are recorded in `p6b_external_interrupt_20260722T045155Z/audit.json`.
+- Failures or warnings: the observed process loss is verified; its exact external cause is inferred because no Python traceback or controller failure record was written. Neither partial job is a formal result. Recovery reuses only completed jobs whose spec, checkpoint, validation, and test-embargo evidence pass the existing verifier; both partial jobs restart from the beginning. The first recovery invocation failed before GPU selection when the managed sandbox returned `nvidia-smi` exit 9; the controller recorded that failure and the identical command was reopened under normal host GPU permissions.
+- Durability migration: after the two restarted B/fold-2 jobs completed with 83/83 metric cores and coverage 1.0, the live controller was stopped at 10 completed jobs and moved from the tool PTY to detached tmux session `alphagenome_v2_p6b`. The newly started C/paper and C/log1p-MSE jobs stopped at steps 596 and 81; their logs are preserved under `tmux_migration_20260722T064354Z`, neither counts as a result, and both restart from step 0.
+- Next actions: complete the remaining formal and ablation matrix, pass R6B, and stop at the unapproved revised G5 gate.
+- Claim status: verified for the interruption state and preserved artifacts; inferred for the external termination cause.
+
 ## 2026-07-22 - Six-Chromosome P6B Core-Coverage-Corrected Matrix
 
 - Run type: training and evaluation, formal blocked cross-validation

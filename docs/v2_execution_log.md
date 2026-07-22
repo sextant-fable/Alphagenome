@@ -2,6 +2,15 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-22 - P6B External Interruption Recovery
+
+- Observation: the corrected six-chromosome P6B controller stopped making progress after `2026-07-22T04:51:55+00:00`. At audit time, no AlphaGenome process remained on physical GPU 2 or 3, while the live execution record was stale at `running`, with eight completed jobs, zero recorded failures, and zero locked-test reads.
+- Preserved evidence: the execution JSON, both incomplete B/fold-2 logs, and the completed-training B/paper partial output were copied to timestamped interruption directories with SHA-256 values in `alphagenome_custom/metadata/v2/p6b_external_interrupt_20260722T045155Z/audit.json`.
+- Disposition: eight complete jobs remain eligible for the existing hash-verified reuse path. The B/paper job stopped at validation 21/83 and the B/log1p-MSE job at training step 1345/2000; neither may count as a result, and both restart from the beginning under the identical locked specification.
+- Gate status: G4 remains the same scoped GPU 2/3 approval. G5 remains unapproved, and locked-test signal reads remain zero.
+- Recovery start: the first controller retry failed before GPU selection because managed-sandbox `nvidia-smi` returned exit 9. After an append-only reopen, the identical host-permission command selected physical GPUs 2/3, hash-verified and reused all eight complete jobs, and restarted both incomplete jobs from step 0.
+- Durable execution: both restarted B/fold-2 jobs completed with full six-chromosome coverage, bringing the reusable total to ten. The controller was then stopped deliberately and migrated to detached tmux session `alphagenome_v2_p6b`; C/paper and C/log1p-MSE partial attempts at steps 596 and 81 were archived and restart from step 0. The machine-readable migration record is `p6b_tmux_migration_20260722T064354Z/audit.json`.
+
 ## 2026-07-22 - P6B Core-Coverage Failure and v2 Correction
 
 - Controlled stop: the first completed `six_chromosome_blocks_v1` formal job measured `validation_core_coverage_fraction=0.8435322914705329`. The controller was interrupted before the matrix could produce a comparative result; one completed job and two partial jobs are retained as invalid/incomplete evidence. Locked-test signal reads remained zero.

@@ -1,0 +1,45 @@
+{
+  "causal_status": "inferred_external_process_termination_without_python_traceback",
+  "completed_jobs_eligible_for_hash_verified_reuse": 8,
+  "event": "p6b_external_process_interruption",
+  "execution_snapshot": {
+    "failures": 0,
+    "jobs": 8,
+    "locked_test_block_signal_reads": 0,
+    "path": "alphagenome_custom/metadata/v2/p6b_external_interrupt_20260722T045155Z/execution_snapshot.json",
+    "sha256": "0b75946fd5695c0d54708bc92245640eedd36fe028b647fd17f3451d7c042e32",
+    "status": "running"
+  },
+  "git_commit": "c7745bd9fdb24c6ed13efced98ae006cdd57b219",
+  "host": "hy8",
+  "incomplete_jobs": [
+    {
+      "archived_checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/external_interrupt_20260722T045155Z/formal/B/paper/seed_20260714/fold_2/checkpoint.pt",
+      "archived_checkpoint_sha256": "d3fb7cff784faff9cb42e90d2c4e3f9631d1214813e3c5d706c01ec6b9e67d7e",
+      "archived_log_path": "logs/v2_p6b_six_chromosome_corefix_20260722/external_interrupt_20260722T045155Z/formal/B/paper/seed_20260714/fold_2.log",
+      "archived_log_sha256": "a281869ef6cd61c635a14688748e8c1008a8282970bab701e53ee2a929039220",
+      "archived_run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/external_interrupt_20260722T045155Z/formal/B/paper/seed_20260714/fold_2/run.json",
+      "archived_run_sha256": "a0c5abd008a4086ac33e18d1bf06c8ff7362470ce1f306ba29ae8c43c6e1dacc",
+      "disposition": "not_a_formal_result_retrain_and_revalidate_from_start",
+      "job_id": "formal:B:paper:seed20260714:fold2",
+      "last_observed_progress": "validation_subwindow_21_of_83"
+    },
+    {
+      "archived_log_path": "logs/v2_p6b_six_chromosome_corefix_20260722/external_interrupt_20260722T045155Z/formal/B/log1p_mse/seed_20260714/fold_2.log",
+      "archived_log_sha256": "ea8fb26f484f8f03c1df11c95e188c7bc85c8cd8200f17807bd4dd5ec8f9b80f",
+      "disposition": "not_a_formal_result_retrain_and_revalidate_from_start",
+      "job_id": "formal:B:log1p_mse:seed20260714:fold2",
+      "last_observed_progress": "training_step_1345_of_2000"
+    }
+  ],
+  "last_log_write_at": "2026-07-22T04:51:55+00:00",
+  "observed_at": "2026-07-22T06:00:51+00:00",
+  "phase": "P6B",
+  "recovery_policy": "reopen_through_controller_reuse_only_complete_hash_verified_jobs_and_restart_incomplete_jobs",
+  "schema_version": 1,
+  "selected_physical_gpus": [
+    2,
+    3
+  ],
+  "split_revision": "six_chromosome_blocks_v2"
+}

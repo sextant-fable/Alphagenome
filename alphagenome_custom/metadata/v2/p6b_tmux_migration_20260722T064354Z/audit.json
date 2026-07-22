@@ -1,0 +1,41 @@
+{
+  "completed_jobs_eligible_for_hash_verified_reuse": 10,
+  "event": "p6b_controlled_tmux_migration",
+  "execution_snapshot": {
+    "failures": 0,
+    "jobs": 10,
+    "locked_test_block_signal_reads": 0,
+    "path": "alphagenome_custom/metadata/v2/p6b_tmux_migration_20260722T064354Z/execution_snapshot.json",
+    "reused_jobs": 8,
+    "sha256": "c525832dcf915caa34a28609c967a0a4213faaa2c9dc4367a2b886bc96891d89",
+    "status": "running"
+  },
+  "git_commit": "c7745bd9fdb24c6ed13efced98ae006cdd57b219",
+  "host": "hy8",
+  "incomplete_jobs": [
+    {
+      "archived_log_path": "logs/v2_p6b_six_chromosome_corefix_20260722/tmux_migration_20260722T064354Z/formal/C/paper/seed_20260714/fold_2.log",
+      "archived_log_sha256": "7f5dbcc34d19f634fc1f8b4613b8e817ed1dc9adb1a06315329870b99af144a8",
+      "disposition": "not_a_formal_result_restart_from_step_zero",
+      "job_id": "formal:C:paper:seed20260714:fold2",
+      "last_observed_progress": "training_step_596_of_2000"
+    },
+    {
+      "archived_log_path": "logs/v2_p6b_six_chromosome_corefix_20260722/tmux_migration_20260722T064354Z/formal/C/log1p_mse/seed_20260714/fold_2.log",
+      "archived_log_sha256": "ae64012720321c9e377f484ad9a29a1e14890fd6602eeacac0c2dd32829f5b00",
+      "disposition": "not_a_formal_result_restart_from_step_zero",
+      "job_id": "formal:C:log1p_mse:seed20260714:fold2",
+      "last_observed_progress": "training_step_81_of_2000"
+    }
+  ],
+  "migration_reason": "move_long_controller_from_tool_pty_to_durable_detached_tmux_session",
+  "observed_at": "2026-07-22T06:43:54+00:00",
+  "phase": "P6B",
+  "recovery_policy": "controller_reopen_then_identical_command_in_tmux_reusing_only_complete_hash_verified_jobs",
+  "schema_version": 1,
+  "selected_physical_gpus": [
+    2,
+    3
+  ],
+  "split_revision": "six_chromosome_blocks_v2"
+}
