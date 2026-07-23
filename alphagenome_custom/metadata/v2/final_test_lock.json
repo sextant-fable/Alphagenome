@@ -1,6 +1,12 @@
 {
   "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/development_selected/checkpoint.pt",
   "checkpoint_sha256": "652e568b4ea9f7596d7189fb3618996e76f41bb4495992180b43f20d64c1a117",
+  "final_document_path": "docs/v2_final_report.md",
+  "final_document_sha256": "8c1518d13612bfeb89bb0078d423d3eda87752e45e439c36dd98275f06a0c870",
+  "final_report_path": "alphagenome_custom/metadata/v2/final_test_report.json",
+  "final_report_sha256": "9c9b06c3eba15d95c30ff4e7403d97dbfe1b72cbc0e8dcd678fe98de762d3a6e",
+  "final_summary_path": "alphagenome_custom/metadata/v2/v2_final_report.json",
+  "final_summary_sha256": "0752b8fb72f27f69c7b3b49fbb96e3f90a23b1b54162fff5506f44eea8ec9360",
   "final_test_chromosomes": [
     "I",
     "II",
@@ -24,9 +30,12 @@
   "split_revision": "six_chromosome_blocks_v2",
   "steps": 2500,
   "superseded": false,
-  "test_consumed": false,
-  "test_consumed_at": null,
+  "test_consumed": true,
+  "test_consumed_at": "2026-07-23T04:50:31+00:00",
+  "test_execution_id": "p6c-20260723T045025Z-8f9262a0ef92",
   "test_intervals_sha256": "7a4396f1e29568795b0c947f7051ee6e9f67e9b0e2d02922e18a511c7b1d9fc2",
+  "test_physical_gpu": 2,
+  "test_status": "completed",
   "training_chromosomes": [
     "I",
     "II",

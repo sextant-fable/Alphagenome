@@ -34,6 +34,26 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-23 - One-Time Six-Chromosome P6C Final Test
+
+- Run type: final evaluation and completion review
+- Purpose: Consume the single authorized six-chromosome locked-block test with the checkpoint frozen by R6B, report the result regardless of outcome, and permanently close the v2 test entry point.
+- Git commit: `96dd1b203a56279150d7615d70a6cbc52e234716`
+- Branch: `setup/agent-maintenance`
+- Host: HY-GPU (`hy8`), non-Slurm; physical GPU 2.
+- Environment: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python`; Python `3.12.13`; GPU `NVIDIA A100 80GB PCIe`.
+- Controller phase and approval scope: P6C; G5 scope `r6c_single_six_chromosome_block_test`, explicitly approved at `2026-07-23T04:49:53+00:00`.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller run --phase P6C --auto`.
+- Input data: 241 uniformly reprocessed and grouped RNA-seq tracks; WBcel235; 83 complete, non-overlapping 131,072 bp test cores from chromosomes I, II, III, IV, V, and X; locked checkpoint `runs/v2_p6b_six_chromosome_corefix_20260722/development_selected/checkpoint.pt` with SHA-256 `652e568b4ea9f7596d7189fb3618996e76f41bb4495992180b43f20d64c1a117`.
+- Execution identity: `p6c-20260723T045025Z-8f9262a0ef92`; the test lock was atomically consumed at `2026-07-23T04:50:31+00:00` before the first signal read.
+- Output path: `alphagenome_custom/metadata/v2/final_test_report.json`, `alphagenome_custom/metadata/v2/v2_final_report.json`, `docs/v2_final_report.md`, and ignored log `logs/p6c-20260723T045025Z-8f9262a0ef92/final_test.log`.
+- Result summary: all 83 cores and 10,878,976 eligible bases were evaluated with coverage 1.0. Primary metrics were gene-exon coverage Pearson `0.6750188054228252` and per-track 128 bp Pearson `0.6641299353063429`. Paper loss was `15.73212767796344`; log1p-MSE was `2.9431066254535354`; 128 bp Spearman was `0.5977938647508569`; top-1% calibration ratio was `0.0949070818457753`.
+- Secondary metrics: exon log1p 1 bp MSE `0.4441663427813459`, gene-body log1p 1 bp MSE `0.2193518538520005`, and local-gradient log1p 1 bp MSE `0.0019791348023378403`.
+- Verification: the final report contains 241 finite per-track Pearson values; the claim status is `completed`; `test_consumed=true`; R6C passed all ten registered checks; the controller workflow status is `COMPLETE`.
+- Failures or warnings: no P6C execution error occurred. Chromosome X was viewed during legacy exploratory work and is not pristine for the project as a whole. The final test is permanently consumed and cannot be reused for tuning or rerun in this study cycle.
+- Next actions: preserve and report this result without post-test model changes. Any further model development requires a new research cycle and a newly preregistered test design rather than reuse of these blocks.
+- Claim status: verified
+
 ## 2026-07-23 - Six-Chromosome P6B Completion and Development Checkpoint Lock
 
 - Run type: training, evaluation, model selection, and development retraining

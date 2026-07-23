@@ -1,0 +1,453 @@
+{
+  "artifacts": {
+    "alphagenome_custom/intervals/v2/test_locked.tsv": {
+      "bytes": 8970,
+      "path": "alphagenome_custom/intervals/v2/test_locked.tsv",
+      "sha256": "7a4396f1e29568795b0c947f7051ee6e9f67e9b0e2d02922e18a511c7b1d9fc2"
+    },
+    "alphagenome_custom/metadata/v2/audits/P6B/review.json": {
+      "bytes": 1762,
+      "path": "alphagenome_custom/metadata/v2/audits/P6B/review.json",
+      "sha256": "05581f3fa225f6835c6717ffaba8452be34de22ef4511b3592e67268654413e2"
+    },
+    "alphagenome_custom/metadata/v2/final_test_report.json": {
+      "bytes": 401746,
+      "path": "alphagenome_custom/metadata/v2/final_test_report.json",
+      "sha256": "9c9b06c3eba15d95c30ff4e7403d97dbfe1b72cbc0e8dcd678fe98de762d3a6e"
+    },
+    "alphagenome_custom/metadata/v2/p1_summary.json": {
+      "bytes": 632,
+      "path": "alphagenome_custom/metadata/v2/p1_summary.json",
+      "sha256": "88881a2d5bfbd8f87c1acf8d3b16651ba59cfdf56df6f61659932756ba908efe"
+    },
+    "alphagenome_custom/metadata/v2/p2_summary.json": {
+      "bytes": 805,
+      "path": "alphagenome_custom/metadata/v2/p2_summary.json",
+      "sha256": "2be6bf406772d19c844bcf19f2107e0480403f94cf3212a83b0f610bfe3f00cc"
+    },
+    "alphagenome_custom/metadata/v2/p3_full_summary.json": {
+      "bytes": 1049,
+      "path": "alphagenome_custom/metadata/v2/p3_full_summary.json",
+      "sha256": "cab9738efd0645bf6ecb2356702255021dad9cf45ac250ef0d2427f948ede8da"
+    },
+    "alphagenome_custom/metadata/v2/p3_group_outputs.tsv": {
+      "bytes": 155965,
+      "path": "alphagenome_custom/metadata/v2/p3_group_outputs.tsv",
+      "sha256": "4f261a4dcbb84f73be26ae2205e049550083b816a54561e6c983b048c6267a65"
+    },
+    "alphagenome_custom/metadata/v2/p3_group_summary.json": {
+      "bytes": 1238,
+      "path": "alphagenome_custom/metadata/v2/p3_group_summary.json",
+      "sha256": "7d167b2dd98bddf6b73d8690a89fb7dd796636f303ee99ab7224a18900f24b2d"
+    },
+    "alphagenome_custom/metadata/v2/p4_loader_benchmark.json": {
+      "bytes": 2372,
+      "path": "alphagenome_custom/metadata/v2/p4_loader_benchmark.json",
+      "sha256": "7e9a93e145e125be730463605a621fcb9ae7645853b1bf11da4d5167c213038b"
+    },
+    "alphagenome_custom/metadata/v2/p5_component_audit.json": {
+      "bytes": 2353,
+      "path": "alphagenome_custom/metadata/v2/p5_component_audit.json",
+      "sha256": "13dc5c735842dfd3eb18828f03a3774289b935919171e5b3315ae01e338a0a8e"
+    },
+    "alphagenome_custom/metadata/v2/p6a_execution.json": {
+      "bytes": 6460,
+      "path": "alphagenome_custom/metadata/v2/p6a_execution.json",
+      "sha256": "e66f5bcc72ad951bcf99d5f44f49ce41f7de957edece33ee0425b504667fc6fe"
+    },
+    "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_ablation_results.tsv": {
+      "bytes": 1062,
+      "path": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_ablation_results.tsv",
+      "sha256": "fa9361e7e5e30123c50c9e262e2e19d446a77cf11e6a198573e481b8bbe92915"
+    },
+    "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_cv_results.tsv": {
+      "bytes": 1696,
+      "path": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_cv_results.tsv",
+      "sha256": "de2408db68c0fc271236e826f5f9e2aa08fe518c4d0b11bccec87293bc400061"
+    },
+    "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_execution.json": {
+      "bytes": 412995,
+      "path": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_execution.json",
+      "sha256": "e98b1e2cfed5f3ccedcb6e6aaf6d5013c17f23d7ed4f320d2a92378740a9502c"
+    },
+    "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_selection.json": {
+      "bytes": 1499,
+      "path": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_selection.json",
+      "sha256": "a5b2ebd934f94475070bd754bd52a0c15b17af8efa5da9730919dd829698fc7a"
+    },
+    "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv": {
+      "bytes": 89129,
+      "path": "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv",
+      "sha256": "06bfc6109b08dc22007601d9c406cd4772701901f069f16ad1ea26b3d6134737"
+    },
+    "alphagenome_custom/metadata/v2/rna_seq_samples_v2.tsv": {
+      "bytes": 519519,
+      "path": "alphagenome_custom/metadata/v2/rna_seq_samples_v2.tsv",
+      "sha256": "c2c80c42bdc1c363838849a79f7c69cbf19fe61a5106203dde51ab38d6f951f4"
+    },
+    "alphagenome_custom/metadata/v2/split_registry_v2.json": {
+      "bytes": 5827,
+      "path": "alphagenome_custom/metadata/v2/split_registry_v2.json",
+      "sha256": "aa783dd6ca799887c0785a2ddeb7985c980a2bfc1ff5548486e3bcd6d99bd91d"
+    },
+    "alphagenome_custom/metadata/v2/track_nonzero_means_v2.tsv": {
+      "bytes": 23534,
+      "path": "alphagenome_custom/metadata/v2/track_nonzero_means_v2.tsv",
+      "sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669"
+    }
+  },
+  "code_commit": "96dd1b203a56279150d7615d70a6cbc52e234716",
+  "data_lineage": {
+    "aggregation_policy": "decoded_signal_rescaled_to_1e8_then_raw_coverage_weighted_within_biological_unit_then_equal_mean_across_units",
+    "batch_counts": {
+      "2026.4.20": 20,
+      "2026.5.18": 26,
+      "sharepoint_2026-07-13_new439": 439
+    },
+    "biological_replicate_groups": 83,
+    "cv_chromosomes": [
+      "I",
+      "II",
+      "III",
+      "IV",
+      "V",
+      "X"
+    ],
+    "dynamic_loader_tracks": 241,
+    "formal_groups": 241,
+    "grouped_tracks": 241,
+    "input_samples": 485,
+    "monolithic_npz_generated": false,
+    "non_rna_runs_excluded": 3,
+    "normalization_interpretation": "1e6 times 100-bp coverage",
+    "normalization_target_total": 100000000,
+    "normalized_runs": 482,
+    "reference_genome": "WBcel235",
+    "rna_seq_runs_reprocessed": 482,
+    "source_fastq_bytes": 1014217532067,
+    "source_normalization_classes": {
+      "A": 0,
+      "B": 0,
+      "C": 485,
+      "D": 0
+    },
+    "test_chromosomes": [
+      "I",
+      "II",
+      "III",
+      "IV",
+      "V",
+      "X"
+    ],
+    "test_windows": 83
+  },
+  "execution_id": "p6c-20260723T045025Z-8f9262a0ef92",
+  "final_test": {
+    "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/development_selected/checkpoint.pt",
+    "checkpoint_sha256": "652e568b4ea9f7596d7189fb3618996e76f41bb4495992180b43f20d64c1a117",
+    "core_coverage_fraction": 1.0,
+    "loss": "paper",
+    "mean_losses": {
+      "log1p_loss": 2.9431066254535354,
+      "log1p_loss_128bp": 2.794347470065197,
+      "log1p_loss_1bp": 0.14875915051853084,
+      "log1p_mse": 2.9431066254535354,
+      "paper_count_128bp": 0.08518402969621751,
+      "paper_count_1bp": 0.08108038533793156,
+      "paper_gene_cross_track": 0.0877115920814405,
+      "paper_loss": 15.73212767796344,
+      "paper_loss_128bp": 5.286438869065549,
+      "paper_loss_1bp": 10.43691775095032,
+      "paper_position_128bp": 1.0402509622186062,
+      "paper_position_1bp": 2.0711674704609147
+    },
+    "model": "B",
+    "no_post_test_tuning": true,
+    "primary_metrics": {
+      "mean_per_track_gene_exon_coverage_pearson_log1p": 0.6750188054228252,
+      "mean_per_track_pearson_128bp_log1p": 0.6641299353063429
+    },
+    "report_path": "alphagenome_custom/metadata/v2/final_test_report.json",
+    "report_sha256": "9c9b06c3eba15d95c30ff4e7403d97dbfe1b72cbc0e8dcd678fe98de762d3a6e",
+    "seed": 20260722,
+    "steps": 2500,
+    "test_consumed_once": true,
+    "validation_bases": 10878976,
+    "validation_subwindows": 83
+  },
+  "formal_validation": {
+    "ablation_jobs": 15,
+    "ablations": [
+      {
+        "ablation_id": "development_pool_mean",
+        "folds": "5",
+        "jobs": "5",
+        "loss": "paper",
+        "mean_exon_mse_log1p_1bp": "0.5820480595070784",
+        "mean_gene_body_mse_log1p_1bp": "0.3073605669078688",
+        "mean_gene_exon_coverage_pearson_log1p": "0.4552949012697667",
+        "mean_local_gradient_mse_log1p_1bp": "0.0028671034069617943",
+        "mean_log1p_mse": "4.702149914546185",
+        "mean_paper_loss": "18.19731546539858",
+        "mean_per_track_pearson_128bp_log1p": "0.5766219696770172",
+        "mean_primary_biological_score": "0.5159584354733919",
+        "mean_spearman_128bp": "0.5355373216391552",
+        "mean_top1_calibration_ratio_128bp": "0.05978404675382406",
+        "mean_top1_mse_128bp": "2685336617.1303167",
+        "model": "A",
+        "seeds": "1"
+      },
+      {
+        "ablation_id": "no_augmentation",
+        "folds": "5",
+        "jobs": "5",
+        "loss": "paper",
+        "mean_exon_mse_log1p_1bp": "0.4928306975945203",
+        "mean_gene_body_mse_log1p_1bp": "0.2584103682342641",
+        "mean_gene_exon_coverage_pearson_log1p": "0.597925706713672",
+        "mean_local_gradient_mse_log1p_1bp": "0.0022189526760513665",
+        "mean_log1p_mse": "3.9626565088708716",
+        "mean_paper_loss": "17.855432232173094",
+        "mean_per_track_pearson_128bp_log1p": "0.6507488666646756",
+        "mean_primary_biological_score": "0.6243372866891738",
+        "mean_spearman_128bp": "0.594282683166367",
+        "mean_top1_calibration_ratio_128bp": "0.10926824785289932",
+        "mean_top1_mse_128bp": "2681874695.152131",
+        "model": "B",
+        "seeds": "1"
+      },
+      {
+        "ablation_id": "no_gene_loss",
+        "folds": "5",
+        "jobs": "5",
+        "loss": "paper",
+        "mean_exon_mse_log1p_1bp": "0.49040846425632934",
+        "mean_gene_body_mse_log1p_1bp": "0.25723612259133755",
+        "mean_gene_exon_coverage_pearson_log1p": "0.5987685613755269",
+        "mean_local_gradient_mse_log1p_1bp": "0.0021845185829236996",
+        "mean_log1p_mse": "3.893756719956915",
+        "mean_paper_loss": "17.853970261797848",
+        "mean_per_track_pearson_128bp_log1p": "0.6517001228336492",
+        "mean_primary_biological_score": "0.6252343421045881",
+        "mean_spearman_128bp": "0.5946112179728253",
+        "mean_top1_calibration_ratio_128bp": "0.10692881737340756",
+        "mean_top1_mse_128bp": "2682017815.087455",
+        "model": "B",
+        "seeds": "1"
+      }
+    ],
+    "development_checkpoint": {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/development_selected/checkpoint.pt",
+      "checkpoint_sha256": "652e568b4ea9f7596d7189fb3618996e76f41bb4495992180b43f20d64c1a117",
+      "fold": 0,
+      "intervals_sha256": "d03e3d02657b94fa18381c01a2dd47dfad610cae1949f197c9ac5cddcc894471",
+      "log_path": "logs/v2_p6b_six_chromosome_corefix_20260722/development_selected.log",
+      "loss": "paper",
+      "means_sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
+      "model": "B",
+      "physical_gpu": 2,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/development_selected/run.json",
+      "seed": 20260722,
+      "spec_sha256": "7f50967e1e53427b5b0ac6630c1b19c9b7344a79e67b60cfb36cb0c1a9289a05",
+      "steps": 2500
+    },
+    "formal_jobs": 90,
+    "matrix": [
+      {
+        "folds": "5",
+        "jobs": "15",
+        "loss": "log1p_mse",
+        "mean_exon_mse_log1p_1bp": "0.5695080816223246",
+        "mean_gene_body_mse_log1p_1bp": "0.2984621106423875",
+        "mean_gene_exon_coverage_pearson_log1p": "0.46525249885203446",
+        "mean_local_gradient_mse_log1p_1bp": "0.002727970998077474",
+        "mean_log1p_mse": "2.8160788248820476",
+        "mean_paper_loss": "18.5736876833391",
+        "mean_per_track_pearson_128bp_log1p": "0.6111524402169742",
+        "mean_primary_biological_score": "0.5382024695345042",
+        "mean_spearman_128bp": "0.5625481486138899",
+        "mean_top1_calibration_ratio_128bp": "0.01128857725707742",
+        "mean_top1_mse_128bp": "2688971871.391777",
+        "model": "A",
+        "seeds": "3"
+      },
+      {
+        "folds": "5",
+        "jobs": "15",
+        "loss": "paper",
+        "mean_exon_mse_log1p_1bp": "0.5833516400609562",
+        "mean_gene_body_mse_log1p_1bp": "0.3091843962352276",
+        "mean_gene_exon_coverage_pearson_log1p": "0.45533649213887856",
+        "mean_local_gradient_mse_log1p_1bp": "0.0029068556452527556",
+        "mean_log1p_mse": "4.742897901764835",
+        "mean_paper_loss": "18.277581305101695",
+        "mean_per_track_pearson_128bp_log1p": "0.5755060488656422",
+        "mean_primary_biological_score": "0.5154212705022603",
+        "mean_spearman_128bp": "0.5345231334413546",
+        "mean_top1_calibration_ratio_128bp": "0.06170743925891096",
+        "mean_top1_mse_128bp": "2685179082.971728",
+        "model": "A",
+        "seeds": "3"
+      },
+      {
+        "folds": "5",
+        "jobs": "15",
+        "loss": "log1p_mse",
+        "mean_exon_mse_log1p_1bp": "0.5164220473571531",
+        "mean_gene_body_mse_log1p_1bp": "0.26887910820387184",
+        "mean_gene_exon_coverage_pearson_log1p": "0.5514248152691993",
+        "mean_local_gradient_mse_log1p_1bp": "0.002515640451498415",
+        "mean_log1p_mse": "2.422752644067787",
+        "mean_paper_loss": "18.232819176534097",
+        "mean_per_track_pearson_128bp_log1p": "0.6793230487256472",
+        "mean_primary_biological_score": "0.6153739319974232",
+        "mean_spearman_128bp": "0.6140150897188089",
+        "mean_top1_calibration_ratio_128bp": "0.027450914214560182",
+        "mean_top1_mse_128bp": "2687829243.0328693",
+        "model": "B",
+        "seeds": "3"
+      },
+      {
+        "folds": "5",
+        "jobs": "15",
+        "loss": "paper",
+        "mean_exon_mse_log1p_1bp": "0.4876224812580479",
+        "mean_gene_body_mse_log1p_1bp": "0.25490153473747357",
+        "mean_gene_exon_coverage_pearson_log1p": "0.5993772753321945",
+        "mean_local_gradient_mse_log1p_1bp": "0.0021945423789281296",
+        "mean_log1p_mse": "3.6995156704661354",
+        "mean_paper_loss": "17.850901021440343",
+        "mean_per_track_pearson_128bp_log1p": "0.6538259756888622",
+        "mean_primary_biological_score": "0.6266016255105283",
+        "mean_spearman_128bp": "0.5938052674709788",
+        "mean_top1_calibration_ratio_128bp": "0.1043187151705361",
+        "mean_top1_mse_128bp": "2681948911.448027",
+        "model": "B",
+        "seeds": "3"
+      },
+      {
+        "folds": "5",
+        "jobs": "15",
+        "loss": "log1p_mse",
+        "mean_exon_mse_log1p_1bp": "0.651888191845563",
+        "mean_gene_body_mse_log1p_1bp": "0.3339149719227752",
+        "mean_gene_exon_coverage_pearson_log1p": "0.4021106981345381",
+        "mean_local_gradient_mse_log1p_1bp": "0.006861994384384507",
+        "mean_log1p_mse": "3.280745999880105",
+        "mean_paper_loss": "18.921367857925382",
+        "mean_per_track_pearson_128bp_log1p": "0.515111282016941",
+        "mean_primary_biological_score": "0.4586109900757395",
+        "mean_spearman_128bp": "0.46214643230408187",
+        "mean_top1_calibration_ratio_128bp": "0.01019027949762723",
+        "mean_top1_mse_128bp": "2689009945.6332965",
+        "model": "C",
+        "seeds": "3"
+      },
+      {
+        "folds": "5",
+        "jobs": "15",
+        "loss": "paper",
+        "mean_exon_mse_log1p_1bp": "0.5989298699181098",
+        "mean_gene_body_mse_log1p_1bp": "0.31690560158467806",
+        "mean_gene_exon_coverage_pearson_log1p": "0.45429542153797126",
+        "mean_local_gradient_mse_log1p_1bp": "0.009199713104321515",
+        "mean_log1p_mse": "4.806658211290597",
+        "mean_paper_loss": "18.409833015687013",
+        "mean_per_track_pearson_128bp_log1p": "0.520793077353333",
+        "mean_primary_biological_score": "0.48754424944565217",
+        "mean_spearman_128bp": "0.47937900070657485",
+        "mean_top1_calibration_ratio_128bp": "0.05615153259372556",
+        "mean_top1_mse_128bp": "2685514071.0128465",
+        "model": "C",
+        "seeds": "3"
+      }
+    ],
+    "registered_failures": [],
+    "selected": {
+      "folds": 5,
+      "jobs": 15,
+      "loss": "paper",
+      "mean_exon_mse_log1p_1bp": 0.4876224812580479,
+      "mean_gene_body_mse_log1p_1bp": 0.25490153473747357,
+      "mean_gene_exon_coverage_pearson_log1p": 0.5993772753321945,
+      "mean_local_gradient_mse_log1p_1bp": 0.0021945423789281296,
+      "mean_log1p_mse": 3.6995156704661354,
+      "mean_paper_loss": 17.850901021440343,
+      "mean_per_track_pearson_128bp_log1p": 0.6538259756888622,
+      "mean_primary_biological_score": 0.6266016255105283,
+      "mean_spearman_128bp": 0.5938052674709788,
+      "mean_top1_calibration_ratio_128bp": 0.1043187151705361,
+      "mean_top1_mse_128bp": 2681948911.448027,
+      "model": "B",
+      "seeds": 3
+    },
+    "selection_rule": {
+      "primary_maximize": "mean_three_seed_five_fold_primary_biological_score",
+      "quaternary_minimize": "mean_three_seed_five_fold_paper_loss",
+      "secondary_maximize": "mean_three_seed_five_fold_gene_exon_coverage_pearson_log1p",
+      "tertiary_maximize": "mean_three_seed_five_fold_per_track_pearson_128bp_log1p"
+    }
+  },
+  "generated_at": "2026-07-23T04:53:57+00:00",
+  "host": "hy8",
+  "limitations": [
+    "Chromosome X was viewed in legacy exploratory work, so its locked test block is not fully pristine; every final test block remains one-time-use within the revised v2 workflow.",
+    "All 485 source runs were class C before reprocessing; 482 RNA-seq runs were uniformly rebuilt and three non-RNA runs were excluded.",
+    "The augmentation and gene-loss ablations used one seed across five folds and are directional rather than high-power estimates.",
+    "The selected B/paper configuration won the preregistered biological primary score but need not dominate every secondary metric.",
+    "The one-time six-chromosome locked-block result must be reported regardless of outcome and cannot be used for further tuning in this study cycle."
+  ],
+  "method_contract": {
+    "blocked_cv": "five-fold within-chromosome block validation over I-V,X",
+    "formal_seeds": 3,
+    "lora_trainable_parameters": 145920,
+    "loss_implementation": "alphagenome_pytorch.losses.multinomial_loss_on_scaled_prediction_and_target",
+    "model_classes": [
+      "A",
+      "B",
+      "C"
+    ],
+    "scale_implementation": "alphagenome_pytorch.heads.targets_scaling",
+    "worm_embedding_rows": 3
+  },
+  "reproduction": {
+    "controller_command": [
+      "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+      "-m",
+      "scripts.v2_phase_controller",
+      "run",
+      "--phase",
+      "P6C",
+      "--auto"
+    ],
+    "cuda_visible_devices": "2",
+    "phase_command": [
+      "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+      "-m",
+      "scripts.evaluate_v2_model",
+      "--model",
+      "B",
+      "--training-loss",
+      "paper",
+      "--fold",
+      "0",
+      "--checkpoint",
+      "runs/v2_p6b_six_chromosome_corefix_20260722/development_selected/checkpoint.pt",
+      "--sequence-length",
+      "131072",
+      "--hidden-channels",
+      "64",
+      "--output",
+      "alphagenome_custom/metadata/v2/final_test_report.json",
+      "--device",
+      "cuda",
+      "--final-test",
+      "--final-test-execution-id",
+      "p6c-20260723T045025Z-8f9262a0ef92"
+    ],
+    "python_environment": "/home/zelinli6/miniconda3/envs/alphagenome/bin/python"
+  },
+  "schema_version": 1,
+  "status": "completed_one_time_final_test",
+  "workflow": "c_elegans_rna_seq_v2"
+}

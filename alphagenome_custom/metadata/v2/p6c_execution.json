@@ -1,0 +1,186 @@
+{
+  "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/development_selected/checkpoint.pt",
+  "checkpoint_sha256": "652e568b4ea9f7596d7189fb3618996e76f41bb4495992180b43f20d64c1a117",
+  "claim_path": "alphagenome_custom/metadata/v2/final_test_claim.json",
+  "command": [
+    "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+    "-m",
+    "scripts.evaluate_v2_model",
+    "--model",
+    "B",
+    "--training-loss",
+    "paper",
+    "--fold",
+    "0",
+    "--checkpoint",
+    "runs/v2_p6b_six_chromosome_corefix_20260722/development_selected/checkpoint.pt",
+    "--sequence-length",
+    "131072",
+    "--hidden-channels",
+    "64",
+    "--output",
+    "alphagenome_custom/metadata/v2/final_test_report.json",
+    "--device",
+    "cuda",
+    "--final-test",
+    "--final-test-execution-id",
+    "p6c-20260723T045025Z-8f9262a0ef92"
+  ],
+  "completed_at": "2026-07-23T04:53:57+00:00",
+  "execution_id": "p6c-20260723T045025Z-8f9262a0ef92",
+  "final_document_path": "docs/v2_final_report.md",
+  "final_document_sha256": "8c1518d13612bfeb89bb0078d423d3eda87752e45e439c36dd98275f06a0c870",
+  "final_summary_path": "alphagenome_custom/metadata/v2/v2_final_report.json",
+  "final_summary_sha256": "0752b8fb72f27f69c7b3b49fbb96e3f90a23b1b54162fff5506f44eea8ec9360",
+  "g5_approved_at": "2026-07-23T04:49:53+00:00",
+  "gpu_wait_snapshots": [
+    {
+      "commands": [
+        [
+          "nvidia-smi",
+          "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+          "--format=csv,noheader,nounits"
+        ],
+        [
+          "nvidia-smi",
+          "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+          "--format=csv,noheader,nounits"
+        ]
+      ],
+      "gpus": [
+        {
+          "index": 0,
+          "memory_free_mib": 1087,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 80067,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+        },
+        {
+          "index": 1,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+        },
+        {
+          "index": 2,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+        },
+        {
+          "index": 3,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+        }
+      ],
+      "observed_at": "2026-07-23T04:50:25+00:00",
+      "processes": [
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 2103240,
+          "process_name": "VLLM::EngineCore",
+          "used_memory_mib": 70584
+        },
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 492165,
+          "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+          "used_memory_mib": 9468
+        }
+      ]
+    }
+  ],
+  "locked_input_hashes": {
+    "checkpoint_sha256": "652e568b4ea9f7596d7189fb3618996e76f41bb4495992180b43f20d64c1a117",
+    "means_sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
+    "selection_sha256": "a5b2ebd934f94475070bd754bd52a0c15b17af8efa5da9730919dd829698fc7a",
+    "split_registry_sha256": "aa783dd6ca799887c0785a2ddeb7985c980a2bfc1ff5548486e3bcd6d99bd91d",
+    "test_intervals_sha256": "7a4396f1e29568795b0c947f7051ee6e9f67e9b0e2d02922e18a511c7b1d9fc2"
+  },
+  "log_path": "logs/p6c-20260723T045025Z-8f9262a0ef92/final_test.log",
+  "phase": "P6C",
+  "physical_gpu": 2,
+  "report_path": "alphagenome_custom/metadata/v2/final_test_report.json",
+  "resources_after": {
+    "commands": [
+      [
+        "nvidia-smi",
+        "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+        "--format=csv,noheader,nounits"
+      ],
+      [
+        "nvidia-smi",
+        "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+        "--format=csv,noheader,nounits"
+      ]
+    ],
+    "gpus": [
+      {
+        "index": 0,
+        "memory_free_mib": 1087,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 80067,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+      },
+      {
+        "index": 1,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+      },
+      {
+        "index": 2,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 20,
+        "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+      },
+      {
+        "index": 3,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+      }
+    ],
+    "processes": [
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 2103240,
+        "process_name": "VLLM::EngineCore",
+        "used_memory_mib": 70584
+      },
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 492165,
+        "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+        "used_memory_mib": 9468
+      }
+    ]
+  },
+  "schema_version": 1,
+  "selection_path": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_selection.json",
+  "started_at": "2026-07-23T04:50:25+00:00",
+  "status": "completed"
+}

@@ -1,0 +1,17 @@
+{
+  "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/development_selected/checkpoint.pt",
+  "checkpoint_sha256": "652e568b4ea9f7596d7189fb3618996e76f41bb4495992180b43f20d64c1a117",
+  "claimed_at": "2026-07-23T04:50:25+00:00",
+  "execution_id": "p6c-20260723T045025Z-8f9262a0ef92",
+  "final_summary_sha256": "0752b8fb72f27f69c7b3b49fbb96e3f90a23b1b54162fff5506f44eea8ec9360",
+  "g5_approved_at": "2026-07-23T04:49:53+00:00",
+  "g5_scope": "r6c_single_six_chromosome_block_test",
+  "means_sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
+  "physical_gpu": 2,
+  "schema_version": 1,
+  "selection_path": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_selection.json",
+  "selection_sha256": "a5b2ebd934f94475070bd754bd52a0c15b17af8efa5da9730919dd829698fc7a",
+  "split_registry_sha256": "aa783dd6ca799887c0785a2ddeb7985c980a2bfc1ff5548486e3bcd6d99bd91d",
+  "status": "completed",
+  "test_intervals_sha256": "7a4396f1e29568795b0c947f7051ee6e9f67e9b0e2d02922e18a511c7b1d9fc2"
+}
