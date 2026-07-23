@@ -7,10 +7,10 @@
     120,
     240
   ],
-  "elapsed_seconds": 7.296184528619051,
-  "full_fold_epoch_seconds_linear_io_estimate": 176.98839277029037,
+  "elapsed_seconds": 7.2415132923051715,
+  "full_fold_epoch_seconds_linear_io_estimate": 175.7468816637993,
   "full_target_bytes": 1018724352,
-  "full_window_digest": "44a5df7a7721bfaf7bcbc12ebd644923544b16c54e4cfe4b1855a84796363575",
+  "full_window_digest": "e6f0e715c478f476b30e85ba8247a1f208d8fb3c1f609333af406f92fa2feddf",
   "full_window_dtypes": {
     "core_mask": "torch.bool",
     "dna_sequence": "torch.float32",
@@ -20,7 +20,7 @@
     "track_mask": "torch.bool",
     "track_strand": "torch.int8"
   },
-  "full_window_seconds": 2.765443637035787,
+  "full_window_seconds": 2.746045025996864,
   "full_window_shapes": {
     "core_mask": [
       1048576
@@ -55,24 +55,24 @@
   "locked_test_block_signal_reads": 0,
   "monolithic_npz_generated": false,
   "multi_worker_digests": [
-    "64d1051d3f7ffb45af0a107e0545d3390d62e7786ce0f462731e2f26fce1caee",
-    "e9d2d1a1f08eab12969b5000d32a14fbd4d82d9ca5eb7365fe5d4301fd26e46c"
+    "5ac0ccb1f391f0c9935ecf528902425fe8a89091d53a1dc765c4c4c496724904",
+    "7c8d7ec66e65979ee8dfb27ff29e8a2090ff90fe52415be697c3c41de492ec86"
   ],
-  "multi_worker_two_window_seconds": 0.5021093152463436,
+  "multi_worker_two_window_seconds": 0.4977964172139764,
   "open_file_descriptors_after": 4,
   "open_file_descriptors_before": 4,
-  "peak_rss_kib_after": 2717984,
-  "peak_rss_kib_before": 537104,
+  "peak_rss_kib_after": 2732352,
+  "peak_rss_kib_before": 536340,
   "phase": "P4",
   "pooling_128bp": "sum_of_128_consecutive_1bp_values",
   "schema_version": 1,
   "single_worker_digests": [
-    "64d1051d3f7ffb45af0a107e0545d3390d62e7786ce0f462731e2f26fce1caee",
-    "e9d2d1a1f08eab12969b5000d32a14fbd4d82d9ca5eb7365fe5d4301fd26e46c"
+    "5ac0ccb1f391f0c9935ecf528902425fe8a89091d53a1dc765c4c4c496724904",
+    "7c8d7ec66e65979ee8dfb27ff29e8a2090ff90fe52415be697c3c41de492ec86"
   ],
-  "single_worker_two_window_seconds": 0.42351859621703625,
-  "split_registry_sha256": "15f3e0b006c5d490904011d6b46e978c3307b1b221bfea23d6024fb3010704ab",
-  "split_revision": "six_chromosome_blocks_v1",
+  "single_worker_two_window_seconds": 0.41263697296380997,
+  "split_registry_sha256": "aa783dd6ca799887c0785a2ddeb7985c980a2bfc1ff5548486e3bcd6d99bd91d",
+  "split_revision": "six_chromosome_blocks_v2",
   "worker_determinism_track_indices": [
     0,
     1,

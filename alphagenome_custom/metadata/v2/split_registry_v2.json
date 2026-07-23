@@ -18,22 +18,22 @@
     "X"
   ],
   "development_train_windows": 80,
-  "evaluation_core_policy": "partition_each_effective_block_across_overlapping_context_windows",
+  "evaluation_core_policy": "one_complete_aligned_131072bp_core_per_context_row_covering_every_effective_block_base",
   "evaluation_subwindow_bp": 131072,
   "exclusion_buffer_bp": 1050624,
   "files": {
-    "alphagenome_custom/intervals/v2/development_train.tsv": "04734b73c6950489baf515660cc6b1679b8a8493284d798d9208bbfe0bc11f8c",
-    "alphagenome_custom/intervals/v2/fold_1/train.tsv": "f7d9797da52d25b136ec796d7417240da3b285b1c47d0ba47f2cd0cc243dbba6",
-    "alphagenome_custom/intervals/v2/fold_1/valid.tsv": "25e5f678e33d50f2782e212217994b8504456d26530a44160fe24e45a77d5ade",
-    "alphagenome_custom/intervals/v2/fold_2/train.tsv": "93afaa729f02a018813a160374bfa7c2048e24742be2c3048d445b9aaa65740e",
-    "alphagenome_custom/intervals/v2/fold_2/valid.tsv": "7e8101ecb444443659c51f35df74af106f819f25e0e42c59145d234bd2b56adc",
-    "alphagenome_custom/intervals/v2/fold_3/train.tsv": "08247a61deb733ad65182b6d9611d1c5ff8bdc380160623725ba90402b101132",
-    "alphagenome_custom/intervals/v2/fold_3/valid.tsv": "c482966846ea97c934b24e6b06c747649391f460042d0416547d780a4e11c0fe",
-    "alphagenome_custom/intervals/v2/fold_4/train.tsv": "a7e8807cfac3d5c08a5df5dde702dfb3865e383a041316d3bdcb649908a5ab60",
-    "alphagenome_custom/intervals/v2/fold_4/valid.tsv": "22765f501506c0f5cf5eb0e9db292e4f160ee9177f582cb880bc9101686aad26",
-    "alphagenome_custom/intervals/v2/fold_5/train.tsv": "130e2db0d4346e32d14e6fc1676ecac0bf22a7328af9497cc3350d653f023173",
-    "alphagenome_custom/intervals/v2/fold_5/valid.tsv": "caa20e00dbacfe09b2b1012782bb54e056d700368eccfe73e5b4472a752bd2ad",
-    "alphagenome_custom/intervals/v2/test_locked.tsv": "d2afb074eb843f8f29b744b55a60500aa9db800c2ba7e90e99523eb1a80eb60c"
+    "alphagenome_custom/intervals/v2/development_train.tsv": "d03e3d02657b94fa18381c01a2dd47dfad610cae1949f197c9ac5cddcc894471",
+    "alphagenome_custom/intervals/v2/fold_1/train.tsv": "0883c444ece4b666324787077dd3ae20f4955e68788777cf8144d7f7b77b67e4",
+    "alphagenome_custom/intervals/v2/fold_1/valid.tsv": "6bca1fc0d334ef12440acc68689560d8725e8fe322ed5f1a42165841c196ac5d",
+    "alphagenome_custom/intervals/v2/fold_2/train.tsv": "550001168afd35b25c6e95fdc917870fb468e94d04144a93061c001c8b2838c0",
+    "alphagenome_custom/intervals/v2/fold_2/valid.tsv": "a2c269e9afa271bcdc23446242b521486d7d3b8c2c64f0dac6ee0c734a792412",
+    "alphagenome_custom/intervals/v2/fold_3/train.tsv": "5820c02f030256276f7592290ee4f01ae95dfbf9617b2059b28103c7a5da9068",
+    "alphagenome_custom/intervals/v2/fold_3/valid.tsv": "145fb6df914cc5be550d64d8939928518c86a4ed043bee1ba6fd92124c4fd656",
+    "alphagenome_custom/intervals/v2/fold_4/train.tsv": "2d7a5427478bd896e36ae018ad4af9fb5e194ae11a6f51ef38e1b02f2225ad17",
+    "alphagenome_custom/intervals/v2/fold_4/valid.tsv": "4c1c41cb5162cd36c001f61fdb9c4721b9fc1f4bed3a0813b22b379e21e381a7",
+    "alphagenome_custom/intervals/v2/fold_5/train.tsv": "10e04a47a2df1be48aaa6746611bec44fbe80c1fa6e40c5521a251270347253b",
+    "alphagenome_custom/intervals/v2/fold_5/valid.tsv": "34e20e8ead8714c8fdc13beb61c1c878550d3289e577e8baf0428cfc9a9b2de2",
+    "alphagenome_custom/intervals/v2/test_locked.tsv": "7a4396f1e29568795b0c947f7051ee6e9f67e9b0e2d02922e18a511c7b1d9fc2"
   },
   "final_test_scope": "r6c_single_six_chromosome_block_test",
   "folds": [
@@ -65,7 +65,7 @@
         "X"
       ],
       "valid_effective_bases": 10878976,
-      "valid_windows": 16
+      "valid_windows": 83
     },
     {
       "fold": 2,
@@ -95,7 +95,7 @@
         "X"
       ],
       "valid_effective_bases": 10878976,
-      "valid_windows": 16
+      "valid_windows": 83
     },
     {
       "fold": 3,
@@ -125,7 +125,7 @@
         "X"
       ],
       "valid_effective_bases": 10878976,
-      "valid_windows": 16
+      "valid_windows": 83
     },
     {
       "fold": 4,
@@ -155,7 +155,7 @@
         "X"
       ],
       "valid_effective_bases": 10878976,
-      "valid_windows": 16
+      "valid_windows": 83
     },
     {
       "fold": 5,
@@ -185,17 +185,17 @@
         "X"
       ],
       "valid_effective_bases": 10878976,
-      "valid_windows": 16
+      "valid_windows": 83
     }
   ],
   "group_manifest_sha256": "06bfc6109b08dc22007601d9c406cd4772701901f069f16ad1ea26b3d6134737",
   "group_outputs_sha256": "4f261a4dcbb84f73be26ae2205e049550083b816a54561e6c983b048c6267a65",
   "max_shift_bp": 1024,
   "reference_fai_sha256": "aaa0bf6e25f337787d22d23e1e94f341cb4d9d7ec8c1ba76f667e859a0f7e3cc",
-  "revision_id": "six_chromosome_blocks_v1",
+  "revision_id": "six_chromosome_blocks_v2",
   "schema_version": 2,
-  "split_spec_path": "alphagenome_custom/metadata/v2/six_chromosome_split_spec.json",
-  "split_spec_sha256": "a0b097db571a6e2d15e0e7501fd2dc30b4e8e8ab6cedf64eee58eaf6b561171a",
+  "split_spec_path": "alphagenome_custom/metadata/v2/six_chromosome_split_v2_spec.json",
+  "split_spec_sha256": "356913f8512c24998d934d4bfc416ee94b3f56fbb66b0d0af68dca3165b55df5",
   "stride": 524288,
   "test_chromosomes": [
     "I",
@@ -207,6 +207,6 @@
   ],
   "test_effective_bases": 10878976,
   "test_status": "embargoed_six_chromosome_locked_blocks",
-  "test_windows": 16,
+  "test_windows": 83,
   "window_size": 1048576
 }

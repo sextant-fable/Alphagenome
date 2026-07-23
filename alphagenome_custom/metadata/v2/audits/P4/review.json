@@ -11,8 +11,8 @@
       "status": "PASS"
     },
     {
-      "check_id": "R4.03_block_buffers_and_no_leakage",
-      "evidence": "block_errors=[] core_errors=[] test_valid=True",
+      "check_id": "R4.03_block_buffers_no_leakage_and_full_metric_coverage",
+      "evidence": "block_errors=[] core_errors=[] test_metric_errors=[] test_valid=True",
       "status": "PASS"
     },
     {
@@ -37,12 +37,12 @@
     },
     {
       "check_id": "R4.08_test_embargo",
-      "evidence": "default_loader_refused=True test_windows=16 chromosomes=['I', 'II', 'III', 'IV', 'V', 'X']",
+      "evidence": "default_loader_refused=True test_windows=83 chromosomes=['I', 'II', 'III', 'IV', 'V', 'X']",
       "status": "PASS"
     },
     {
       "check_id": "R4.09_io_benchmark",
-      "evidence": "window_seconds=2.765443637035787 target_bytes=1018724352",
+      "evidence": "window_seconds=2.746045025996864 target_bytes=1018724352",
       "status": "PASS"
     },
     {
@@ -59,11 +59,16 @@
       "check_id": "R4.12_superseded_holdout_preserved",
       "evidence": "archived_intervals=12",
       "status": "PASS"
+    },
+    {
+      "check_id": "R4.13_incomplete_core_revision_preserved",
+      "evidence": "source_jobs=1 coverage=[0.8435322914705329]",
+      "status": "PASS"
     }
   ],
   "phase": "P4",
   "review": "R4",
-  "reviewed_at": "2026-07-21T11:51:24+00:00",
+  "reviewed_at": "2026-07-22T02:32:56+00:00",
   "schema_version": 1,
   "status": "PASS"
 }

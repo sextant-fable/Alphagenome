@@ -21,7 +21,7 @@
   "locked_test_block_signal_reads": 0,
   "output_sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
   "schema_version": 2,
-  "split_registry_sha256": "15f3e0b006c5d490904011d6b46e978c3307b1b221bfea23d6024fb3010704ab",
-  "split_revision": "six_chromosome_blocks_v1",
+  "split_registry_sha256": "aa783dd6ca799887c0785a2ddeb7985c980a2bfc1ff5548486e3bcd6d99bd91d",
+  "split_revision": "six_chromosome_blocks_v2",
   "tracks": 241
 }

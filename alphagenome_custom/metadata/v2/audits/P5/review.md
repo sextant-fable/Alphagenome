@@ -2,7 +2,7 @@
 
 Status: **PASS**
 
-Reviewed at: `2026-07-21T12:10:27+00:00`
+Reviewed at: `2026-07-22T02:45:18+00:00`
 
 | Check | Status | Evidence |
 | --- | --- | --- |
@@ -14,6 +14,6 @@ Reviewed at: `2026-07-21T12:10:27+00:00`
 | R5.06_real_worm_embedding | PASS | paths=['organism_embed', 'embedder_128bp.organism_embed', 'embedder_1bp.organism_embed', 'embedder_pair.organism_embed'] index=2 |
 | R5.07_checkpoint_freeze_and_lora_scope | PASS | lora_modules=6 unexpected=[] |
 | R5.08_cpu_forward_backward | PASS | head={'1': [1, 241, 1024], '128': [1, 241, 8]} baseline={'1': [1, 16, 1024], '128': [1, 16, 8]} |
-| R5.09_unit_and_golden_tests | PASS | unit_tests=79 return=0 |
+| R5.09_unit_and_golden_tests | PASS | unit_tests=80 return=0 |
 | R5.10_test_embargo | PASS | x=registered_train_valid_blocks_allowed test=prohibited_until_locked_G5_P6C |
 | R5.11_manifest_hashes | PASS | P5 audit hashes bind means and model specification |

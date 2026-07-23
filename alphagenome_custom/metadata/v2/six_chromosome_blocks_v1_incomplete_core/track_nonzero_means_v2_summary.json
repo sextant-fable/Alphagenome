@@ -1,0 +1,27 @@
+{
+  "controlled_comparison": "development_pool_train_blocks_vs_fold_train_blocks",
+  "development_block_count": 30,
+  "development_mean_chromosomes": [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "X"
+  ],
+  "fold_mean_policy": "nonzero_mean_on_registered_train_blocks_only",
+  "fold_train_block_counts": {
+    "1": 24,
+    "2": 24,
+    "3": 24,
+    "4": 24,
+    "5": 24
+  },
+  "group_outputs_sha256": "4f261a4dcbb84f73be26ae2205e049550083b816a54561e6c983b048c6267a65",
+  "locked_test_block_signal_reads": 0,
+  "output_sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
+  "schema_version": 2,
+  "split_registry_sha256": "15f3e0b006c5d490904011d6b46e978c3307b1b221bfea23d6024fb3010704ab",
+  "split_revision": "six_chromosome_blocks_v1",
+  "tracks": 241
+}

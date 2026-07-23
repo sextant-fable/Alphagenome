@@ -1,0 +1,128 @@
+{
+  "completed_at": null,
+  "failures": [],
+  "gpu_wait_snapshots": [
+    {
+      "commands": [
+        [
+          "nvidia-smi",
+          "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+          "--format=csv,noheader,nounits"
+        ],
+        [
+          "nvidia-smi",
+          "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+          "--format=csv,noheader,nounits"
+        ]
+      ],
+      "gpus": [
+        {
+          "index": 0,
+          "memory_free_mib": 1087,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 80067,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+        },
+        {
+          "index": 1,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+        },
+        {
+          "index": 2,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+        },
+        {
+          "index": 3,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+        }
+      ],
+      "observed_at": "2026-07-22T01:57:18+00:00",
+      "processes": [
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 2103240,
+          "process_name": "VLLM::EngineCore",
+          "used_memory_mib": 70584
+        },
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 492165,
+          "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+          "used_memory_mib": 9468
+        }
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "amendment_spec_sha256": "330d40d1cf1130db4ebac205c0f8ce46fb4457f1daad06454117345da6254cb3",
+      "base_job": false,
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_20260721/formal/A/paper/seed_20260714/fold_1/checkpoint.pt",
+      "checkpoint_sha256": "e1bec5d42b8adccd48780e88a750afc5471e8ee29574c45315cebc08afabeb0f",
+      "elapsed_seconds": 1311.1780810998753,
+      "exon_mse_log1p_1bp": 0.570743231269385,
+      "fold": 1,
+      "gene_body_mse_log1p_1bp": 0.3210543692175807,
+      "gene_exon_coverage_pearson_log1p": 0.43773904067349056,
+      "gene_weight": 0.1,
+      "job_id": "formal:A:paper:seed20260714:fold1",
+      "job_kind": "formal",
+      "job_path": "runs/v2_p6b_six_chromosome_20260721/jobs/formal/A/paper/seed_20260714/fold_1.json",
+      "local_gradient_mse_log1p_1bp": 0.0030697957371699815,
+      "log1p_mse": 5.043901692117964,
+      "log_path": "logs/v2_p6b_six_chromosome_20260721/formal/A/paper/seed_20260714/fold_1.log",
+      "loss": "paper",
+      "max_shift_bp": 1024,
+      "mean_column": "fold_1_train_nonzero_mean",
+      "model": "A",
+      "output_dir": "runs/v2_p6b_six_chromosome_20260721/formal/A/paper/seed_20260714/fold_1",
+      "paper_loss": 19.105979604380472,
+      "per_track_pearson_128bp_log1p": 0.5668537826472465,
+      "physical_gpu": 2,
+      "primary_biological_score": 0.5022964116603685,
+      "reused": false,
+      "reverse_complement_probability": 0.5,
+      "schema_version": 1,
+      "seed": 20260714,
+      "spearman_128bp": 0.5310429006838823,
+      "spec_sha256": "330d40d1cf1130db4ebac205c0f8ce46fb4457f1daad06454117345da6254cb3",
+      "status": "completed",
+      "top1_calibration_ratio_128bp": 0.05803199926472736,
+      "top1_mse_128bp": 115554307.37737472,
+      "validation_path": "runs/v2_p6b_six_chromosome_20260721/formal/A/paper/seed_20260714/fold_1/validation_full_metrics.json"
+    }
+  ],
+  "jobs_expected": 105,
+  "locked_test_block_signal_reads": 0,
+  "means_sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
+  "phase": "P6B",
+  "revision_id": "P6B-SIXCHR-1",
+  "schema_version": 1,
+  "selected_physical_gpus": [
+    2,
+    3
+  ],
+  "spec_path": "alphagenome_custom/metadata/v2/p6b_six_chromosome_spec.json",
+  "spec_sha256": "330d40d1cf1130db4ebac205c0f8ce46fb4457f1daad06454117345da6254cb3",
+  "split_registry_sha256": "15f3e0b006c5d490904011d6b46e978c3307b1b221bfea23d6024fb3010704ab",
+  "split_revision": "six_chromosome_blocks_v1",
+  "started_at": "2026-07-22T01:57:18+00:00",
+  "status": "running"
+}

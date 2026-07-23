@@ -34,6 +34,26 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-23 - Six-Chromosome P6B Completion and Development Checkpoint Lock
+
+- Run type: training, evaluation, model selection, and development retraining
+- Purpose: Complete the preregistered six-chromosome P6B matrix, select one configuration without final-test access, retrain it on the full development partition, and bind exactly one checkpoint for the separately gated P6C evaluation.
+- Git commit: The durable controller resumed from `f35ee52`; the completed generated evidence is recorded by the next repository commit.
+- Branch: `setup/agent-maintenance`
+- Host: HY-GPU (`hy8`), non-Slurm; physical GPUs 2 and 3 only for the matrix and GPU 2 for development retraining.
+- Controller phase and approval scope: P6B; `G4:r6_gpu_auto_available_2_3`. G5 remained unapproved throughout.
+- Environment: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python`; Python `3.12.13`; PyTorch `2.11.0+cu128`.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller run --phase P6B --auto` in detached tmux session `alphagenome_v2_p6b`.
+- Input data: 241 uniformly reprocessed grouped RNA-seq tracks; WBcel235; split revision `six_chromosome_blocks_v2`; spec SHA-256 `7f50967e1e53427b5b0ac6630c1b19c9b7344a79e67b60cfb36cb0c1a9289a05`; split-registry SHA-256 `aa783dd6ca799887c0785a2ddeb7985c980a2bfc1ff5548486e3bcd6d99bd91d`; means SHA-256 `a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669`.
+- Output path: ignored run artifacts under `runs/v2_p6b_six_chromosome_corefix_20260722/` and logs under `logs/v2_p6b_six_chromosome_corefix_20260722/`; tracked summaries under `alphagenome_custom/metadata/v2/`.
+- Result summary: completed 90/90 formal jobs and 15/15 ablations with zero recorded failures. The locked four-level selection rule chose model B with the paper loss. Its three-seed, five-fold primary biological score was `0.6266016255105283`; this is a development-CV result, not a final-test result.
+- Development retraining: model B, paper loss, seed `20260722`, 2,500 steps, 131,072 bp sequence length, standard +/-1,024 bp shifts, reverse-complement probability 0.5, gene weight 0.1, and `development_train_nonzero_mean`.
+- Locked checkpoint: `runs/v2_p6b_six_chromosome_corefix_20260722/development_selected/checkpoint.pt`, SHA-256 `652e568b4ea9f7596d7189fb3618996e76f41bb4495992180b43f20d64c1a117`.
+- Verification: every one of the 90 formal and 15 ablation jobs evaluated 83 complete, non-overlapping 131,072 bp cores over 10,878,976 bases across chromosomes I, II, III, IV, V, and X with coverage 1.0. R6B passed all ten checks. The execution record contains zero locked final-test signal reads; `test_consumed=false` and G5 remains unapproved.
+- Failures or warnings: earlier incomplete and core-coverage-defective attempts remain preserved and excluded. Chromosome X had prior legacy-project exposure, so the eventual final evaluation is not pristine for the project as a whole. No P6C metric exists yet.
+- Next actions: require the exact one-time `G5:r6c_single_six_chromosome_block_test` authorization before running P6C. Once consumed, the locked six-chromosome final-test blocks cannot be evaluated again under this workflow.
+- Claim status: verified for P6B execution, selection, checkpoint lock, and test embargo; no final-test or biological superiority claim.
+
 ## 2026-07-22 - Six-Chromosome P6B External Process Interruption and Resume
 
 - Run type: training and evaluation, operational recovery

@@ -1,0 +1,179 @@
+{
+  "archived_audits": [
+    {
+      "bytes": 2291,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/audits/P4/review.json",
+      "sha256": "4048f0aab782b7d285f39ab5389453fb856ce49d8be71e3b844bc17da00fae58"
+    },
+    {
+      "bytes": 1489,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/audits/P4/review.md",
+      "sha256": "6b1850d15b8d461f2a7c9ab8949099fbea62e1e1975154442e6c7901c364d547"
+    },
+    {
+      "bytes": 2414,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/audits/P5/review.json",
+      "sha256": "6b45ac055bae7bbb17f4682b17deabce5c4aab2e76ae0433c8173f4f17dd34f5"
+    },
+    {
+      "bytes": 1677,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/audits/P5/review.md",
+      "sha256": "e2611f18ec4be228a2c7f80f20f901c1c2a78e56313b04d9f93f4256743b7a36"
+    },
+    {
+      "bytes": 1396,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/audits/P6A/review.json",
+      "sha256": "b2ba2bf4fb6e3b33cf48f9cbe84b1217c9347ff40cd06e1bcd33c57fcc88be3d"
+    },
+    {
+      "bytes": 853,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/audits/P6A/review.md",
+      "sha256": "99d153852854929d674cc32a754a4f598c57e99e92ac5cb2e0ee1bd9095e9d44"
+    }
+  ],
+  "archived_intervals": [
+    {
+      "bytes": 2679,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/blocks.tsv",
+      "sha256": "4414bd0acc5fc08d1df91b00c99f50d4e3a6fd851344a38bf450bac9b274577e"
+    },
+    {
+      "bytes": 8574,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/development_train.tsv",
+      "sha256": "04734b73c6950489baf515660cc6b1679b8a8493284d798d9208bbfe0bc11f8c"
+    },
+    {
+      "bytes": 6240,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/fold_1/train.tsv",
+      "sha256": "f7d9797da52d25b136ec796d7417240da3b285b1c47d0ba47f2cd0cc243dbba6"
+    },
+    {
+      "bytes": 1633,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/fold_1/valid.tsv",
+      "sha256": "25e5f678e33d50f2782e212217994b8504456d26530a44160fe24e45a77d5ade"
+    },
+    {
+      "bytes": 6214,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/fold_2/train.tsv",
+      "sha256": "93afaa729f02a018813a160374bfa7c2048e24742be2c3048d445b9aaa65740e"
+    },
+    {
+      "bytes": 1656,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/fold_2/valid.tsv",
+      "sha256": "7e8101ecb444443659c51f35df74af106f819f25e0e42c59145d234bd2b56adc"
+    },
+    {
+      "bytes": 6266,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/fold_3/train.tsv",
+      "sha256": "08247a61deb733ad65182b6d9611d1c5ff8bdc380160623725ba90402b101132"
+    },
+    {
+      "bytes": 1606,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/fold_3/valid.tsv",
+      "sha256": "c482966846ea97c934b24e6b06c747649391f460042d0416547d780a4e11c0fe"
+    },
+    {
+      "bytes": 6259,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/fold_4/train.tsv",
+      "sha256": "a7e8807cfac3d5c08a5df5dde702dfb3865e383a041316d3bdcb649908a5ab60"
+    },
+    {
+      "bytes": 1614,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/fold_4/valid.tsv",
+      "sha256": "22765f501506c0f5cf5eb0e9db292e4f160ee9177f582cb880bc9101686aad26"
+    },
+    {
+      "bytes": 6214,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/fold_5/train.tsv",
+      "sha256": "130e2db0d4346e32d14e6fc1676ecac0bf22a7328af9497cc3350d653f023173"
+    },
+    {
+      "bytes": 1657,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/fold_5/valid.tsv",
+      "sha256": "caa20e00dbacfe09b2b1012782bb54e056d700368eccfe73e5b4472a752bd2ad"
+    },
+    {
+      "bytes": 1810,
+      "path": "alphagenome_custom/intervals/v2_six_chromosome_blocks_v1_incomplete_core/test_locked.tsv",
+      "sha256": "d2afb074eb843f8f29b744b55a60500aa9db800c2ba7e90e99523eb1a80eb60c"
+    }
+  ],
+  "archived_metadata": [
+    {
+      "bytes": 5803,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/split_registry_v2.json",
+      "sha256": "15f3e0b006c5d490904011d6b46e978c3307b1b221bfea23d6024fb3010704ab"
+    },
+    {
+      "bytes": 2372,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/p4_loader_benchmark.json",
+      "sha256": "d21d15cd124e9f083a5c34e8ff981060fc8377c8e6b171d852eb0ea4a7e6a395"
+    },
+    {
+      "bytes": 23534,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/track_nonzero_means_v2.tsv",
+      "sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669"
+    },
+    {
+      "bytes": 788,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/track_nonzero_means_v2_summary.json",
+      "sha256": "36fdf7bdb216aa0d2bb5b246d14035b2c7cc9c9e4db00122083237c3fd77b87d"
+    },
+    {
+      "bytes": 1417,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/model_specs_v2.json",
+      "sha256": "9a5e9d7002268e0aaa5e6981d152a16c1926192ca5f10ef4c5fccd4e45e2d3b1"
+    },
+    {
+      "bytes": 2353,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/p5_component_audit.json",
+      "sha256": "3f70bede7644b017a6437640336d1b66e6f1e4aadde77b036ebc72531aee415b"
+    },
+    {
+      "bytes": 6798,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/p6a_execution.json",
+      "sha256": "f4bf4c4278923ce2f74f3e79ebe04b46a321ee13f221067b02c80f63dc20bff3"
+    },
+    {
+      "bytes": 4677,
+      "path": "alphagenome_custom/metadata/v2/six_chromosome_blocks_v1_incomplete_core/p6b_six_chromosome_execution.json",
+      "sha256": "294ef37930afb88805fabd0b62b72da33fef5c7214ab34d2d7897585c0ab5810"
+    }
+  ],
+  "observed_validation_core_coverage_fractions": [
+    0.8435322914705329
+  ],
+  "prepared_at": "2026-07-22T02:31:34+00:00",
+  "reason": "Nearest-window eval cores omitted eligible bases; the first formal job measured validation_core_coverage_fraction=0.8435322914705329.",
+  "retained_log_root": "logs/v2_p6b_six_chromosome_20260721",
+  "retained_run_evidence": [
+    {
+      "bytes": 1734,
+      "path": "runs/v2_p6b_six_chromosome_20260721/jobs/formal/A/paper/seed_20260714/fold_1.json",
+      "sha256": "d288068fa5ace65734d901ed69268072ef0423a700b647dfa5c02a5c4f547472"
+    },
+    {
+      "bytes": 401066,
+      "path": "runs/v2_p6b_six_chromosome_20260721/formal/A/paper/seed_20260714/fold_1/validation_full_metrics.json",
+      "sha256": "2b6e86e6d0ae5de8307628fb47d35c9c852aa076d4acefc25eec31285eaf5348"
+    },
+    {
+      "bytes": 1225140,
+      "path": "runs/v2_p6b_six_chromosome_20260721/formal/A/paper/seed_20260714/fold_1/run.json",
+      "sha256": "6704b8ead2cee9bd6a8c1fc2c025d22b6d1d2c1f1451fbac0e6c8be3d4c03c9f"
+    },
+    {
+      "bytes": 13346485,
+      "path": "runs/v2_p6b_six_chromosome_20260721/formal/A/paper/seed_20260714/fold_1/checkpoint.pt",
+      "sha256": "e1bec5d42b8adccd48780e88a750afc5471e8ee29574c45315cebc08afabeb0f"
+    }
+  ],
+  "retained_run_root": "runs/v2_p6b_six_chromosome_20260721",
+  "schema_version": 1,
+  "source_completed_jobs": 1,
+  "source_execution_status": "running",
+  "source_failures": [],
+  "source_locked_test_block_signal_reads": 0,
+  "source_revision": "six_chromosome_blocks_v1",
+  "target_revision": "six_chromosome_blocks_v2"
+}

@@ -1,0 +1,80 @@
+{
+  "base_checkpoint_loaded": true,
+  "base_checkpoint_path": "weights/alphagenome_pytorch/model_all_folds.safetensors",
+  "base_checkpoint_sha256": "8c1cde573ba9f462e8aa91fd9c6e13ea6bd004857c429932d6c64db386e13595",
+  "baseline_gradients_finite": true,
+  "baseline_loss": 1.3425869941711426,
+  "baseline_prediction_shapes": {
+    "1": [
+      1,
+      16,
+      1024
+    ],
+    "128": [
+      1,
+      16,
+      8
+    ]
+  },
+  "device": "cpu",
+  "head_gradients_finite": true,
+  "head_loss": 27.337594985961914,
+  "head_loss_finite": true,
+  "head_prediction_shapes": {
+    "1": [
+      1,
+      241,
+      1024
+    ],
+    "128": [
+      1,
+      241,
+      8
+    ]
+  },
+  "locked_test_block_signal_reads": 0,
+  "lora_modules": [
+    "tower.blocks.8.mha.q_proj",
+    "tower.blocks.8.mha.k_proj",
+    "tower.blocks.8.mha.v_proj",
+    "tower.blocks.8.mha.linear_embedding",
+    "tower.blocks.8.mlp.fc1",
+    "tower.blocks.8.mlp.fc2"
+  ],
+  "lora_targets": [
+    "tower.blocks.8.mha",
+    "tower.blocks.8.mlp"
+  ],
+  "lora_trainable_parameters": 145920,
+  "loss_implementation": "alphagenome_pytorch.losses.multinomial_loss_on_scaled_prediction_and_target",
+  "loss_metrics": {
+    "count_128bp": 0.40985849499702454,
+    "count_1bp": 0.15836761891841888,
+    "gene_cross_track": 0.14799848198890686,
+    "loss": 27.337594985961914,
+    "loss_128bp": 0.409858763217926,
+    "loss_1bp": 26.91293716430664,
+    "position_128bp": 5.571587280428503e-08,
+    "position_1bp": 5.350914001464844
+  },
+  "means_path": "alphagenome_custom/metadata/v2/track_nonzero_means_v2.tsv",
+  "means_sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
+  "model_specs_sha256": "9a5e9d7002268e0aaa5e6981d152a16c1926192ca5f10ef4c5fccd4e45e2d3b1",
+  "phase": "P5",
+  "scale_implementation": "alphagenome_pytorch.heads.targets_scaling",
+  "schema_version": 1,
+  "split_registry_sha256": "15f3e0b006c5d490904011d6b46e978c3307b1b221bfea23d6024fb3010704ab",
+  "unexpected_base_trainable_parameters": [],
+  "unit_test_count": 79,
+  "unit_tests_return_code": 0,
+  "worm_embedding_finite": true,
+  "worm_embedding_index": 2,
+  "worm_embedding_parameter_elements": 18816,
+  "worm_embedding_paths": [
+    "organism_embed",
+    "embedder_128bp.organism_embed",
+    "embedder_1bp.organism_embed",
+    "embedder_pair.organism_embed"
+  ],
+  "worm_embedding_rows": 3
+}

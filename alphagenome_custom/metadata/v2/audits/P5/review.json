@@ -42,7 +42,7 @@
     },
     {
       "check_id": "R5.09_unit_and_golden_tests",
-      "evidence": "unit_tests=79 return=0",
+      "evidence": "unit_tests=80 return=0",
       "status": "PASS"
     },
     {
@@ -58,7 +58,7 @@
   ],
   "phase": "P5",
   "review": "R5",
-  "reviewed_at": "2026-07-21T12:10:27+00:00",
+  "reviewed_at": "2026-07-22T02:45:18+00:00",
   "schema_version": 1,
   "status": "PASS"
 }

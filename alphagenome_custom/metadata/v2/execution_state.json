@@ -31,7 +31,7 @@
       "updated_at": null
     }
   },
-  "current_phase": "P6B",
+  "current_phase": "P6C",
   "history": [
     {
       "detail": "Phase command started.",
@@ -740,10 +740,178 @@
       "phase": "P6B",
       "status": "PENDING",
       "timestamp": "2026-07-21T12:12:35+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-22T01:57:18+00:00"
+    },
+    {
+      "detail": "P6B controlled stop after the first six-chromosome job exposed validation_core_coverage_fraction=0.8435322914705329. The effective blocks are exactly divisible by 131072 bp, but nearest-window core boundaries were not aligned, so 15.65% of eligible validation bases were omitted. Preserve the invalid/incomplete run evidence, revise manifests to one complete aligned metric core per context row, and rerun R4-R6B before any G5.",
+      "phase": "P4",
+      "status": "REOPENED",
+      "timestamp": "2026-07-22T02:21:14+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P4",
+      "status": "RUNNING",
+      "timestamp": "2026-07-22T02:31:33+00:00"
+    },
+    {
+      "detail": "Operational retry: the managed sandbox denied PyTorch DataLoader multiprocessing socket creation after the v1 evidence archive and v2 manifests completed; rerun the identical G3-scoped P4 command with normal host permissions.",
+      "phase": "P4",
+      "status": "REOPENED",
+      "timestamp": "2026-07-22T02:32:34+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P4",
+      "status": "RUNNING",
+      "timestamp": "2026-07-22T02:32:46+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P4",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-22T02:32:55+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P4",
+      "status": "PASS",
+      "timestamp": "2026-07-22T02:32:56+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P4 PASS.",
+      "phase": "P5",
+      "status": "PENDING",
+      "timestamp": "2026-07-22T02:32:56+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P5",
+      "status": "RUNNING",
+      "timestamp": "2026-07-22T02:32:56+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P5",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-22T02:45:18+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P5",
+      "status": "PASS",
+      "timestamp": "2026-07-22T02:45:18+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P5 PASS.",
+      "phase": "P6A",
+      "status": "PENDING",
+      "timestamp": "2026-07-22T02:45:18+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6A",
+      "status": "RUNNING",
+      "timestamp": "2026-07-22T02:45:18+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P6A",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-22T02:45:37+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P6A",
+      "status": "PASS",
+      "timestamp": "2026-07-22T02:45:37+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P6A PASS.",
+      "phase": "P6B",
+      "status": "PENDING",
+      "timestamp": "2026-07-22T02:45:37+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-22T02:45:37+00:00"
+    },
+    {
+      "detail": "Operational recovery after externally terminated GPU child processes left a stale RUNNING record at eight completed jobs; archive the stale execution and two incomplete B/fold-2 attempts, reuse only hash-verified complete jobs, restart incomplete jobs under the unchanged six-chromosome v2 specification, and keep G5 unapproved.",
+      "phase": "P6B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-22T06:05:37+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-22T06:05:53+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P6B",
+      "status": "FAIL",
+      "timestamp": "2026-07-22T06:05:53+00:00"
+    },
+    {
+      "detail": "Operational retry after the managed sandbox returned nvidia-smi exit 9 before GPU selection or any training; rerun the identical controller command with normal host GPU permissions and preserve all interruption evidence.",
+      "phase": "P6B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-22T06:06:04+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-22T06:06:21+00:00"
+    },
+    {
+      "detail": "Controlled durability migration after both restarted B/fold-2 jobs completed with full coverage: archive the execution at ten completed jobs and two incomplete C/fold-2 logs, then run the identical controller in detached tmux so the remaining long matrix is not tied to the tool PTY; reuse only hash-verified complete jobs and keep G5 unapproved.",
+      "phase": "P6B",
+      "status": "REOPENED",
+      "timestamp": "2026-07-22T06:45:25+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P6B",
+      "status": "RUNNING",
+      "timestamp": "2026-07-22T06:45:53+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P6B",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-23T04:33:06+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P6B",
+      "status": "PASS",
+      "timestamp": "2026-07-23T04:33:10+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P6B PASS.",
+      "phase": "P6C",
+      "status": "PENDING",
+      "timestamp": "2026-07-23T04:33:10+00:00"
+    },
+    {
+      "detail": "Missing scoped approvals: G5:r6c_single_six_chromosome_block_test.",
+      "phase": "P6C",
+      "status": "APPROVAL_REQUIRED",
+      "timestamp": "2026-07-23T04:33:10+00:00"
     }
   ],
   "schema_version": 2,
-  "status": "PENDING",
-  "updated_at": "2026-07-21T12:12:35+00:00",
+  "status": "APPROVAL_REQUIRED",
+  "updated_at": "2026-07-23T04:33:10+00:00",
   "workflow": "c_elegans_rna_seq_v2"
 }
