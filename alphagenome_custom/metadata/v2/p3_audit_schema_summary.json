@@ -1,0 +1,48 @@
+{
+  "ambiguous_legacy_fields_removed": [
+    "source_fastq_urls",
+    "source_fastq_md5",
+    "source_fastq_sha256",
+    "source_fastq_bytes"
+  ],
+  "completed_at": "2026-07-15T10:02:25+00:00",
+  "decoded_total_method": "sum_of_pyBigWig_exact_per_reference_chromosome",
+  "decoded_total_relative_error_max": 0.335199607564,
+  "decoded_total_relative_error_median": 0.0147213008242,
+  "decoded_total_relative_error_min": 1.45256519318e-12,
+  "downloaded_ena_fastq_fields": [
+    "downloaded_ena_fastq_sha256",
+    "downloaded_ena_fastq_bytes",
+    "ena_fastq_expected_record_count"
+  ],
+  "extracted_fastq_fields": [
+    "extracted_fastq_sha256",
+    "extracted_fastq_bytes",
+    "extracted_fastq_record_count"
+  ],
+  "formal_group_member_correction": "rescale decoded sample signal to 1e8 before biological aggregation",
+  "ledger_sha256": "091a0f0aecc711adcd19c5cfb3daabe0cb9f0702c18f670398a92bbc7033947f",
+  "sample_audits": 482,
+  "schema_version": 2,
+  "signal_total_fields": [
+    "output_header_total_signal",
+    "output_decoded_total_signal",
+    "decoded_rescale_to_1e8"
+  ],
+  "source_archive_fields": [
+    "source_archive_url",
+    "source_archive_md5",
+    "source_archive_sha256",
+    "source_archive_bytes"
+  ],
+  "source_reference_fields": [
+    "source_reference_ena_fastq_urls",
+    "source_reference_ena_fastq_md5",
+    "source_reference_ena_fastq_bytes"
+  ],
+  "transport": "mixed",
+  "transport_counts": {
+    "ena_fastq_fallback_after_sra_extraction_failure": 20,
+    "ncbi_sra": 462
+  }
+}

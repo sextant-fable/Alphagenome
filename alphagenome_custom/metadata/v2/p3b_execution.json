@@ -1,0 +1,45 @@
+{
+  "commands": [
+    [
+      "/home/zelinli6/miniconda3/condabin/conda",
+      "run",
+      "--no-capture-output",
+      "-n",
+      "alphagenome",
+      "python",
+      "scripts/run_v2_reprocessing_full.py",
+      "--threads-per-sample",
+      "16",
+      "--workers",
+      "4",
+      "--work-dir",
+      "shared/source_reads/v2/full_streaming",
+      "--output-dir",
+      "alphagenome_custom/tracks/rna_seq_v2_normalized",
+      "--star-index",
+      "shared/reference_indexes/WBcel235_STAR_2.7.11b",
+      "--download-backend",
+      "ncbi_sra"
+    ],
+    [
+      "/home/zelinli6/miniconda3/condabin/conda",
+      "run",
+      "--no-capture-output",
+      "-n",
+      "alphagenome",
+      "python",
+      "scripts/finalize_v2_reprocessed_groups.py"
+    ]
+  ],
+  "completed_at": "2026-07-15T10:05:04+00:00",
+  "download_backend": "ncbi_sra",
+  "free_bytes_at_start": 2137100771328,
+  "log_path": "logs/v2_p3b_20260714/p3b_full.log",
+  "phase": "P3B",
+  "sra_toolkit_archive_sha256": "b950362c054765a4184af41947f022f040e94e964862017c0ecb0b0273db3596",
+  "sra_toolkit_version": "3.4.1",
+  "started_at": "2026-07-15T10:01:54+00:00",
+  "status": "completed",
+  "threads_per_sample": 16,
+  "workers": 4
+}

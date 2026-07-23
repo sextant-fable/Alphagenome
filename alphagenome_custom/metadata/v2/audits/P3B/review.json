@@ -1,0 +1,79 @@
+{
+  "checks": [
+    {
+      "check_id": "R3.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.02_full_scope",
+      "evidence": "rna_runs=482 ledger=482 failures=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.03_normalized_bigwig_integrity",
+      "evidence": "errors=[] count=482",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.04_raw_immutability",
+      "evidence": "changed_or_missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.05_final_membership",
+      "evidence": "groups=241 members=482",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.06_context_and_formal_status",
+      "evidence": "context_errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.07_group_output_integrity",
+      "evidence": "outputs=241 errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.08_replicate_qc",
+      "evidence": "pairs=648/648 groups=83/83 errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.09_duplicate_source_reuse_resolution",
+      "evidence": "pairs=[('SRR12483327', 'SRR13964554'), ('SRR12483328', 'SRR13964555'), ('SRR12483329', 'SRR13964556')]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.10_cleanup_and_partial_safety",
+      "evidence": "partial_files=[] failures=0",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.11_manifest_provenance",
+      "evidence": "tracked manifest digests agree with the P3 group summary",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.12_execution_record",
+      "evidence": "status=completed log=logs/v2_p3b_20260714/p3b_full.log",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.13_sra_transport_provenance",
+      "evidence": "sra_sources=482 total_bytes=722781740735",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R3.14_unambiguous_audit_schema",
+      "evidence": "schema=2 audits=482",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P3B",
+  "review": "R3",
+  "reviewed_at": "2026-07-15T10:13:13+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}
