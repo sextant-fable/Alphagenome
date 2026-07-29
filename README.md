@@ -84,7 +84,8 @@ Alphagenome/
 |   `-- metadata/                    manifests, QC, state, and audit records
 |-- remote_inventory/                small source-file inventories
 |-- docs/                            plans, logs, results, and reproducibility notes
-|-- requirements-torch.txt           minimal legacy PyTorch dependencies
+|-- requirements-torch.txt           lightweight legacy PyTorch dependencies
+|-- requirements.txt                 Python 3.12+ v2 dependencies
 |-- SERVER_README.md                 EEHPC/Slurm reference for the archival host
 `-- AGENTS.md                        repository operating and research-integrity rules
 ```
@@ -105,11 +106,26 @@ source .venv/bin/activate
 python -m pip install -r requirements-torch.txt
 ```
 
-The full v2 workflow also relies on the prepared project environment and local
-assets such as bigWigs, WBcel235 FASTA/GTF files, AlphaGenome weights, and
-bioinformatics tools. Do not regenerate or download those assets merely to
-make a checkout look complete. Confirm the required inputs for the intended
-phase in the execution plan and its audit records first.
+The v2 workflow requires Python 3.12 or newer and a separate environment. Do
+not activate a virtual environment on top of a Conda environment, and do not
+use Python 3.11: it can resolve an older `alphagenome-pytorch` API without the
+`heads`, `losses`, and LoRA modules required by v2.
+
+```bash
+conda create -n alphagenome-v2 python=3.12 -y
+conda activate alphagenome-v2
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m scripts.check_v2_environment
+python -m pytest -q
+```
+
+Install a CUDA-appropriate PyTorch build before the v2 requirements on a GPU
+host. The full v2 workflow also relies on prepared local assets such as
+bigWigs, WBcel235 FASTA/GTF files, AlphaGenome weights, and bioinformatics
+tools. Do not regenerate or download those assets merely to make a checkout
+look complete. Confirm the required inputs for the intended phase in the
+execution plan and its audit records first.
 
 Useful read-only checks:
 

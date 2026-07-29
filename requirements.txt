@@ -1,0 +1,12 @@
+# Full Python dependency set for the audited v2 workflow.
+#
+# Requires Python 3.12 or newer. Do not install this into Python 3.11: pip can
+# resolve an older alphagenome-pytorch API that lacks the heads, losses, and
+# finetuning modules used by v2.
+#
+# On a GPU host, install the CUDA-appropriate PyTorch build before this file.
+# Do not hard-code a CUDA wheel here because it must match the target host.
+numpy>=1.26,<3
+torch>=2.2,<3
+alphagenome-pytorch[finetuning]==0.3.1
+pytest>=8,<10

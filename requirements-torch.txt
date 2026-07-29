@@ -1,2 +1,4 @@
-numpy>=1.26
-torch>=2.2
+# Lightweight legacy utilities only. This does not provide the AlphaGenome v2
+# API; install requirements.txt for v2 training, evaluation, and tests.
+numpy>=1.26,<3
+torch>=2.2,<3
