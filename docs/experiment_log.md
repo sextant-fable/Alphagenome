@@ -34,6 +34,25 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-30 - P8 B-noLoRA Fold-1 Ablation Result
+
+- Run type: exploratory training and development validation.
+- Purpose: isolate the effect of removing LoRA from model B while retaining the trainable third-row C. elegans organism embedding and the 241-track dual-resolution 1 bp/128 bp RNA head.
+- Git commit: `923f58190727f79ae3c8d2f3ce6a36be4b6638e2` (`Register B no LoRA ablation`).
+- Branch and host: `setup/agent-maintenance` on HY-GPU (`hy8`), non-Slurm; physical GPU 3 only.
+- Controller and approval scope: P8 with `G4:p8_b_no_lora_fold1`.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller run --phase P8`.
+- Execution window: `2026-07-30T11:54:24+00:00` to `2026-07-30T12:31:54+00:00` (`2250.2` seconds).
+- Input data: 241 uniformly reprocessed/grouped WBcel235 RNA-seq tracks, fold-1 train/validation manifests, fold-1 train-only means, and the hash-locked B/paper fold-1 seed-`20260714` checkpoint and validation artifact.
+- Architecture and training: `B_no_lora` used the same fold `1`, seed `20260714`, paper loss, 2,000 steps, 131,072 bp contexts, learning rate `1e-4`, gene weight `0.1`, +/-1,024 bp shifts, reverse-complement probability `0.5`, hidden channels `64`, and fold-1 training mean as B/paper. It retained the C. elegans embedding and dual-resolution RNA head but set `lora_enabled=false`, `lora_target_modules=[]`, and `trunk_policy=worm_embeddings_only`. It trained `1,130,308` parameters, versus `1,276,228` for the matched B baseline.
+- Output path: ignored artifacts in `runs/v2_p8_b_no_lora_fold1_20260730/` and `logs/v2_p8_b_no_lora_fold1_20260730/`; tracked execution, comparison, and review records in `alphagenome_custom/metadata/v2/`.
+- Result summary: across all 83 complete non-overlapping fold-1 development cores (10,878,976 bases; coverage `1.0`), B-noLoRA achieved primary biological score `0.509567111366191`, gene-exon coverage Pearson `0.443595944040327`, and mean 128 bp per-track Pearson `0.575538278692054`.
+- Matched B/paper comparator: `0.602161323942477`, `0.566838838705920`, and `0.637483809179034`, respectively. B-noLoRA minus B was `-0.092594212576286` for the composite, `-0.123242894665593` for gene-exon Pearson, and `-0.061945530486979` for 128 bp Pearson.
+- Verification: R8 passed all seven checks, including the exact embedding-only/no-LoRA contract, complete development coverage, locked-input hashes, paired baseline comparison, controller scope, and preservation of the P6C lock/report hashes. Candidate checkpoint SHA-256: `d0e3f0ca5543dcec520bf4b65d24474411050bb7d674b7659f620de063897c0b`.
+- Final-test boundary: final-test access was prohibited and `locked_test_block_signal_reads=0`; this run did not alter the selected P6B model or P6C result.
+- Interpretation: for this exact fold and seed, LoRA is materially beneficial in the B design. The result does not quantify a general effect across folds or seeds, so it is evidence against removing LoRA by default, not a new formal selection.
+- Claim status: verified for this single-fold development comparison; unverified for a general LoRA-effect estimate.
+
 ## 2026-07-30 - P8 B-noLoRA Fold-1 Ablation Preregistration
 
 - Run type: exploratory training and development validation.

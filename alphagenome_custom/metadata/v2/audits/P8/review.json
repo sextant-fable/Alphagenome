@@ -1,0 +1,44 @@
+{
+  "checks": [
+    {
+      "check_id": "R8.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R8.02_locked_inputs",
+      "evidence": "errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R8.03_embedding_only_training_contract",
+      "evidence": "gpu=3 no_lora=True path_errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R8.04_development_validation",
+      "evidence": "coverage=1.0",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R8.05_matched_baseline_comparison",
+      "evidence": "delta=-0.0925942125762863",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R8.06_final_test_preserved",
+      "evidence": "P6C lock and report hashes unchanged",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R8.07_controller_scope",
+      "evidence": "phase=P8",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P8",
+  "review": "R8-b-no-lora-fold1",
+  "reviewed_at": "2026-07-30T12:31:54+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

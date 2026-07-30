@@ -2,6 +2,15 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-30 - P8 B-noLoRA Fold-1 Ablation Result
+
+- Execution: P8 completed on HY-GPU physical GPU 3 from `2026-07-30T11:54:24+00:00` to `2026-07-30T12:31:54+00:00` under `G4:p8_b_no_lora_fold1`, using execution commit `923f58190727f79ae3c8d2f3ce6a36be4b6638e2`.
+- Controlled difference: B-noLoRA preserved B's newly added trainable third-row C. elegans organism embedding and 241-track dual 1 bp/128 bp RNA head. It removed all LoRA modules (`lora_enabled=false`, empty target list) and kept original trunk policy `worm_embeddings_only`. The candidate trained `1,130,308` parameters, `145,920` fewer than matched B/paper (`1,276,228`).
+- Matched development contract: fold `1`, seed `20260714`, paper loss, 2,000 steps, 131,072 bp contexts, learning rate `1e-4`, gene weight `0.1`, standard shift/reverse-complement augmentation, hidden channels `64`, and the fold-1 train-only mean. All 83 registered development cores were evaluated, covering `10,878,976` bases at coverage `1.0`.
+- Result: B-noLoRA obtained primary biological score `0.509567111366191`, gene-exon coverage Pearson `0.443595944040327`, and mean 128 bp per-track Pearson `0.575538278692054`. Exact matched B/paper was `0.602161323942477`, `0.566838838705920`, and `0.637483809179034`; candidate-minus-baseline deltas were `-0.092594212576286`, `-0.123242894665593`, and `-0.061945530486979`.
+- Interpretation: in this one controlled fold/seed comparison, removing LoRA substantially harms every primary biological metric, so the current evidence does not support dropping LoRA. It remains a single-fold development ablation, not a replacement for the P6B selection or a general cross-fold estimate.
+- Test preservation and review: `locked_test_block_signal_reads=0`, final-test access was prohibited, and R8 passed all seven checks, including unchanged P6C lock/report hashes. The machine-readable records are `p8_b_no_lora_fold1_execution.json`, `p8_b_no_lora_fold1_comparison.json`, and `audits/P8/review.json`.
+
 ## 2026-07-30 - P8 B-noLoRA Fold-1 Ablation Registration
 
 - User scope: one matched fold-1 B-noLoRA run retaining the third C. elegans organism embedding and dual RNA head while removing LoRA. This is development-only, does not retune the formal selection, and may not access the consumed final-test blocks.
