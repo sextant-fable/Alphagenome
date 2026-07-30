@@ -2,6 +2,16 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-30 - P7 Legacy 1bp-B Architecture Port Result
+
+- Execution: P7 completed on HY-GPU physical GPU 2 from `2026-07-30T07:57:40+00:00` to `2026-07-30T08:33:08+00:00` under `G4:p7_single_legacy_residual_fold1`. The implementation used commit `b2501f1`; the controller/runner execution commit was `f5e375746b249bd7df25f60e51bca0b1dbef8111`.
+- Data and topology: all 241 current uniformly reprocessed RNA-seq tracks were used. A new 241-track 128 bp Conv5 base head was trained for 2,000 steps, frozen (SHA-256 `7b8300b2230fed406ab930e52eed37a5a3eacb07ec72e1f64548c26552f327f2`), then its frozen 1 bp interpolation received the legacy 128-channel-bottleneck Conv5 residual trained for 1,500 steps. Historical 11-track weights were not dimension-compatible with the new targets.
+- Development result: across all 83 complete fold-1 development cores (10,878,976 bases; coverage `1.0`), D/paper seed `20260714` achieved primary biological score `0.602707560944138`, gene-exon coverage Pearson `0.564589786166844`, and mean 128 bp per-track Pearson `0.640825335721432`.
+- Matched B/paper comparator: `0.602161323942477`, `0.566838838705920`, and `0.637483809179034`, respectively. D minus B was `+0.000546237001661` for the composite, `-0.002249052539076` for gene-exon Pearson, and `+0.003341526542398` for 128 bp Pearson.
+- Interpretation: this one-fold/one-seed architecture check is effectively mixed/near-neutral, not a new selection. It cannot supersede P6B's formal selection or P6C's already-consumed final evaluation.
+- Test preservation: `locked_test_block_signal_reads=0`, final-test access was prohibited, and R7 verified unchanged P6C lock/report hashes. P7 did evaluate the six-chromosome development split, including its registered development X blocks, but not locked final-test blocks.
+- Review: R7 passed all required-output, locked-input, training-contract, coverage, baseline-comparison, final-test-preservation, and controller-scope checks. Machine-readable records are `p7_legacy_residual_fold1_execution.json`, `p7_legacy_residual_fold1_comparison.json`, and `audits/P7/review.json`.
+
 ## 2026-07-30 - P7 Legacy 1bp-B Architecture Port Registration
 
 - User scope: one fold-1 run of the pre-new-data 1bp-B structure on all 241 current v2 tracks, with a result reported against the matched existing B/paper fold-1 baseline.

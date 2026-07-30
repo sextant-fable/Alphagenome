@@ -34,6 +34,25 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-30 - P7 Legacy 1bp-B Architecture Port Result
+
+- Run type: exploratory training and development validation.
+- Purpose: execute the user-requested single fold-1 comparison of the pre-new-data 1bp-B architecture on all 241 current v2 RNA-seq tracks against the exact matched B/paper baseline.
+- Git commit: `f5e375746b249bd7df25f60e51bca0b1dbef8111` (runner registration); model implementation commit `b2501f1`.
+- Branch and host: `setup/agent-maintenance` on HY-GPU (`hy8`), non-Slurm; physical GPU 2 only.
+- Controller and approval scope: P7 with `G4:p7_single_legacy_residual_fold1`.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller run --phase P7`.
+- Execution window: `2026-07-30T07:57:40+00:00` to `2026-07-30T08:33:08+00:00` (`2127.595` seconds).
+- Input data: 241 uniformly reprocessed/grouped RNA-seq tracks, WBcel235, fold-1 train/validation manifests, and fold-1 train-only means. Development validation evaluated 83 complete non-overlapping 131,072 bp cores (10,878,976 bases) across chromosomes I, II, III, IV, V, and X.
+- Architecture and training: a 128 bp Conv5 base head was trained for 2,000 steps and frozen (SHA-256 `7b8300b2230fed406ab930e52eed37a5a3eacb07ec72e1f64548c26552f327f2`); the legacy-style 1 bp 128-channel-bottleneck Conv5 residual was then trained for 1,500 steps. Both stages used seed `20260714`, paper loss, 131,072 bp contexts, standard augmentation, and the fold-1 train-only mean. The historical 11-track weights were not loadable into the 241-track target space, so this is a topology port, not a direct old-weight continuation.
+- Output path: ignored artifacts in `runs/v2_p7_legacy_residual_fold1_20260730/` and `logs/v2_p7_legacy_residual_fold1_20260730/`; tracked execution, comparison, and review records in `alphagenome_custom/metadata/v2/`.
+- Result summary: relative to matched B/paper fold 1 seed `20260714`, the primary biological score was `0.602707560944138` versus `0.602161323942477` (delta `+0.000546237001661`). Gene-exon coverage Pearson was `0.564589786166844` versus `0.566838838705920` (delta `-0.002249052539076`); mean 128 bp per-track Pearson was `0.640825335721432` versus `0.637483809179034` (delta `+0.003341526542398`).
+- Verification: 241/241 per-track 128 bp Pearson values were finite; validation-core coverage was `1.0`; R7 passed all seven checks; the residual checkpoint SHA-256 is `fcb64fef45f0dc1da9b9036bfa8d5a61756829cee1955414a3b9538b2b77a5fd`.
+- Final-test boundary: `locked_test_block_signal_reads=0`; no P6C test claim was supplied; R7 verified the final-test lock/report hashes remained unchanged.
+- Failures or warnings: no execution failure. This is one fold and one seed only. The tiny composite increase combines a lower gene-exon Pearson with a higher 128 bp Pearson, so it is not evidence that the residual architecture is generally superior and does not alter the P6B selection or P6C result.
+- Next actions: retain this as the requested bounded result; do not use the consumed final test for follow-up tuning. Any broader confirmation needs separately authorized development-only replication.
+- Claim status: verified for this single-fold measurement; unverified for general architecture superiority.
+
 ## 2026-07-30 - P7 Legacy 1bp-B Architecture Port Preregistration
 
 - Run type: exploratory training and development validation

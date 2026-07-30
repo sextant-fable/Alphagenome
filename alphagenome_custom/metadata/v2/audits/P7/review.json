@@ -1,0 +1,44 @@
+{
+  "checks": [
+    {
+      "check_id": "R7.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R7.02_locked_inputs",
+      "evidence": "errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R7.03_training_contract",
+      "evidence": "gpu=2 path_errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R7.04_development_validation",
+      "evidence": "coverage=1.0",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R7.05_matched_baseline_comparison",
+      "evidence": "delta=0.0005462370016612317",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R7.06_final_test_preserved",
+      "evidence": "P6C lock and report hashes unchanged",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R7.07_controller_scope",
+      "evidence": "phase=P7",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P7",
+  "review": "R7-legacy-residual-fold1",
+  "reviewed_at": "2026-07-30T08:33:08+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

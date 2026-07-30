@@ -20,9 +20,9 @@
     },
     "G4_gpu_experiments": {
       "approved": true,
-      "note": "User directed later GPU phases to find available GPUs and proceed; enforce project policy to prefer GPU 2/3 and never interrupt unrelated processes.",
-      "scope": "r6_gpu_auto_available_2_3",
-      "updated_at": "2026-07-13T16:35:12+00:00"
+      "note": "User requested one fold-1 legacy 1bp-B architecture port on all 241 v2 tracks; development validation only with no final-test access.",
+      "scope": "p7_single_legacy_residual_fold1",
+      "updated_at": "2026-07-30T07:57:31+00:00"
     },
     "G5_final_test": {
       "approved": true,
@@ -31,7 +31,7 @@
       "updated_at": "2026-07-23T04:49:53+00:00"
     }
   },
-  "current_phase": "P6C",
+  "current_phase": "P7",
   "history": [
     {
       "detail": "Phase command started.",
@@ -932,10 +932,40 @@
       "phase": "P6C",
       "status": "PASS",
       "timestamp": "2026-07-23T04:53:57+00:00"
+    },
+    {
+      "detail": "User requested one fold-1 legacy 1bp-B architecture port on all 241 v2 tracks; development validation only and no final-test access.",
+      "phase": "P7",
+      "status": "PENDING",
+      "timestamp": "2026-07-30T07:57:31+00:00"
+    },
+    {
+      "detail": "scope=p7_single_legacy_residual_fold1; User requested one fold-1 legacy 1bp-B architecture port on all 241 v2 tracks; development validation only with no final-test access.",
+      "phase": "P7",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-07-30T07:57:31+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P7",
+      "status": "RUNNING",
+      "timestamp": "2026-07-30T07:57:40+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P7",
+      "status": "REVIEWING",
+      "timestamp": "2026-07-30T08:33:08+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P7",
+      "status": "PASS",
+      "timestamp": "2026-07-30T08:33:08+00:00"
     }
   ],
   "schema_version": 2,
   "status": "COMPLETE",
-  "updated_at": "2026-07-23T04:53:57+00:00",
+  "updated_at": "2026-07-30T08:33:08+00:00",
   "workflow": "c_elegans_rna_seq_v2"
 }
