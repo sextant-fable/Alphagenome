@@ -2,6 +2,15 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-30 - P7 Legacy 1bp-B Architecture Port Registration
+
+- User scope: one fold-1 run of the pre-new-data 1bp-B structure on all 241 current v2 tracks, with a result reported against the matched existing B/paper fold-1 baseline.
+- Architecture fidelity: the 128 bp Conv5 base head is trained on the new target space then frozen; the 1 bp head uses the legacy 128-channel bottleneck plus Conv5 residual correction. The old 11-track checkpoint cannot be loaded because its output dimensions do not match 241 v2 tracks.
+- Locked development contract: fold `1`, seed `20260714`, paper loss, 131,072 bp windows, fold-1 train-only means, 2,000 base-head steps followed by 1,500 residual steps. The B/paper baseline checkpoint, baseline validation report, manifests, means, split registry, and completed P6C lock/report are SHA-256 bound in `p7_legacy_residual_fold1_spec.json`.
+- Final-test preservation: P7 prohibits `--final-test`, uses only `fold_1/valid.tsv`, and R7 verifies that the already-consumed P6C lock/report hashes are unchanged. It may not alter the formal selection or final-test conclusion.
+- Controller boundary: the new P7 entry point is allowed only from completed P6C and requires the distinct `G4:p7_single_legacy_residual_fold1` approval. The registered implementation commit is `b2501f1`.
+- Status: registered and pending execution; no P7 signal read or model result yet.
+
 ## 2026-07-22 - P6B External Interruption Recovery
 
 - Observation: the corrected six-chromosome P6B controller stopped making progress after `2026-07-22T04:51:55+00:00`. At audit time, no AlphaGenome process remained on physical GPU 2 or 3, while the live execution record was stale at `running`, with eight completed jobs, zero recorded failures, and zero locked-test reads.

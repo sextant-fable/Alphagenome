@@ -34,6 +34,23 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-30 - P7 Legacy 1bp-B Architecture Port Preregistration
+
+- Run type: exploratory training and development validation
+- Purpose: At the user's request, port the pre-new-data 1bp-B frozen-base residual architecture to the current 241 uniformly reprocessed v2 tracks and measure it once on the matched fold-1 development validation split.
+- Git commit: `b2501f1` (`Run legacy residual architecture port`).
+- Branch: `setup/agent-maintenance`.
+- Planned host and GPU policy: HY-GPU (`hy8`), one idle physical GPU selected from 2 then 3; no use of GPUs 0/1 and no modification of unrelated processes.
+- Controller and approval scope: start `P7` only from completed `P6C`, then require `G4:p7_single_legacy_residual_fold1`.
+- Registered commands: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller start-p7-legacy-residual`; `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller approve --gate G4 --scope p7_single_legacy_residual_fold1 --note "User-requested one fold-1 legacy 1bp-B architecture port"`; `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller run --phase P7`.
+- Input data: 241 grouped RNA-seq tracks on WBcel235, fold-1 train/validation manifests, fold-1 train-only means, and the locked B/paper fold-1 seed-`20260714` baseline validation artifact. All input hashes are bound in `alphagenome_custom/metadata/v2/p7_legacy_residual_fold1_spec.json`.
+- Training contract: train a 128 bp Conv5 base head for 2,000 steps, freeze its checkpoint, then train the 1 bp 128-channel-bottleneck Conv5 residual for 1,500 steps. Both stages use fold 1, seed `20260714`, paper loss, 131,072 bp windows, identical augmentation, and the fold-1 train-only mean column.
+- Output path: ignored `runs/v2_p7_legacy_residual_fold1_20260730/` and `logs/v2_p7_legacy_residual_fold1_20260730/`; tracked execution/comparison/review records under `alphagenome_custom/metadata/v2/` and `alphagenome_custom/metadata/v2/audits/P7/`.
+- Test boundary: final-test access is prohibited. P7 verifies that the completed P6C lock and report hashes remain unchanged; it does not create a claim or open any locked final-test signal.
+- Planned comparison: primary biological score, gene-exon coverage Pearson, and 128 bp per-track Pearson against the exact B/paper fold-1 seed-`20260714` baseline. This is one fold/one seed and cannot replace the P6B selection or P6C result.
+- Status: preregistered before execution; no GPU job has started and no P7 result exists yet.
+- Claim status: preregistered, not a result.
+
 ## 2026-07-23 - One-Time Six-Chromosome P6C Final Test
 
 - Run type: final evaluation and completion review
