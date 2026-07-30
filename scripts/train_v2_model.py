@@ -25,11 +25,47 @@ from scripts import v2_training_components as components
 REPO_ROOT = Path(__file__).resolve().parents[1]
 METADATA_DIR = REPO_ROOT / "alphagenome_custom/metadata/v2"
 WEIGHTS_PATH = REPO_ROOT / "weights/alphagenome_pytorch/model_all_folds.safetensors"
+B_MODEL_IDS = {"B", "B_no_lora"}
+LORA_TARGET_MODULES = ["tower.blocks.8.mha", "tower.blocks.8.mlp"]
+
+
+def adaptation_metadata(model_id: str) -> dict[str, object]:
+    if model_id == "B":
+        return {
+            "base_organism_index": 2,
+            "c_elegans_organism_embedding": True,
+            "lora_enabled": True,
+            "lora_rank": 8,
+            "lora_alpha": 16,
+            "lora_target_modules": LORA_TARGET_MODULES,
+            "trunk_policy": "worm_embeddings_and_lora_only",
+        }
+    if model_id == "B_no_lora":
+        return {
+            "base_organism_index": 2,
+            "c_elegans_organism_embedding": True,
+            "lora_enabled": False,
+            "lora_rank": None,
+            "lora_alpha": None,
+            "lora_target_modules": [],
+            "trunk_policy": "worm_embeddings_only",
+        }
+    return {
+        "base_organism_index": 0 if model_id in {"A", "D_base", "D"} else None,
+        "c_elegans_organism_embedding": False,
+        "lora_enabled": False,
+        "lora_rank": None,
+        "lora_alpha": None,
+        "lora_target_modules": [],
+        "trunk_policy": "frozen" if model_id != "C" else "from_scratch",
+    }
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=["A", "B", "C", "D_base", "D"], required=True)
+    parser.add_argument(
+        "--model", choices=["A", "B", "B_no_lora", "C", "D_base", "D"], required=True
+    )
     parser.add_argument("--fold", type=int, choices=range(0, 6), default=1)
     parser.add_argument("--seed", type=int, default=20260714)
     parser.add_argument("--loss", choices=["paper", "log1p_mse"], default="paper")
@@ -148,16 +184,19 @@ def build_model(
         ).to(device)
         model.load_frozen_base_state(checkpoint.get("trainable_model_state", {}))
         return model
+    if model_id not in B_MODEL_IDS:
+        raise ValueError(f"Unsupported model {model_id}")
     components.add_c_elegans_organism_embeddings(base_model)
     base_model.encoder.gradient_checkpointing = True
     base_model.tower.gradient_checkpointing = True
     base_model.decoder.gradient_checkpointing = True
-    apply_lora(
-        base_model,
-        target_modules=["tower.blocks.8.mha", "tower.blocks.8.mlp"],
-        rank=8,
-        alpha=16,
-    )
+    if model_id == "B":
+        apply_lora(
+            base_model,
+            target_modules=LORA_TARGET_MODULES,
+            rank=8,
+            alpha=16,
+        )
     return components.AlphaGenomeRnaModel(
         base_model,
         n_tracks=fold_means.numel(),
@@ -332,6 +371,7 @@ def main() -> None:
             "gene_weight": args.gene_weight,
             "max_shift_bp": args.max_shift_bp,
             "reverse_complement_probability": args.reverse_complement_probability,
+            "adaptation": adaptation_metadata(args.model),
             "frozen_base_checkpoint": args.frozen_base_checkpoint,
             "frozen_base_checkpoint_sha256": (
                 sha256(frozen_base_checkpoint)
@@ -371,6 +411,7 @@ def main() -> None:
         "gene_weight": args.gene_weight,
         "max_shift_bp": args.max_shift_bp,
         "reverse_complement_probability": args.reverse_complement_probability,
+        "adaptation": adaptation_metadata(args.model),
         "frozen_base_checkpoint": args.frozen_base_checkpoint,
         "frozen_base_checkpoint_sha256": (
             sha256(frozen_base_checkpoint)

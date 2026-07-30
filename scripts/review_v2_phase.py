@@ -3639,6 +3639,188 @@ def review_p7() -> dict[str, Any]:
     }
 
 
+def review_p8() -> dict[str, Any]:
+    """Review the bounded B-noLoRA development ablation."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    paths = {
+        "spec": metadata_dir / "p8_b_no_lora_fold1_spec.json",
+        "execution": metadata_dir / "p8_b_no_lora_fold1_execution.json",
+        "comparison": metadata_dir / "p8_b_no_lora_fold1_comparison.json",
+    }
+    missing = [
+        str(path.relative_to(REPO_ROOT))
+        for path in paths.values()
+        if not path.is_file()
+    ]
+    checks = [check("R8.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P8",
+            "review": "R8-b-no-lora-fold1",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    spec = json.loads(paths["spec"].read_text())
+    execution = json.loads(paths["execution"].read_text())
+    comparison = json.loads(paths["comparison"].read_text())
+    state = json.loads((metadata_dir / "execution_state.json").read_text())
+    spec_sha = sha256(paths["spec"])
+    input_errors = []
+    for key, relative in spec.get("locked_inputs", {}).items():
+        try:
+            if sha256(repository_file(relative)) != spec["input_sha256"][key]:
+                input_errors.append(key)
+        except Exception:
+            input_errors.append(key)
+    required_execution_paths = ("run_path", "checkpoint_path", "validation_path", "log_path")
+    paths_from_execution = {
+        key: repository_file(execution.get(key, ""))
+        for key in required_execution_paths
+        if execution.get(key)
+    }
+    execution_path_errors = [
+        key
+        for key in required_execution_paths
+        if key not in paths_from_execution or not paths_from_execution[key].is_file()
+    ]
+    run: dict[str, Any] = {}
+    validation: dict[str, Any] = {}
+    candidate_metrics: dict[str, Any] = {}
+    validation_ok = False
+    try:
+        run = json.loads(paths_from_execution["run_path"].read_text())
+        validation = json.loads(paths_from_execution["validation_path"].read_text())
+        primary = validation["full_metrics"]["primary"]
+        candidate_metrics = comparison["candidate"]
+        expected_primary = 0.5 * float(
+            primary["mean_per_track_gene_exon_coverage_pearson_log1p"]
+        ) + 0.5 * float(primary["mean_per_track_pearson_128bp_log1p"])
+        validation_ok = (
+            validation.get("schema_version") == 2
+            and validation.get("model") == "B_no_lora"
+            and validation.get("training_loss") == "paper"
+            and validation.get("fold") == 1
+            and validation.get("locked_test_block_signal_reads") is False
+            and validation.get("chromosome_x_train_valid_blocks_read") is True
+            and set(validation.get("evaluated_chromosomes", []))
+            == {"I", "II", "III", "IV", "V", "X"}
+            and float(validation.get("validation_core_coverage_fraction", 0)) >= 0.999
+            and int(validation.get("finite_per_track_pearson_128bp", 0)) == 241
+            and math.isclose(
+                float(candidate_metrics["primary_biological_score"]),
+                expected_primary,
+                rel_tol=1e-12,
+                abs_tol=1e-12,
+            )
+        )
+    except Exception:
+        validation_ok = False
+    adaptation = run.get("adaptation", {})
+    no_lora_contract = (
+        adaptation.get("base_organism_index") == 2
+        and adaptation.get("c_elegans_organism_embedding") is True
+        and adaptation.get("lora_enabled") is False
+        and adaptation.get("lora_rank") is None
+        and adaptation.get("lora_alpha") is None
+        and adaptation.get("lora_target_modules") == []
+        and adaptation.get("trunk_policy") == "worm_embeddings_only"
+    )
+    training = spec.get("training", {})
+    execution_ok = (
+        not execution_path_errors
+        and execution.get("phase") == "P8"
+        and execution.get("status") == "completed"
+        and execution.get("model") == "B_no_lora"
+        and execution.get("loss") == "paper"
+        and execution.get("fold") == 1
+        and execution.get("seed") == 20260714
+        and execution.get("final_test_access") == "prohibited"
+        and execution.get("locked_test_block_signal_reads") == 0
+        and int(execution.get("physical_gpu", -1)) in {2, 3}
+        and execution.get("spec_sha256") == spec_sha
+        and execution.get("checkpoint_sha256")
+        == sha256(paths_from_execution["checkpoint_path"])
+        and execution.get("validation_sha256")
+        == sha256(paths_from_execution["validation_path"])
+        and execution.get("comparison_sha256") == sha256(paths["comparison"])
+        and execution.get("candidate_adaptation") == adaptation
+        and run.get("model") == "B_no_lora"
+        and run.get("loss") == "paper"
+        and run.get("fold") == 1
+        and run.get("seed") == 20260714
+        and run.get("steps") == training.get("max_steps") == 2000
+        and run.get("n_tracks") == 241
+        and run.get("intervals_sha256") == spec["input_sha256"]["fold_1_train"]
+        and run.get("means_sha256") == spec["input_sha256"]["means"]
+        and no_lora_contract
+        and paths_from_execution["log_path"].stat().st_size > 0
+    )
+    baseline = comparison.get("baseline", {})
+    candidate = comparison.get("candidate", {})
+    delta = comparison.get("delta", {})
+    baseline_ok = (
+        baseline.get("model") == "B"
+        and baseline.get("loss") == "paper"
+        and baseline.get("fold") == 1
+        and baseline.get("seed") == 20260714
+        and baseline.get("checkpoint_sha256")
+        == spec["input_sha256"]["baseline_checkpoint"]
+        and candidate.get("adaptation") == adaptation
+        and comparison.get("spec_sha256") == spec_sha
+        and math.isclose(
+            float(comparison.get("primary_biological_score_delta", "nan")),
+            float(candidate.get("primary_biological_score", "nan"))
+            - float(baseline.get("primary_biological_score", "nan")),
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        )
+        and "primary_biological_score" in delta
+    )
+    lock = repository_file(spec["locked_inputs"]["final_test_lock"])
+    report = repository_file(spec["locked_inputs"]["final_test_report"])
+    lock_data = json.loads(lock.read_text())
+    checks.extend(
+        [
+            check("R8.02_locked_inputs", not input_errors, f"errors={input_errors}"),
+            check(
+                "R8.03_embedding_only_training_contract",
+                execution_ok,
+                f"gpu={execution.get('physical_gpu')} no_lora={no_lora_contract} path_errors={execution_path_errors}",
+            ),
+            check("R8.04_development_validation", validation_ok, f"coverage={validation.get('validation_core_coverage_fraction')}"),
+            check("R8.05_matched_baseline_comparison", baseline_ok, f"delta={comparison.get('primary_biological_score_delta')}"),
+            check(
+                "R8.06_final_test_preserved",
+                lock_data.get("test_consumed") is True
+                and lock_data.get("test_status") == "completed"
+                and sha256(lock) == spec["input_sha256"]["final_test_lock"]
+                and sha256(report) == spec["input_sha256"]["final_test_report"],
+                "P6C lock and report hashes unchanged",
+            ),
+            check(
+                "R8.07_controller_scope",
+                state.get("current_phase") == "P8"
+                and state.get("approvals", {}).get("G4_gpu_experiments", {}).get("scope")
+                == "p8_b_no_lora_fold1",
+                f"phase={state.get('current_phase')}",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P8",
+        "review": "R8-b-no-lora-fold1",
+        "reviewed_at": utc_now(),
+        "status": "PASS"
+        if all(item["status"] == "PASS" for item in checks)
+        else "FAIL",
+        "checks": checks,
+    }
+
+
 def write_report(report: dict[str, Any]) -> None:
     audit_dir = AUDIT_ROOT / report["phase"]
     audit_dir.mkdir(parents=True, exist_ok=True)
@@ -3678,6 +3860,7 @@ def parse_args() -> argparse.Namespace:
             "P6B",
             "P6C",
             "P7",
+            "P8",
         ],
     )
     return parser.parse_args()
@@ -3705,8 +3888,10 @@ def main() -> None:
         report = review_p6b()
     elif args.phase == "P6C":
         report = review_p6c()
-    else:
+    elif args.phase == "P7":
         report = review_p7()
+    else:
+        report = review_p8()
     assert report is not None
     write_report(report)
     print(json.dumps(report, indent=2, sort_keys=True))

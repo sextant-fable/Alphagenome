@@ -547,6 +547,12 @@ MODEL_SPECS = (
         2,
         "worm_embeddings_and_lora_only",
     ),
+    ModelSpec(
+        "B_no_lora",
+        "new C. elegans embedding and dual RNA head without LoRA",
+        2,
+        "worm_embeddings_only",
+    ),
     ModelSpec("C", "residual sequence baseline trained from scratch", None, "from_scratch"),
     ModelSpec(
         "D",

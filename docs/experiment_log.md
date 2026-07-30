@@ -34,6 +34,24 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-07-30 - P8 B-noLoRA Fold-1 Ablation Preregistration
+
+- Run type: exploratory training and development validation.
+- Purpose: At the user's request, isolate the effect of removing LoRA from model B while retaining the C. elegans organism embedding and the same 241-track dual-resolution RNA head.
+- Git commit: pending implementation commit; the exact execution commit is recorded in the P8 machine-readable execution artifact.
+- Branch: `setup/agent-maintenance`.
+- Planned host and GPU policy: HY-GPU (`hy8`), one idle physical GPU selected from 2 then 3; no use of GPUs 0/1 and no modification of unrelated processes.
+- Controller and approval scope: start `P8` only after completed P7, then require `G4:p8_b_no_lora_fold1`.
+- Registered commands: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller start-p8-b-no-lora`; `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller approve --gate G4 --scope p8_b_no_lora_fold1 --note "User-requested matched B-noLoRA fold-1 development ablation"`; `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.v2_phase_controller run --phase P8`.
+- Input data: 241 grouped RNA-seq tracks on WBcel235, fold-1 train/validation manifests, fold-1 train-only means, and the locked B/paper fold-1 seed-`20260714` validation artifact. All input hashes are bound in `alphagenome_custom/metadata/v2/p8_b_no_lora_fold1_spec.json`.
+- Training contract: model `B_no_lora`, fold `1`, seed `20260714`, paper loss, 2,000 steps, 131,072 bp windows, learning rate `1e-4`, weight decay `1e-4`, gene weight `0.1`, +/-1,024 bp shift augmentation, reverse-complement probability `0.5`, and fold-1 train-only target means.
+- Architecture contract: preserve model B's third-row trainable C. elegans embedding, direct dual-resolution 1 bp/128 bp RNA head, and frozen original trunk parameters. Do not install any LoRA module; the run record must state `lora_enabled=false` with an empty LoRA target-module list.
+- Output path: ignored `runs/v2_p8_b_no_lora_fold1_20260730/` and `logs/v2_p8_b_no_lora_fold1_20260730/`; tracked execution/comparison/review records under `alphagenome_custom/metadata/v2/` and `alphagenome_custom/metadata/v2/audits/P8/`.
+- Test boundary: final-test access is prohibited. P8 verifies that the completed P6C lock and report hashes remain unchanged; it does not create a final-test claim or open any locked final-test signal.
+- Planned comparison: primary biological score, gene-exon coverage Pearson, and 128 bp per-track Pearson against exact B/paper fold-1 seed-`20260714`. This is one fold/one seed and cannot identify a general LoRA effect or replace the P6B selection/P6C result.
+- Status: preregistered before execution; no P8 GPU job has started and no P8 result exists yet.
+- Claim status: preregistered, not a result.
+
 ## 2026-07-30 - P7 Legacy 1bp-B Architecture Port Result
 
 - Run type: exploratory training and development validation.

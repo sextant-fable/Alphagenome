@@ -2,6 +2,14 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-07-30 - P8 B-noLoRA Fold-1 Ablation Registration
+
+- User scope: one matched fold-1 B-noLoRA run retaining the third C. elegans organism embedding and dual RNA head while removing LoRA. This is development-only, does not retune the formal selection, and may not access the consumed final-test blocks.
+- Locked contract: fold `1`, seed `20260714`, paper loss, 2,000 steps, 131,072 bp contexts, standard shift/reverse-complement augmentation, and fold-1 train-only means. The exact B/paper fold-1 baseline checkpoint/validation artifact, manifests, means, split registry, and completed P6C lock/report are SHA-256 bound in `p8_b_no_lora_fold1_spec.json`.
+- Architecture audit: `B_no_lora` expands and trains only the new third-row C. elegans organism embeddings, retains the 241-track direct dual-resolution RNA head, and has no LoRA modules. The trained run record and R8 review require `lora_enabled=false`, an empty LoRA target list, and `trunk_policy=worm_embeddings_only`.
+- Controller boundary: P8 can start only after P7 is complete and requires the distinct `G4:p8_b_no_lora_fold1` scope. Its commands reject `--final-test`; R8 verifies that the P6C lock/report hashes remain unchanged.
+- Status: registered and pending execution; no P8 signal read or model result yet.
+
 ## 2026-07-30 - P7 Legacy 1bp-B Architecture Port Result
 
 - Execution: P7 completed on HY-GPU physical GPU 2 from `2026-07-30T07:57:40+00:00` to `2026-07-30T08:33:08+00:00` under `G4:p7_single_legacy_residual_fold1`. The implementation used commit `b2501f1`; the controller/runner execution commit was `f5e375746b249bd7df25f60e51bca0b1dbef8111`.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 from pathlib import Path
 import tempfile
 
@@ -17,6 +18,51 @@ from scripts import train_v2_model
 
 
 class V2TrainingComponentsTest(unittest.TestCase):
+    def test_b_no_lora_keeps_worm_embedding_path_without_installing_lora(self) -> None:
+        class Settings:
+            gradient_checkpointing = False
+
+        class FakeBase(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.anchor = torch.nn.Parameter(torch.ones(1))
+                self.encoder = Settings()
+                self.tower = Settings()
+                self.decoder = Settings()
+
+        base = FakeBase()
+        with (
+            mock.patch.object(
+                train_v2_model.AlphaGenome, "from_pretrained", return_value=base
+            ),
+            mock.patch.object(
+                components, "add_c_elegans_organism_embeddings", return_value=[]
+            ) as add_embeddings,
+            mock.patch.object(train_v2_model, "apply_lora") as apply_lora,
+        ):
+            model = train_v2_model.build_model(
+                "B_no_lora", torch.ones(3), torch.device("cpu"), 64
+            )
+
+        add_embeddings.assert_called_once_with(base)
+        apply_lora.assert_not_called()
+        self.assertEqual(model.base_organism_index, 2)
+        self.assertTrue(model.encode_requires_grad)
+        self.assertTrue(base.encoder.gradient_checkpointing)
+        self.assertFalse(base.anchor.requires_grad)
+        self.assertEqual(
+            train_v2_model.adaptation_metadata("B_no_lora"),
+            {
+                "base_organism_index": 2,
+                "c_elegans_organism_embedding": True,
+                "lora_enabled": False,
+                "lora_rank": None,
+                "lora_alpha": None,
+                "lora_target_modules": [],
+                "trunk_policy": "worm_embeddings_only",
+            },
+        )
+
     def test_validation_subwindows_stay_inside_nonoverlapping_cores(self) -> None:
         intervals = [
             {
