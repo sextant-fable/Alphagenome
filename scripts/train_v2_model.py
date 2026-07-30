@@ -29,7 +29,7 @@ WEIGHTS_PATH = REPO_ROOT / "weights/alphagenome_pytorch/model_all_folds.safetens
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=["A", "B", "C"], required=True)
+    parser.add_argument("--model", choices=["A", "B", "C", "D_base", "D"], required=True)
     parser.add_argument("--fold", type=int, choices=range(0, 6), default=1)
     parser.add_argument("--seed", type=int, default=20260714)
     parser.add_argument("--loss", choices=["paper", "log1p_mse"], default="paper")
@@ -42,6 +42,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reverse-complement-probability", type=float, default=0.5)
     parser.add_argument("--hidden-channels", type=int, default=64)
     parser.add_argument("--mean-column")
+    parser.add_argument(
+        "--frozen-base-checkpoint",
+        help="Required for model D; a D_base checkpoint whose Conv5 head is frozen.",
+    )
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--device", default="cuda")
     return parser.parse_args()
@@ -110,6 +114,7 @@ def build_model(
     fold_means: torch.Tensor,
     device: torch.device,
     hidden_channels: int,
+    frozen_base_checkpoint: Path | None = None,
 ) -> torch.nn.Module:
     if model_id == "C":
         return components.WormSequenceBaseline(
@@ -126,6 +131,23 @@ def build_model(
             base_organism_index=0,
             encode_requires_grad=False,
         ).to(device)
+    if model_id == "D_base":
+        return components.Legacy128bpBaseRnaModel(
+            base_model, n_tracks=fold_means.numel()
+        ).to(device)
+    if model_id == "D":
+        if frozen_base_checkpoint is None:
+            raise ValueError("Model D requires --frozen-base-checkpoint")
+        checkpoint = torch.load(
+            frozen_base_checkpoint, map_location="cpu", weights_only=False
+        )
+        if checkpoint.get("model_id") != "D_base":
+            raise ValueError("--frozen-base-checkpoint must be from model D_base")
+        model = components.LegacyResidualRnaModel(
+            base_model, n_tracks=fold_means.numel()
+        ).to(device)
+        model.load_frozen_base_state(checkpoint.get("trainable_model_state", {}))
+        return model
     components.add_c_elegans_organism_embeddings(base_model)
     base_model.encoder.gradient_checkpointing = True
     base_model.tower.gradient_checkpointing = True
@@ -151,6 +173,17 @@ def main() -> None:
         raise ValueError("sequence-length must be <= 1048576 and divisible by 128")
     output_dir = REPO_ROOT / args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
+    frozen_base_checkpoint = (
+        REPO_ROOT / args.frozen_base_checkpoint
+        if args.frozen_base_checkpoint is not None
+        else None
+    )
+    if args.model == "D" and (
+        frozen_base_checkpoint is None or not frozen_base_checkpoint.is_file()
+    ):
+        raise ValueError("Model D requires an existing --frozen-base-checkpoint")
+    if args.model != "D" and frozen_base_checkpoint is not None:
+        raise ValueError("--frozen-base-checkpoint is valid only for model D")
     device = torch.device(args.device)
     if device.type != "cuda" or not torch.cuda.is_available():
         raise RuntimeError("Registered P6 training requires CUDA")
@@ -198,7 +231,11 @@ def main() -> None:
         generator=generator,
     )
     model = build_model(
-        args.model, fold_means.detach().cpu(), device, args.hidden_channels
+        args.model,
+        fold_means.detach().cpu(),
+        device,
+        args.hidden_channels,
+        frozen_base_checkpoint,
     )
     optimizer, trainable = build_optimizer(
         model,
@@ -295,6 +332,12 @@ def main() -> None:
             "gene_weight": args.gene_weight,
             "max_shift_bp": args.max_shift_bp,
             "reverse_complement_probability": args.reverse_complement_probability,
+            "frozen_base_checkpoint": args.frozen_base_checkpoint,
+            "frozen_base_checkpoint_sha256": (
+                sha256(frozen_base_checkpoint)
+                if frozen_base_checkpoint is not None
+                else None
+            ),
         },
         checkpoint_path,
     )
@@ -328,6 +371,12 @@ def main() -> None:
         "gene_weight": args.gene_weight,
         "max_shift_bp": args.max_shift_bp,
         "reverse_complement_probability": args.reverse_complement_probability,
+        "frozen_base_checkpoint": args.frozen_base_checkpoint,
+        "frozen_base_checkpoint_sha256": (
+            sha256(frozen_base_checkpoint)
+            if frozen_base_checkpoint is not None
+            else None
+        ),
         "physical_cuda_visible_devices": visible,
         "cuda_device_name": torch.cuda.get_device_name(0),
         "trainable_parameters": sum(parameter.numel() for parameter in trainable),

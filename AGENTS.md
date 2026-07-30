@@ -58,13 +58,14 @@ As recorded on 2026-07-20, P6B was reopened because the original validation matr
 
 ## Controlled v2 Workflow
 
-- The phase sequence is `P0 -> P1 -> P2 -> P3A -> P3B -> P4 -> P5 -> P6A -> P6B -> P6C`.
+- The phase sequence is `P0 -> P1 -> P2 -> P3A -> P3B -> P4 -> P5 -> P6A -> P6B -> P6C -> P7`.
 - Formal phase work must go through `scripts/v2_phase_controller.py`; do not bypass the controller by invoking training or evaluation entry points directly.
 - G1 protects large downloads and realignment, G2 protects scientific manifest acceptance, G3 protects large generated data, G4 protects GPU experiments, and G5 protects the single chromosome-X evaluation.
 - Scoped approvals are records, not reusable booleans. A prior approval does not authorize a different scope.
 - The canonical state is `alphagenome_custom/metadata/v2/execution_state.json`; do not hand-edit it while a controller phase is running.
 - Phase reviews and corrections are append-only. Preserve failed, original, superseded, and reopened evidence.
 - P6C may consume chromosome `X` only once, after P6B locks one non-superseded checkpoint and the user separately approves G5.
+- P7 is a one-off, user-authorized post-completion port of the legacy 1bp-B architecture to all 241 v2 tracks. It is development-only, must retain the P6C lock/report hashes, must not read the final-test block, and cannot replace the P6B selection or P6C result.
 
 ## EEHPC Archival Host Policy
 

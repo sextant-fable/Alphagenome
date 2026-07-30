@@ -29,13 +29,17 @@ FINAL_CLAIM_PATH = METADATA_DIR / "final_test_claim.json"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=("A", "B", "C"), required=True)
+    parser.add_argument("--model", choices=("A", "B", "C", "D"), required=True)
     parser.add_argument("--training-loss", choices=("paper", "log1p_mse"), required=True)
     parser.add_argument("--fold", type=int, choices=range(0, 6), required=True)
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--sequence-length", type=int, default=131072)
     parser.add_argument("--hidden-channels", type=int, default=64)
     parser.add_argument("--mean-column")
+    parser.add_argument(
+        "--frozen-base-checkpoint",
+        help="Required for model D; the exact D_base checkpoint used in training.",
+    )
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--final-test", action="store_true")
@@ -157,6 +161,8 @@ def load_checkpoint(
     expected_sequence_length: int,
     expected_hidden_channels: int,
     expected_mean_column: str,
+    expected_frozen_base_checkpoint: str | None = None,
+    expected_frozen_base_checkpoint_sha256: str | None = None,
 ) -> dict[str, object]:
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     expected = {
@@ -166,6 +172,8 @@ def load_checkpoint(
         "sequence_length": expected_sequence_length,
         "hidden_channels": expected_hidden_channels,
         "mean_column": expected_mean_column,
+        "frozen_base_checkpoint": expected_frozen_base_checkpoint,
+        "frozen_base_checkpoint_sha256": expected_frozen_base_checkpoint_sha256,
     }
     mismatches = {
         key: (checkpoint.get(key), value)
@@ -263,11 +271,23 @@ def main() -> None:
         if args.final_test
         else REPO_ROOT / f"alphagenome_custom/intervals/v2/fold_{args.fold}/valid.tsv"
     )
+    frozen_base_checkpoint = (
+        REPO_ROOT / args.frozen_base_checkpoint
+        if args.frozen_base_checkpoint is not None
+        else None
+    )
+    if args.model == "D" and (
+        frozen_base_checkpoint is None or not frozen_base_checkpoint.is_file()
+    ):
+        raise ValueError("Model D requires an existing --frozen-base-checkpoint")
+    if args.model != "D" and frozen_base_checkpoint is not None:
+        raise ValueError("--frozen-base-checkpoint is valid only for model D")
     model = train_v2_model.build_model(
         args.model,
         fold_means.detach().cpu(),
         device,
         args.hidden_channels,
+        frozen_base_checkpoint,
     )
     checkpoint_path = REPO_ROOT / args.checkpoint
     checkpoint = load_checkpoint(
@@ -279,6 +299,12 @@ def main() -> None:
         expected_sequence_length=args.sequence_length,
         expected_hidden_channels=args.hidden_channels,
         expected_mean_column=mean_column,
+        expected_frozen_base_checkpoint=args.frozen_base_checkpoint,
+        expected_frozen_base_checkpoint_sha256=(
+            sha256(frozen_base_checkpoint)
+            if frozen_base_checkpoint is not None
+            else None
+        ),
     )
     checkpoint_sha = sha256(checkpoint_path)
     dataset = V2BigWigDataset(
@@ -503,6 +529,12 @@ def main() -> None:
         "seed": checkpoint["seed"],
         "checkpoint_path": args.checkpoint,
         "checkpoint_sha256": checkpoint_sha,
+        "frozen_base_checkpoint": args.frozen_base_checkpoint,
+        "frozen_base_checkpoint_sha256": (
+            sha256(frozen_base_checkpoint)
+            if frozen_base_checkpoint is not None
+            else None
+        ),
         "sequence_length": args.sequence_length,
         "validation_policy": (
             "all_complete_nonoverlapping_context_relative_core_only_131072bp_subwindows"

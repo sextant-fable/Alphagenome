@@ -15,7 +15,8 @@ class V2PhaseControllerTest(unittest.TestCase):
         self.assertEqual(controller.next_phase("P3A"), "P3B")
         self.assertEqual(controller.next_phase("P5"), "P6A")
         self.assertEqual(controller.next_phase("P6B"), "P6C")
-        self.assertIsNone(controller.next_phase("P6C"))
+        self.assertEqual(controller.next_phase("P6C"), "P7")
+        self.assertIsNone(controller.next_phase("P7"))
 
     def test_p3a_requires_all_three_exact_scopes(self) -> None:
         state = controller.initial_state()
@@ -142,6 +143,23 @@ class V2PhaseControllerTest(unittest.TestCase):
         )
         self.assertTrue(
             any(value == "P6C" for value in controller.REVIEW_COMMANDS["P6C"])
+        )
+
+    def test_p7_is_registered_as_a_scoped_development_only_follow_up(self) -> None:
+        self.assertTrue(
+            "scripts.run_v2_p7_legacy_residual" in controller.PHASE_COMMANDS["P7"]
+        )
+        self.assertTrue(
+            any(value == "P7" for value in controller.REVIEW_COMMANDS["P7"])
+        )
+        controller.validate_approval_scope(
+            "G4", "p7_single_legacy_residual_fold1", "P7"
+        )
+        state = controller.initial_state()
+        state["current_phase"] = "P7"
+        self.assertEqual(
+            controller.missing_approvals(state, "P7"),
+            ["G4:p7_single_legacy_residual_fold1"],
         )
 
     def test_final_test_scope_cannot_be_approved_early(self) -> None:

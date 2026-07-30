@@ -373,6 +373,123 @@ class AlphaGenomeRnaModel(torch.nn.Module):
         return self.rna_head(embeddings)
 
 
+class Legacy128bpBaseRnaModel(torch.nn.Module):
+    """The frozen-trunk 128-bp Conv5 base prediction used by legacy 1bp-B."""
+
+    def __init__(self, base_model: torch.nn.Module, n_tracks: int) -> None:
+        super().__init__()
+        self.base_model = base_model
+        self.base_head_128bp = torch.nn.Sequential(
+            torch.nn.Conv1d(3072, 256, kernel_size=1),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(256, 256, kernel_size=5, padding=2),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(256, n_tracks, kernel_size=1),
+        )
+        for parameter in self.base_model.parameters():
+            parameter.requires_grad_(False)
+
+    def train(self, mode: bool = True) -> "Legacy128bpBaseRnaModel":
+        super().train(mode)
+        self.base_model.eval()
+        return self
+
+    def _encode(self, dna: torch.Tensor) -> dict[str, torch.Tensor]:
+        organism = torch.zeros(dna.shape[0], dtype=torch.long, device=dna.device)
+        with torch.no_grad():
+            return self.base_model.encode(
+                dna.transpose(1, 2).contiguous(),
+                organism,
+                resolutions=RESOLUTIONS,
+                channels_last=False,
+            )
+
+    def _base_predictions(
+        self, embeddings_128bp: torch.Tensor, sequence_length: int
+    ) -> dict[int, torch.Tensor]:
+        prediction_128bp = F.softplus(self.base_head_128bp(embeddings_128bp))
+        return {
+            1: F.interpolate(
+                prediction_128bp,
+                size=sequence_length,
+                mode="linear",
+                align_corners=False,
+            ),
+            128: prediction_128bp,
+        }
+
+    def forward(self, dna: torch.Tensor) -> dict[int, torch.Tensor]:
+        encoded = self._encode(dna)
+        return self._base_predictions(encoded["embeddings_128bp"], dna.shape[-1])
+
+
+class LegacyResidualRnaModel(Legacy128bpBaseRnaModel):
+    """Port the legacy 1bp-B frozen-base residual topology to 241 tracks.
+
+    The 128-bp Conv5 base head must be trained and checkpointed separately on
+    v2 before this model loads and freezes it. The old 11-track head cannot be
+    reused because its output space does not match the 241 audited v2 tracks.
+    """
+
+    def __init__(self, base_model: torch.nn.Module, n_tracks: int) -> None:
+        super().__init__(base_model, n_tracks)
+        self.residual_bottleneck_1bp = torch.nn.Conv1d(1536, 128, kernel_size=1)
+        self.residual_head_1bp = torch.nn.Sequential(
+            torch.nn.GELU(),
+            torch.nn.Conv1d(128, 128, kernel_size=5, padding=2),
+            torch.nn.GELU(),
+            torch.nn.Conv1d(128, n_tracks, kernel_size=1),
+        )
+        self.residual_scale = torch.nn.Parameter(torch.full((1, n_tracks, 1), 0.01))
+
+    def load_frozen_base_state(self, state: Mapping[str, torch.Tensor]) -> None:
+        """Copy exactly the trained base-head tensors and make them immutable."""
+
+        expected = {
+            f"base_head_128bp.{key}": value
+            for key, value in self.base_head_128bp.state_dict().items()
+        }
+        received = {
+            key: value
+            for key, value in state.items()
+            if key.startswith("base_head_128bp.")
+        }
+        if set(received) != set(expected):
+            raise ValueError("Legacy base checkpoint has an incompatible base head")
+        local_state = self.base_head_128bp.state_dict()
+        for key, expected_value in expected.items():
+            value = received[key]
+            if value.shape != expected_value.shape:
+                raise ValueError(f"Legacy base checkpoint shape mismatch: {key}")
+            local_state[key.removeprefix("base_head_128bp.")] = value.detach().clone()
+        self.base_head_128bp.load_state_dict(local_state, strict=True)
+        for parameter in self.base_head_128bp.parameters():
+            parameter.requires_grad_(False)
+
+    def train(self, mode: bool = True) -> "LegacyResidualRnaModel":
+        super().train(mode)
+        self.base_head_128bp.eval()
+        return self
+
+    def forward(self, dna: torch.Tensor) -> dict[int, torch.Tensor]:
+        encoded = self._encode(dna)
+        with torch.no_grad():
+            base_predictions = self._base_predictions(
+                encoded["embeddings_128bp"], dna.shape[-1]
+            )
+        residual_update_1bp = self.residual_head_1bp(
+            self.residual_bottleneck_1bp(encoded["embeddings_1bp"])
+        )
+        # The legacy topology adds a small signed residual to a frozen base
+        # prediction. Paper loss additionally requires non-negative outputs.
+        prediction_1bp = (
+            base_predictions[1]
+            + self.residual_scale.to(dtype=residual_update_1bp.dtype)
+            * residual_update_1bp
+        ).clamp_min(1e-6)
+        return {1: prediction_1bp, 128: base_predictions[128]}
+
+
 class ResidualBlock(torch.nn.Module):
     def __init__(self, channels: int, dilation: int) -> None:
         super().__init__()
@@ -431,6 +548,12 @@ MODEL_SPECS = (
         "worm_embeddings_and_lora_only",
     ),
     ModelSpec("C", "residual sequence baseline trained from scratch", None, "from_scratch"),
+    ModelSpec(
+        "D",
+        "frozen AlphaGenome trunk with legacy 128bp-base plus 1bp residual head",
+        0,
+        "frozen",
+    ),
 )
 
 

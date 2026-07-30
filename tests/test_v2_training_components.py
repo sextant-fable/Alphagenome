@@ -369,6 +369,50 @@ class V2TrainingComponentsTest(unittest.TestCase):
         adaptable.train()
         self.assertTrue(adaptable.base_model.training)
 
+    def test_legacy_residual_port_keeps_trunk_frozen_and_outputs_both_resolutions(self) -> None:
+        class FakeBase(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.placeholder = torch.nn.Parameter(torch.ones(1))
+
+            def encode(self, dna, organism, resolutions, channels_last):
+                self.observed_shape = tuple(dna.shape)
+                self.observed_organism = organism.detach().clone()
+                return {
+                    "embeddings_1bp": torch.ones(dna.shape[0], 1536, dna.shape[1]),
+                    "embeddings_128bp": torch.ones(
+                        dna.shape[0], 3072, dna.shape[1] // 128
+                    ),
+                }
+
+        source = components.Legacy128bpBaseRnaModel(FakeBase(), n_tracks=3)
+        frozen_state = {
+            f"base_head_128bp.{key}": value.detach().clone()
+            for key, value in source.base_head_128bp.state_dict().items()
+        }
+        base = FakeBase()
+        model = components.LegacyResidualRnaModel(base, n_tracks=3)
+        model.load_frozen_base_state(frozen_state)
+        model.train()
+        outputs = model(torch.ones(1, 4, 256))
+        self.assertEqual(base.observed_shape, (1, 256, 4))
+        self.assertEqual(base.observed_organism.tolist(), [0])
+        self.assertFalse(model.base_model.training)
+        self.assertFalse(any(p.requires_grad for p in model.base_head_128bp.parameters()))
+        self.assertEqual(outputs[1].shape, (1, 3, 256))
+        self.assertEqual(outputs[128].shape, (1, 3, 2))
+        self.assertTrue((outputs[1] > 0).all())
+        self.assertTrue((outputs[128] > 0).all())
+        (outputs[1].mean() + outputs[128].mean()).backward()
+        self.assertIsNone(base.placeholder.grad)
+        trainable = [
+            parameter
+            for name, parameter in model.named_parameters()
+            if parameter.requires_grad and not name.startswith("base_model.")
+        ]
+        self.assertTrue(trainable)
+        self.assertTrue(all(parameter.grad is not None for parameter in trainable))
+
     def test_random_shift_is_seeded_bounded_and_epoch_dependent(self) -> None:
         class FakeDataset(torch.utils.data.Dataset):
             intervals = [

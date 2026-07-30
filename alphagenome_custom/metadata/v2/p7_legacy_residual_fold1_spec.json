@@ -1,0 +1,59 @@
+{
+  "baseline": {
+    "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_1/checkpoint.pt",
+    "validation_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_1/validation_full_metrics.json"
+  },
+  "final_test_access": "prohibited",
+  "gpu_policy": {
+    "allowed_physical_indices": [2, 3],
+    "maximum_concurrent_jobs_per_gpu": 1,
+    "minimum_free_mib": 70000
+  },
+  "input_sha256": {
+    "baseline_checkpoint": "f9fe7725e841a996086a3eebed3106427ee0cb18a34c828bc64d4d04705b3a65",
+    "baseline_validation": "9f728d53787ab6d0f436b54c367672abca06a36af6ff278db429733b250cc4e6",
+    "final_test_lock": "602988f99a952e23e98a205ef3e264c11b94cc22e06ad2213a109339cd9cb421",
+    "final_test_report": "9c9b06c3eba15d95c30ff4e7403d97dbfe1b72cbc0e8dcd678fe98de762d3a6e",
+    "fold_1_train": "0883c444ece4b666324787077dd3ae20f4955e68788777cf8144d7f7b77b67e4",
+    "fold_1_valid": "6bca1fc0d334ef12440acc68689560d8725e8fe322ed5f1a42165841c196ac5d",
+    "means": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
+    "split_registry": "aa783dd6ca799887c0785a2ddeb7985c980a2bfc1ff5548486e3bcd6d99bd91d"
+  },
+  "legacy_architecture": {
+    "base_head": "separately trained then frozen 128bp Conv5, 256 hidden channels",
+    "base_organism_index": 0,
+    "output_heads": "reinitialized for 241 v2 tracks",
+    "residual_head": "1bp bottleneck 128, Conv5 128 hidden channels; signed correction added to frozen base prediction",
+    "residual_scale_init": 0.01,
+    "trunk": "frozen AlphaGenome"
+  },
+  "locked_inputs": {
+    "baseline_checkpoint": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_1/checkpoint.pt",
+    "baseline_validation": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_1/validation_full_metrics.json",
+    "final_test_lock": "alphagenome_custom/metadata/v2/final_test_lock.json",
+    "final_test_report": "alphagenome_custom/metadata/v2/final_test_report.json",
+    "fold_1_train": "alphagenome_custom/intervals/v2/fold_1/train.tsv",
+    "fold_1_valid": "alphagenome_custom/intervals/v2/fold_1/valid.tsv",
+    "means": "alphagenome_custom/metadata/v2/track_nonzero_means_v2.tsv",
+    "split_registry": "alphagenome_custom/metadata/v2/split_registry_v2.json"
+  },
+  "model": "D",
+  "phase": "P7",
+  "purpose": "One bounded port of the pre-new-data 1bp-B residual architecture onto all 241 uniformly reprocessed v2 tracks.",
+  "schema_version": 1,
+  "training": {
+    "fold": 1,
+    "gene_weight": 0.1,
+    "hidden_channels": 64,
+    "learning_rate": 0.0001,
+    "loss": "paper",
+    "max_shift_bp": 1024,
+    "base_max_steps": 2000,
+    "mean_column": "fold_1_train_nonzero_mean",
+    "residual_max_steps": 1500,
+    "reverse_complement_probability": 0.5,
+    "seed": 20260714,
+    "sequence_length": 131072,
+    "weight_decay": 0.0001
+  }
+}
