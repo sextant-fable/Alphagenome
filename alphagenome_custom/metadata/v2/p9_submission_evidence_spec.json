@@ -1,0 +1,253 @@
+{
+  "analysis": {
+    "confidence_interval": {
+      "level": 0.95,
+      "method": "paired hierarchical bootstrap: resample held-out folds, then resample seed outcomes within each sampled fold",
+      "resamples": 10000,
+      "seed": 20260813
+    },
+    "effect_direction": "candidate minus B/paper reference; lower-is-better metrics retain this algebraic sign",
+    "expected_folds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "expected_seeds": [
+      20260714,
+      20260715,
+      20260716
+    ],
+    "factorial_effects": {
+      "lora_main": "0.5 * ((B_lora_only - A) + (B - B_no_lora))",
+      "worm_embedding_main": "0.5 * ((B_no_lora - A) + (B - B_lora_only))",
+      "worm_lora_interaction": "B - B_no_lora - B_lora_only + A"
+    },
+    "independent_blocking_unit": "held-out genomic fold",
+    "loss_auxiliary": "The existing 15 B/log1p_mse records are compared with the same-fold, same-seed B/paper records and are not retrained or counted among the 90 component records.",
+    "metrics": [
+      "primary_biological_score",
+      "gene_exon_coverage_pearson_log1p",
+      "per_track_pearson_128bp_log1p",
+      "paper_loss",
+      "log1p_mse",
+      "spearman_128bp",
+      "top1_mse_128bp",
+      "top1_calibration_ratio_128bp",
+      "gene_body_mse_log1p_1bp",
+      "exon_mse_log1p_1bp",
+      "local_gradient_mse_log1p_1bp"
+    ],
+    "pairing_keys": [
+      "fold",
+      "seed"
+    ],
+    "track_inference_boundary": "the 241 tracks are descriptive outcomes, not independent experimental replicates"
+  },
+  "baseline": {
+    "loss": "paper",
+    "model": "B",
+    "source_execution": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_execution.json"
+  },
+  "final_test_access": "prohibited",
+  "gpu_policy": {
+    "allowed_physical_indices": [
+      2,
+      3
+    ],
+    "maximum_concurrent_jobs_per_gpu": 1,
+    "minimum_free_mib": 70000
+  },
+  "input_sha256": {
+    "base_weights": "8c1cde573ba9f462e8aa91fd9c6e13ea6bd004857c429932d6c64db386e13595",
+    "final_test_lock": "602988f99a952e23e98a205ef3e264c11b94cc22e06ad2213a109339cd9cb421",
+    "final_test_report": "9c9b06c3eba15d95c30ff4e7403d97dbfe1b72cbc0e8dcd678fe98de762d3a6e",
+    "fai": "aaa0bf6e25f337787d22d23e1e94f341cb4d9d7ec8c1ba76f667e859a0f7e3cc",
+    "fasta": "e4e7397ed0830b631006dbd969b868cfe9bc2e746283a454088b5eb065c2f000",
+    "fold_1_train": "0883c444ece4b666324787077dd3ae20f4955e68788777cf8144d7f7b77b67e4",
+    "fold_1_valid": "6bca1fc0d334ef12440acc68689560d8725e8fe322ed5f1a42165841c196ac5d",
+    "fold_2_train": "550001168afd35b25c6e95fdc917870fb468e94d04144a93061c001c8b2838c0",
+    "fold_2_valid": "a2c269e9afa271bcdc23446242b521486d7d3b8c2c64f0dac6ee0c734a792412",
+    "fold_3_train": "5820c02f030256276f7592290ee4f01ae95dfbf9617b2059b28103c7a5da9068",
+    "fold_3_valid": "145fb6df914cc5be550d64d8939928518c86a4ed043bee1ba6fd92124c4fd656",
+    "fold_4_train": "2d7a5427478bd896e36ae018ad4af9fb5e194ae11a6f51ef38e1b02f2225ad17",
+    "fold_4_valid": "4c1c41cb5162cd36c001f61fdb9c4721b9fc1f4bed3a0813b22b379e21e381a7",
+    "fold_5_train": "10e04a47a2df1be48aaa6746611bec44fbe80c1fa6e40c5521a251270347253b",
+    "fold_5_valid": "34e20e8ead8714c8fdc13beb61c1c878550d3289e577e8baf0428cfc9a9b2de2",
+    "group_manifest": "06bfc6109b08dc22007601d9c406cd4772701901f069f16ad1ea26b3d6134737",
+    "gtf": "2629ac02ceeecbeffc6901a44588630949ca6b6ef32a4f282d58352fe9482187",
+    "means": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
+    "p6b_execution": "e98b1e2cfed5f3ccedcb6e6aaf6d5013c17f23d7ed4f320d2a92378740a9502c",
+    "p6b_results": "de2408db68c0fc271236e826f5f9e2aa08fe518c4d0b11bccec87293bc400061",
+    "p6b_selection": "a5b2ebd934f94475070bd754bd52a0c15b17af8efa5da9730919dd829698fc7a",
+    "p6b_spec": "7f50967e1e53427b5b0ac6630c1b19c9b7344a79e67b60cfb36cb0c1a9289a05",
+    "p8_checkpoint": "d0e3f0ca5543dcec520bf4b65d24474411050bb7d674b7659f620de063897c0b",
+    "p8_comparison": "2009a54576b89c737ecb1dc262fbd57c70b93b47a984029bd16fa816e2302e32",
+    "p8_execution": "d01833b55e156228594e5d88135d6aff9abda7c15110c5b78685b27eba197b72",
+    "p8_run": "d6222c5e90b8a50bf5c9fd37a853be415acc65f760227b4b6c9b26aeea29f7f6",
+    "p8_spec": "0ca1dc85b0e9ec6381fe7894cab1fc78fff03cf58cb02bd6e11dee97628774b4",
+    "p8_validation": "d5d160b5014a058f4cbfae5fff146512d5d0d2ce485150208efbd024ca517c84",
+    "split_registry": "aa783dd6ca799887c0785a2ddeb7985c980a2bfc1ff5548486e3bcd6d99bd91d",
+    "track_manifest": "4f261a4dcbb84f73be26ae2205e049550083b816a54561e6c983b048c6267a65"
+  },
+  "locked_inputs": {
+    "base_weights": "weights/alphagenome_pytorch/model_all_folds.safetensors",
+    "final_test_lock": "alphagenome_custom/metadata/v2/final_test_lock.json",
+    "final_test_report": "alphagenome_custom/metadata/v2/final_test_report.json",
+    "fai": "alphagenome_custom/reference/genome.fa.fai",
+    "fasta": "alphagenome_custom/reference/Caenorhabditis_elegans.WBcel235.dna.toplevel.fa",
+    "fold_1_train": "alphagenome_custom/intervals/v2/fold_1/train.tsv",
+    "fold_1_valid": "alphagenome_custom/intervals/v2/fold_1/valid.tsv",
+    "fold_2_train": "alphagenome_custom/intervals/v2/fold_2/train.tsv",
+    "fold_2_valid": "alphagenome_custom/intervals/v2/fold_2/valid.tsv",
+    "fold_3_train": "alphagenome_custom/intervals/v2/fold_3/train.tsv",
+    "fold_3_valid": "alphagenome_custom/intervals/v2/fold_3/valid.tsv",
+    "fold_4_train": "alphagenome_custom/intervals/v2/fold_4/train.tsv",
+    "fold_4_valid": "alphagenome_custom/intervals/v2/fold_4/valid.tsv",
+    "fold_5_train": "alphagenome_custom/intervals/v2/fold_5/train.tsv",
+    "fold_5_valid": "alphagenome_custom/intervals/v2/fold_5/valid.tsv",
+    "group_manifest": "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv",
+    "gtf": "alphagenome_custom/reference/Caenorhabditis_elegans.WBcel235.115.gtf",
+    "means": "alphagenome_custom/metadata/v2/track_nonzero_means_v2.tsv",
+    "p6b_execution": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_execution.json",
+    "p6b_results": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_cv_results.tsv",
+    "p6b_selection": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_selection.json",
+    "p6b_spec": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_spec.json",
+    "p8_checkpoint": "runs/v2_p8_b_no_lora_fold1_20260730/model_B_no_lora_paper/fold_1/checkpoint.pt",
+    "p8_comparison": "alphagenome_custom/metadata/v2/p8_b_no_lora_fold1_comparison.json",
+    "p8_execution": "alphagenome_custom/metadata/v2/p8_b_no_lora_fold1_execution.json",
+    "p8_run": "runs/v2_p8_b_no_lora_fold1_20260730/model_B_no_lora_paper/fold_1/run.json",
+    "p8_spec": "alphagenome_custom/metadata/v2/p8_b_no_lora_fold1_spec.json",
+    "p8_validation": "runs/v2_p8_b_no_lora_fold1_20260730/model_B_no_lora_paper/fold_1/validation_full_metrics.json",
+    "split_registry": "alphagenome_custom/metadata/v2/split_registry_v2.json",
+    "track_manifest": "alphagenome_custom/metadata/v2/p3_group_outputs.tsv"
+  },
+  "implementation_sha256": {
+    "scripts/evaluate_v2_model.py": "3e42b1c309584daee8f8ca0cf9882928bd0783433e52eee05eaab632811b85f5",
+    "scripts/run_v2_p6b.py": "84ec8c25540491d217cd97482b4c673229b826efdb8abc2bf5ed04b5fd4feb9f",
+    "scripts/run_v2_p6b_amendment.py": "9fd54a8636426892cd215974ce56e2c06c0da9ca201abd2d3b334726e91f4d28",
+    "scripts/run_v2_p9_submission_evidence.py": "e8a43f3069e2812e4fd2c4de6d9998ebd4b9e0fb8b5dffabaff4fec284e5d061",
+    "scripts/train_v2_model.py": "36404f5d0a65aaab19b20938ffa5912ac37a33bfc7e0f9b8c130798c912e2de8",
+    "scripts/v2_bigwig_dataset.py": "06e20dfe0e9b3b979da6f119464ae6ac81ab58302af4968e2051966da26562d9",
+    "scripts/v2_gpu_resources.py": "7a26c3a5b6f40365740bd3fad472bf721d3909291eb76193bac6997f71d3873e",
+    "scripts/v2_submission_statistics.py": "c50ab80fbee6b525a6b66b9aa89eec660821c79e4e6f945018e891c432fc1291",
+    "scripts/v2_subprocess.py": "e7037e5afdc2743bd2c271d5d60cf71686dc27d43999e4621415008a0c41a27a",
+    "scripts/v2_training_components.py": "20e1eb984a35ba41299edc44ad89829d76815e9be8aa5337687a30c2d8a5d381"
+  },
+  "dataset_contract": {
+    "bigwig_integrity": "Before GPU selection, SHA-256 every one of the 241 output_path files and require each digest to equal output_sha256 in the locked track manifest; repeat the audit during R9 review.",
+    "group_count": 241,
+    "group_id_order": "track_manifest, group_manifest, and fold-means rows must have the identical ordered group_id sequence",
+    "track_count": 241
+  },
+  "p6b_reuse_contract": {
+    "artifact_count": 90,
+    "artifacts_per_record": [
+      "checkpoint",
+      "run",
+      "validation"
+    ],
+    "loss": "paper",
+    "manifest_sha256": "a33a5690ec135cba3db2ae259a14218f8899630c2c506cdfa0e2627231253379",
+    "models": [
+      "A",
+      "B"
+    ],
+    "record_count": 30,
+    "source_execution": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_execution.json"
+  },
+  "matrix": {
+    "configurations": [
+      {
+        "expected_trainable_parameters": 1111492,
+        "id": "frozen_no_worm_no_lora",
+        "model": "A",
+        "reuse_source": "P6B",
+        "semantics": "original organism-0 embedding, no LoRA, and the matched dual-resolution RNA head"
+      },
+      {
+        "expected_trainable_parameters": 1276228,
+        "id": "full_worm_lora",
+        "model": "B",
+        "reuse_source": "P6B",
+        "semantics": "trainable C. elegans embedding plus LoRA and the matched dual-resolution RNA head"
+      },
+      {
+        "expected_trainable_parameters": 1130308,
+        "id": "no_lora",
+        "model": "B_no_lora",
+        "semantics": "retain the trainable C. elegans embedding and dual-resolution RNA head; remove LoRA"
+      },
+      {
+        "expected_trainable_parameters": 1257412,
+        "id": "lora_only",
+        "model": "B_lora_only",
+        "semantics": "retain the original organism-0 embedding and dual-resolution RNA head; train only LoRA in the trunk"
+      },
+      {
+        "expected_trainable_parameters": 535394,
+        "id": "learned_1bp_head_only",
+        "model": "B_1bp_head_only",
+        "semantics": "the learned output head contains only the 1-bp branch while the full model-B C. elegans embedding and LoRA remain trainable; derive the 128-bp model-space prediction by sum-pooling the unscaled 1-bp prediction and rescaling at 128 bp"
+      },
+      {
+        "expected_trainable_parameters": 1265122,
+        "hidden_channels": 152,
+        "id": "size_matched_scratch",
+        "model": "C_size_matched",
+        "semantics": "from-scratch residual sequence model with the same dual outputs and approximately model-B trainable parameter count"
+      }
+    ],
+    "folds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "loss": "paper",
+    "parameter_match_reference": {
+      "absolute_difference": 11106,
+      "candidate_trainable_parameters": 1265122,
+      "maximum_relative_difference": 0.01,
+      "model_b_trainable_parameters": 1276228,
+      "relative_difference": 0.00870220336836304
+    },
+    "new_training_jobs": 59,
+    "registered_records": 90,
+    "reused_records": 31,
+    "reused_record": {
+      "configuration": "no_lora",
+      "fold": 1,
+      "seed": 20260714,
+      "source": "P8"
+    },
+    "seeds": [
+      20260714,
+      20260715,
+      20260716
+    ]
+  },
+  "phase": "P9",
+  "purpose": "Development-only submission evidence matrix. It cannot replace the P6B model selection or P6C final result.",
+  "outputs": {
+    "factorial_effects": "alphagenome_custom/metadata/v2/p9_submission_evidence_factorial_effects.tsv",
+    "paired_effects": "alphagenome_custom/metadata/v2/p9_submission_evidence_paired_effects.tsv",
+    "per_track": "alphagenome_custom/metadata/v2/p9_submission_evidence_per_track.tsv",
+    "raw_factorial_effects": "alphagenome_custom/metadata/v2/p9_submission_evidence_raw_factorial_effects.tsv",
+    "raw_paired_effects": "alphagenome_custom/metadata/v2/p9_submission_evidence_raw_paired_effects.tsv",
+    "results": "alphagenome_custom/metadata/v2/p9_submission_evidence_results.tsv"
+  },
+  "schema_version": 1,
+  "training": {
+    "gene_weight": 0.1,
+    "hidden_channels_default": 64,
+    "learning_rate": 0.0001,
+    "max_shift_bp": 1024,
+    "max_steps": 2000,
+    "reverse_complement_probability": 0.5,
+    "sequence_length": 131072,
+    "weight_decay": 0.0001
+  }
+}

@@ -1,0 +1,264 @@
+{
+  "analysis_contract": "dpy27_internal_genomic_block_validation_v1",
+  "analysis_label": "internal_genomic_block_validation",
+  "biological_claim_boundary": "Tests whether Model B recovers the DPY-27 RNAi versus vector RNAi chromosome-X relative expression pattern in held-out genomic blocks. The conditions and tracks were model targets during training, so this is not unseen-condition, independent-study, causal, or final-test validation.",
+  "checkpoint_matrix": [
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_1/checkpoint.pt",
+      "checkpoint_sha256": "f9fe7725e841a996086a3eebed3106427ee0cb18a34c828bc64d4d04705b3a65",
+      "fold": 1,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_1/run.json",
+      "run_sha256": "8f39e147e68d7be6f0212ba18b12dc34c2b34eb2c529f19c604ae5ddcda652f3",
+      "seed": 20260714
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_2/checkpoint.pt",
+      "checkpoint_sha256": "d3fb7cff784faff9cb42e90d2c4e3f9631d1214813e3c5d706c01ec6b9e67d7e",
+      "fold": 2,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_2/run.json",
+      "run_sha256": "d4e50b12fe48cdfa27b3ccb7209645913620cfe01c53825baa26cdda880f8789",
+      "seed": 20260714
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_3/checkpoint.pt",
+      "checkpoint_sha256": "734ccc7ed98a91845d98ae19757395e649ba1c86330362717af2bf802c149ca3",
+      "fold": 3,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_3/run.json",
+      "run_sha256": "10a8809fe7e8adea78efe14c17093e5c92db4ce202cdbc1fbdbc3f56e7370ddd",
+      "seed": 20260714
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_4/checkpoint.pt",
+      "checkpoint_sha256": "fa566b853d9b0a82ebad6139cdf7c64e90f578accab03add02e8db9c8429044b",
+      "fold": 4,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_4/run.json",
+      "run_sha256": "8518fd9e1a80553a3de0a81a28bb56eea5b41a2f590f8a42216a368bc464a552",
+      "seed": 20260714
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_5/checkpoint.pt",
+      "checkpoint_sha256": "ce163b31bed41bcd0be7c22ad1b832e124b708524a4aa9eb2a8072af208824a1",
+      "fold": 5,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260714/fold_5/run.json",
+      "run_sha256": "dd248c8cb4dcb9a5725428bc11694307ba195acf7a4070436574e051102a2d2d",
+      "seed": 20260714
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260715/fold_1/checkpoint.pt",
+      "checkpoint_sha256": "2853c72d1470d5649335e50c18facca867c74941eeaf76ec0c27b6f6bd3533d0",
+      "fold": 1,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260715/fold_1/run.json",
+      "run_sha256": "a947fc40a0acfa04a1dd33778848eea8084ed6fea09756a36e33b9f0db8232df",
+      "seed": 20260715
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260715/fold_2/checkpoint.pt",
+      "checkpoint_sha256": "e4abe504682a252a700f3c3121009ead100e081aa7ce9007b5f14a0dca30be02",
+      "fold": 2,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260715/fold_2/run.json",
+      "run_sha256": "5919951782fc4a1527f0d746cb329f13c1a340c79f5a3979690586c28f2229e8",
+      "seed": 20260715
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260715/fold_3/checkpoint.pt",
+      "checkpoint_sha256": "ee12aba0f10edd362c91a892b49761415e7ac0c1fe462e3d280fcaaf68dec34b",
+      "fold": 3,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260715/fold_3/run.json",
+      "run_sha256": "5cb7005c640f0ba22c21b4ee1fa0bd7473848b1bce3a00b0b37a27bde28cdc51",
+      "seed": 20260715
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260715/fold_4/checkpoint.pt",
+      "checkpoint_sha256": "46ef7c2d2c946fc6c1db2806c94ab147da6b01469e0f518b993eb1c7dfdb0719",
+      "fold": 4,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260715/fold_4/run.json",
+      "run_sha256": "358818aca65e7d2185917c29bb6a7a95c0db41a2c81a0300afdafbcdcdee4feb",
+      "seed": 20260715
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260715/fold_5/checkpoint.pt",
+      "checkpoint_sha256": "ca98439be4527ca94610f4ab88031addd83a085d4db3a2d0f75ed92bac5b6562",
+      "fold": 5,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260715/fold_5/run.json",
+      "run_sha256": "cd9e63e7a43eda390ef01e5aa1a698f6eeb471e80fcc88cf6caa8b3f0b5b4a58",
+      "seed": 20260715
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260716/fold_1/checkpoint.pt",
+      "checkpoint_sha256": "f9644107d459bbe583d7a161f9b4ddd810512a27b0c3e68f66ccbf408c18a8aa",
+      "fold": 1,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260716/fold_1/run.json",
+      "run_sha256": "2f7b3b630e8e894f962c35fca24d3235ffdbfaf89ae0b88e5c7e129017484bf2",
+      "seed": 20260716
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260716/fold_2/checkpoint.pt",
+      "checkpoint_sha256": "fe9ccde8590d16a0ed131094fa22836083db6310428b081bce745cb1b4bed2db",
+      "fold": 2,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260716/fold_2/run.json",
+      "run_sha256": "660ee916dac474f72615a8dfdadbe567c4e09bd5de4c7a3e622d4ff4816d87fd",
+      "seed": 20260716
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260716/fold_3/checkpoint.pt",
+      "checkpoint_sha256": "7c0e9bca13683d3e3b12ea0e3ad481cfee680483a43852e38c1da75b87726b89",
+      "fold": 3,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260716/fold_3/run.json",
+      "run_sha256": "0d53b6289701f9a7c5ae812321a8cd253c387a0ec845664614140a39988538f8",
+      "seed": 20260716
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260716/fold_4/checkpoint.pt",
+      "checkpoint_sha256": "f1a2a645f278dae4c943b1cc4c6c1550db4f70d6fe7454805d8ecd4d7001d55d",
+      "fold": 4,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260716/fold_4/run.json",
+      "run_sha256": "cd64ec14a9db2dab2ea1c1229bc1b2729811c956bfd39f37531f5535895fa57a",
+      "seed": 20260716
+    },
+    {
+      "checkpoint_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260716/fold_5/checkpoint.pt",
+      "checkpoint_sha256": "a341789eb49067b7ba442d1be8b0b5cb5ab884ba33e481e518c65d08c7c054c7",
+      "fold": 5,
+      "run_path": "runs/v2_p6b_six_chromosome_corefix_20260722/formal/B/paper/seed_20260716/fold_5/run.json",
+      "run_sha256": "8d8181ee8eb9b12941b51ab2b837c5811be56953306b51491e33dde6223a99e2",
+      "seed": 20260716
+    }
+  ],
+  "expected_folds": [1, 2, 3, 4, 5],
+  "expected_seeds": [20260714, 20260715, 20260716],
+  "expected_subwindows_per_fold": 83,
+  "final_test_access": "prohibited",
+  "figure_source_data_contract": {
+    "panels": [
+      "a_gene_contrasts",
+      "b_fold_x_minus_autosomes",
+      "c_fold_agreement",
+      "c_fold_primary_summary"
+    ],
+    "panel_endpoints": {
+      "a_gene_contrasts": [
+        "gene_log1p_contrast"
+      ],
+      "b_fold_x_minus_autosomes": [
+        "observed_median_contrast_x_minus_autosomes",
+        "predicted_median_contrast_x_minus_autosomes"
+      ],
+      "c_fold_agreement": [
+        "x_predicted_observed_direction_concordance",
+        "predicted_observed_gene_spearman"
+      ],
+      "c_fold_primary_summary": [
+        "predicted_median_contrast_x_minus_autosomes",
+        "observed_median_contrast_x_minus_autosomes",
+        "x_predicted_observed_direction_concordance",
+        "predicted_observed_gene_spearman"
+      ]
+    }
+  },
+  "gpu_policy": {
+    "allowed_physical_indices": [2, 3],
+    "maximum_concurrent_jobs_per_gpu": 1,
+    "minimum_free_mib": 70000
+  },
+  "implementation_sha256": {
+    "scripts/plot_dpy27_internal_application.py": "6b06739fd851ef6bd6764f278f38b36cb0be6b3abd781b7e639c2c1744a62297",
+    "scripts/run_dpy27_internal_application.py": "76e94ee0b06b8c43997268e865d27914e5ede1fef2a976cb6ae86a352e3625fe",
+    "scripts/train_v2_model.py": "36404f5d0a65aaab19b20938ffa5912ac37a33bfc7e0f9b8c130798c912e2de8",
+    "scripts/v2_bigwig_dataset.py": "06e20dfe0e9b3b979da6f119464ae6ac81ab58302af4968e2051966da26562d9",
+    "scripts/v2_biological_validation.py": "ec7126f74273777504431cc391b39fca909cf082588328b0054bab42f6a8dfd9",
+    "scripts/v2_training_components.py": "20e1eb984a35ba41299edc44ad89829d76815e9be8aa5337687a30c2d8a5d381"
+  },
+  "input_sha256": {
+    "case_bigwig": "6d1ee5439be86d2b9084f081c12a9fc1f1edaf38bbf2773cbd1eabda70282d98",
+    "control_bigwig": "13b35ea3cfd0c367e2053e1d74e3ead233b330dbfb2f3468d45d096b081e4934",
+    "fai": "aaa0bf6e25f337787d22d23e1e94f341cb4d9d7ec8c1ba76f667e859a0f7e3cc",
+    "fasta": "e4e7397ed0830b631006dbd969b868cfe9bc2e746283a454088b5eb065c2f000",
+    "final_test_lock": "602988f99a952e23e98a205ef3e264c11b94cc22e06ad2213a109339cd9cb421",
+    "final_test_report": "9c9b06c3eba15d95c30ff4e7403d97dbfe1b72cbc0e8dcd678fe98de762d3a6e",
+    "fold_1_valid": "6bca1fc0d334ef12440acc68689560d8725e8fe322ed5f1a42165841c196ac5d",
+    "fold_2_valid": "a2c269e9afa271bcdc23446242b521486d7d3b8c2c64f0dac6ee0c734a792412",
+    "fold_3_valid": "145fb6df914cc5be550d64d8939928518c86a4ed043bee1ba6fd92124c4fd656",
+    "fold_4_valid": "4c1c41cb5162cd36c001f61fdb9c4721b9fc1f4bed3a0813b22b379e21e381a7",
+    "fold_5_valid": "34e20e8ead8714c8fdc13beb61c1c878550d3289e577e8baf0428cfc9a9b2de2",
+    "group_manifest": "06bfc6109b08dc22007601d9c406cd4772701901f069f16ad1ea26b3d6134737",
+    "gtf": "2629ac02ceeecbeffc6901a44588630949ca6b6ef32a4f282d58352fe9482187",
+    "means": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
+    "model_specs": "50e8c8b1fe21936ee9676950c71216b60d9d26c2a8b0a6d1050b66e119d0da56",
+    "model_weights": "8c1cde573ba9f462e8aa91fd9c6e13ea6bd004857c429932d6c64db386e13595",
+    "track_manifest": "4f261a4dcbb84f73be26ae2205e049550083b816a54561e6c983b048c6267a65"
+  },
+  "locked_inputs": {
+    "case_bigwig": "alphagenome_custom/tracks/rna_seq_v2_grouped/RNA_V2_G0005.bw",
+    "control_bigwig": "alphagenome_custom/tracks/rna_seq_v2_grouped/RNA_V2_G0006.bw",
+    "fai": "alphagenome_custom/reference/genome.fa.fai",
+    "fasta": "alphagenome_custom/reference/Caenorhabditis_elegans.WBcel235.dna.toplevel.fa",
+    "final_test_lock": "alphagenome_custom/metadata/v2/final_test_lock.json",
+    "final_test_report": "alphagenome_custom/metadata/v2/final_test_report.json",
+    "fold_1_valid": "alphagenome_custom/intervals/v2/fold_1/valid.tsv",
+    "fold_2_valid": "alphagenome_custom/intervals/v2/fold_2/valid.tsv",
+    "fold_3_valid": "alphagenome_custom/intervals/v2/fold_3/valid.tsv",
+    "fold_4_valid": "alphagenome_custom/intervals/v2/fold_4/valid.tsv",
+    "fold_5_valid": "alphagenome_custom/intervals/v2/fold_5/valid.tsv",
+    "group_manifest": "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv",
+    "gtf": "alphagenome_custom/reference/Caenorhabditis_elegans.WBcel235.115.gtf",
+    "means": "alphagenome_custom/metadata/v2/track_nonzero_means_v2.tsv",
+    "model_specs": "alphagenome_custom/metadata/v2/model_specs_v2.json",
+    "model_weights": "weights/alphagenome_pytorch/model_all_folds.safetensors",
+    "track_manifest": "alphagenome_custom/metadata/v2/p3_group_outputs.tsv"
+  },
+  "model_contract": {
+    "hidden_channels": 64,
+    "loss": "paper",
+    "mean_column_template": "fold_{fold}_train_nonzero_mean",
+    "model": "B",
+    "sequence_length": 131072
+  },
+  "normalization_boundary": "Both grouped RNA-seq tracks were independently rescaled to a decoded total signal of 1e8. All endpoints are relative G0005-G0006 contrasts; no absolute global-RNA or spike-in interpretation is permitted.",
+  "output_paths": {
+    "analysis_audit": "alphagenome_custom/metadata/v2/p10_dpy27_internal_application_execution.json",
+    "figure_pdf": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.pdf",
+    "figure_png": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.png",
+    "figure_qa": "runs/v2_p10_dpy27_internal_application_20260813/figure_qa.json",
+    "figure_svg": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.svg",
+    "figure_tiff": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.tiff",
+    "figure_source_data": "runs/v2_p10_dpy27_internal_application_20260813/figure_source_data.tsv",
+    "fold_endpoints": "runs/v2_p10_dpy27_internal_application_20260813/fold_endpoints.tsv",
+    "fold_gene_contrasts": "runs/v2_p10_dpy27_internal_application_20260813/fold_gene_contrasts.tsv",
+    "gene_contrasts": "runs/v2_p10_dpy27_internal_application_20260813/gene_contrasts.tsv",
+    "preflight_audit": "runs/v2_p10_dpy27_internal_application_20260813/preflight_audit.json",
+    "run_endpoints": "runs/v2_p10_dpy27_internal_application_20260813/run_endpoints.tsv",
+    "run_root": "runs/v2_p10_dpy27_internal_application_20260813",
+    "summary_endpoints": "runs/v2_p10_dpy27_internal_application_20260813/summary_endpoints.tsv"
+  },
+  "phase": "P10",
+  "plot_runtime": {
+    "audit_pdf_text_path": "/home/zelinli6/.codex/skills/nature-figure/scripts/audit_pdf_text.py",
+    "audit_pdf_text_sha256": "11b8f3ec50bc13e2bd8561eeb7cd204307f4ce5a70ac57fa24c809ce1b9c252c",
+    "matplotlib_version": "3.7.0",
+    "numpy_version": "1.21.0",
+    "pillow_version": "9.5.0",
+    "python_executable": "/home/zelinli6/miniconda3/envs/CellUNetr/bin/python",
+    "python_executable_sha256": "daa2a914453986fae345e534229167112c2d38b0fb74618a080dbe371448a7c6",
+    "python_version": "3.9.16",
+    "validate_figure_path": "/home/zelinli6/.codex/skills/nature-figure/scripts/validate_figure.py",
+    "validate_figure_sha256": "3573147e771bb1c98da24b1d59d66ff84d0300a6ce9c7275c71c2aedf1789374"
+  },
+  "purpose": "Apply all 15 existing Model-B paper-loss blocked-CV checkpoints to the DPY-27 RNAi and matched vector RNAi tracks on each fold's validation cores only.",
+  "schema_version": 1,
+  "statistics": {
+    "bootstrap_replicates": 10000,
+    "bootstrap_seed": 20260813,
+    "case_group_id": "RNA_V2_G0005",
+    "complete_exon_coverage_required": true,
+    "contrast": "log1p(case exon mean) - log1p(control exon mean)",
+    "control_group_id": "RNA_V2_G0006",
+    "direction_zero_epsilon": 0.0,
+    "endpoints": [
+      "predicted_median_contrast_x_minus_autosomes",
+      "observed_median_contrast_x_minus_autosomes",
+      "x_predicted_observed_direction_concordance",
+      "predicted_observed_gene_spearman"
+    ],
+    "inference_unit": "fold_after_within_fold_gene_condition_seed_mean"
+  }
+}

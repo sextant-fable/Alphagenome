@@ -17,7 +17,9 @@ class V2PhaseControllerTest(unittest.TestCase):
         self.assertEqual(controller.next_phase("P6B"), "P6C")
         self.assertEqual(controller.next_phase("P6C"), "P7")
         self.assertEqual(controller.next_phase("P7"), "P8")
-        self.assertIsNone(controller.next_phase("P8"))
+        self.assertEqual(controller.next_phase("P8"), "P9")
+        self.assertEqual(controller.next_phase("P9"), "P10")
+        self.assertIsNone(controller.next_phase("P10"))
 
     def test_p3a_requires_all_three_exact_scopes(self) -> None:
         state = controller.initial_state()
@@ -177,6 +179,65 @@ class V2PhaseControllerTest(unittest.TestCase):
             controller.missing_approvals(state, "P8"),
             ["G4:p8_b_no_lora_fold1"],
         )
+
+    def test_p9_is_registered_as_scoped_submission_evidence(self) -> None:
+        self.assertIn("scripts.run_v2_p9_submission_evidence", controller.PHASE_COMMANDS["P9"])
+        controller.validate_approval_scope(
+            "G4", "p9_submission_evidence_matrix", "P9"
+        )
+        state = controller.initial_state()
+        state["current_phase"] = "P9"
+        self.assertEqual(
+            controller.missing_approvals(state, "P9"),
+            ["G4:p9_submission_evidence_matrix"],
+        )
+
+    def test_start_p9_requires_completed_p8_and_preserved_final_lock(self) -> None:
+        state = controller.initial_state()
+        state["current_phase"] = "P8"
+        state["status"] = "COMPLETE"
+        with (
+            mock.patch.object(controller, "save_state"),
+            mock.patch.object(
+                controller.json,
+                "loads",
+                return_value={"test_consumed": True, "test_status": "completed"},
+            ),
+        ):
+            self.assertEqual(controller.start_p9_submission_evidence(state), 0)
+        self.assertEqual(state["current_phase"], "P9")
+        self.assertEqual(state["status"], "PENDING")
+
+    def test_p10_is_registered_and_auto_follows_p9(self) -> None:
+        self.assertIn("scripts.run_dpy27_internal_application", controller.PHASE_COMMANDS["P10"])
+        controller.validate_approval_scope(
+            "G4", "p10_dpy27_internal_application", "P10"
+        )
+        state = controller.initial_state()
+        state["current_phase"] = "P10"
+        self.assertEqual(
+            controller.missing_approvals(state, "P10"),
+            ["G4:p10_dpy27_internal_application"],
+        )
+
+    def test_p9_pass_advances_to_p10_pending_without_start_command(self) -> None:
+        state = controller.initial_state()
+        state["current_phase"] = "P9"
+        state["status"] = "PENDING"
+        state["approvals"][controller.GATE_KEYS["G4"]] = {
+            "approved": True,
+            "scope": "p9_submission_evidence_matrix",
+            "note": "test",
+            "updated_at": "test",
+        }
+        with (
+            mock.patch.object(controller, "save_state"),
+            mock.patch.object(controller, "run_command", side_effect=(0, 0)),
+        ):
+            self.assertEqual(controller.run_phase(state, "P9"), 0)
+        self.assertEqual(state["current_phase"], "P10")
+        self.assertEqual(state["status"], "PENDING")
+        self.assertEqual(state["history"][-1]["phase"], "P10")
 
     def test_final_test_scope_cannot_be_approved_early(self) -> None:
         with self.assertRaisesRegex(ValueError, "only in P6C"):

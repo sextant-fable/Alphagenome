@@ -30,7 +30,12 @@ FINAL_CLAIM_PATH = METADATA_DIR / "final_test_claim.json"
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model", choices=("A", "B", "B_no_lora", "C", "D"), required=True
+        "--model",
+        choices=(
+            "A", "B", "B_no_lora", "B_lora_only", "B_1bp_head_only",
+            "C", "C_size_matched", "D",
+        ),
+        required=True,
     )
     parser.add_argument("--training-loss", choices=("paper", "log1p_mse"), required=True)
     parser.add_argument("--fold", type=int, choices=range(0, 6), required=True)

@@ -2,6 +2,15 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-08-13 - P9/P10 Development-Only Registration
+
+- P9 contract: `p9_submission_evidence_spec.json` freezes six 5-fold x 3-seed component cells, 90 registered records, 31 exact reuses, and 59 new training jobs. The exact G4 scope is `p9_submission_evidence_matrix`; only physical GPUs 2/3 may be selected after live checks.
+- P9 component semantics: A and B are reused in full; no-LoRA retains the worm embedding; LoRA-only retains the original organism-0 embedding; the learned output head contains only the 1 bp branch while full-B worm embedding and LoRA adaptation remain trainable, with the 128 bp prediction derived by unscaled 1 bp sum pooling; the from-scratch baseline uses hidden width 152 and 1,265,122 trainable parameters, within 0.88% of B's 1,276,228.
+- P9 analysis: raw same-fold/same-seed differences and true fold-then-seed hierarchical bootstrap intervals are frozen. Worm and LoRA main effects and their interaction use the exact paired 2x2 formulas. All 241-track component metrics and their exact composite score are emitted as descriptive source data, not independent replicates. Existing B/log1p-MSE records are auxiliary and are not retrained.
+- P10 contract: `p10_dpy27_internal_application_spec.json` freezes all 15 B/paper checkpoints, five validation manifests, RNA_V2_G0005/RNA_V2_G0006 inputs, model/data hashes, six implementation hashes, fold-primary inference, and submission figure outputs under exact scope `p10_dpy27_internal_application`. R10 requires 15 checksum-valid shards, complete tabular source data, terminal execution status, and passing PDF/SVG/TIFF/PNG QA.
+- Claim boundary: P9 and P10 are development-only and preserve the completed P6C lock/report hashes. P10 is an internal application to conditions present among model targets, not unseen-study or unseen-condition validation. No P9/P10 GPU job or biological result was executed in this registration change.
+- Controller sequence: run `start-p9-submission-evidence`, approve the exact P9 G4 scope, and run P9. R9 PASS advances automatically to P10/PENDING; approve the distinct P10 G4 scope before running P10. There is no separate start-P10 command.
+
 ## 2026-07-30 - P8 B-noLoRA Fold-1 Ablation Result
 
 - Execution: P8 completed on HY-GPU physical GPU 3 from `2026-07-30T11:54:24+00:00` to `2026-07-30T12:31:54+00:00` under `G4:p8_b_no_lora_fold1`, using execution commit `923f58190727f79ae3c8d2f3ce6a36be4b6638e2`.

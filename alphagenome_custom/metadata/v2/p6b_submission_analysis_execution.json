@@ -1,0 +1,349 @@
+{
+  "schema_version": 1,
+  "analysis_id": "P6B-SIXCHR-SUBMISSION-1",
+  "status": "complete",
+  "completed_at": "2026-08-13T18:27:56+08:00",
+  "host": "hy8",
+  "repository": "/home/zelinli6/Alphagenome",
+  "git_head_at_execution": "764cfb073eea867af884cf1de172a72bd2eb7f06",
+  "git_worktree_clean_at_execution": false,
+  "git_note": "The recorded Git HEAD is the baseline checkout. The analysis files were uncommitted when this audit was written, and unrelated user/P9/P10 changes were preserved.",
+  "scope": {
+    "lineage": "P6B six-chromosome development validation",
+    "formal_validation_runs": 90,
+    "models": [
+      "A",
+      "B",
+      "C"
+    ],
+    "training_losses": [
+      "paper",
+      "log1p_mse"
+    ],
+    "folds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "seeds": [
+      20260714,
+      20260715,
+      20260716
+    ],
+    "tracks": 241,
+    "locked_test_block_signal_reads": 0,
+    "final_test_inputs_accessed": false,
+    "boundary": "Development-validation evidence only; no chromosome-X final-test interval, final-test signal, or final-test report was read. Development folds themselves cover all six chromosomes, including chromosome X train/validation blocks, under the existing split contract."
+  },
+  "locked_inputs": {
+    "analysis_spec": {
+      "path": "alphagenome_custom/metadata/v2/p6b_submission_analysis_spec.json",
+      "sha256": "62877e331fa3bfa74a9c5bec4abb173533e3c922470ef17b1c5120687cb21f51"
+    },
+    "p6b_training_spec": {
+      "path": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_spec.json",
+      "sha256": "7f50967e1e53427b5b0ac6630c1b19c9b7344a79e67b60cfb36cb0c1a9289a05"
+    },
+    "p6b_execution_record": {
+      "path": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_execution.json",
+      "sha256": "e98b1e2cfed5f3ccedcb6e6aaf6d5013c17f23d7ed4f320d2a92378740a9502c"
+    },
+    "track_manifest": {
+      "path": "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv",
+      "sha256": "06bfc6109b08dc22007601d9c406cd4772701901f069f16ad1ea26b3d6134737"
+    },
+    "development_signal_means": {
+      "path": "alphagenome_custom/metadata/v2/track_nonzero_means_v2.tsv",
+      "sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669"
+    },
+    "validation_manifest": {
+      "root": "runs/v2_p6b_six_chromosome_corefix_20260722/formal",
+      "files": 90,
+      "sha256": "7c6be7c62364074ba5b9a6437f0f71d8fd31b2bf0de0d1ec57461b4ec7a4c25f",
+      "digest_algorithm": "sha256 of sorted lines '<file_sha256>  <repo_relative_path>\\n'"
+    }
+  },
+  "implementation": {
+    "analysis_script": {
+      "path": "scripts/analyze_v2_p6b_submission.py",
+      "sha256": "eb39a4b01f4c583b41d54e2fe55cf6957dafec2cc056c605f863d9baba93238c"
+    },
+    "statistics_helper": {
+      "path": "scripts/v2_submission_statistics.py",
+      "sha256": "c50ab80fbee6b525a6b66b9aa89eec660821c79e4e6f945018e891c432fc1291"
+    },
+    "focused_tests": {
+      "path": "tests/test_v2_submission_statistics.py",
+      "sha256": "b702b85a5312697e9036ea0d03c127e1092aa831112f6a7b06f1b3db26907743"
+    },
+    "tracked_report": {
+      "path": "docs/v2_p6b_submission_analysis.md",
+      "sha256": "888a1b65bbe286049a64098b1857646012c6d9bdd4ca2c298f4e725865886c5c"
+    }
+  },
+  "statistical_contract": {
+    "independent_resampling_unit": "development-validation fold",
+    "algorithmic_repeat": "training seed within fold",
+    "point_estimate": "mean of five fold means; each fold mean averages three seeds",
+    "bootstrap": "hierarchical paired percentile bootstrap",
+    "iterations": 20000,
+    "rng": "numpy.random.Generator(PCG64)",
+    "seed": 20260813,
+    "confidence_level": 0.95,
+    "resampling": "sample five folds with replacement; for every sampled fold occurrence sample three seeds with replacement; average seeds within occurrence and then average the five sampled fold means",
+    "pairing": "candidate minus comparator at identical fold and seed before resampling",
+    "track_inference": "descriptive only; 241 tracks are not treated as independent inferential n",
+    "p_values": "not computed"
+  },
+  "counts": {
+    "formal_validation_jsons": 90,
+    "run_level_rows": 90,
+    "configuration_bootstrap_rows": 60,
+    "paired_fold_seed_rows": 1350,
+    "paired_contrast_bootstrap_rows": 90,
+    "per_track_metric_ids_including_derived_primary": 39,
+    "track_long_rows": 845910,
+    "track_configuration_summary_rows": 56394,
+    "track_metadata_rows": 241,
+    "stratified_summary_rows": 1504,
+    "source_data_rows": 1928,
+    "signal_strength_tracks": {
+      "Low": 81,
+      "Middle": 80,
+      "High": 80
+    }
+  },
+  "headline_results": {
+    "B_paper_composite_biological_score": {
+      "estimate": 0.6266016255105283,
+      "ci_lower": 0.6114471694606759,
+      "ci_upper": 0.6409322579521625
+    },
+    "B_paper_vs_A_paper_composite": {
+      "paired_effect": 0.11118035500826803,
+      "ci_lower": 0.10726430864973713,
+      "ci_upper": 0.11618631572799552
+    },
+    "B_paper_vs_C_paper_composite": {
+      "paired_effect": 0.13905737606487623,
+      "ci_lower": 0.13276172515547122,
+      "ci_upper": 0.14539543777601746
+    },
+    "B_paper_vs_B_log1p_mse_composite": {
+      "paired_effect": 0.011227693513105137,
+      "ci_lower": 0.0049704795703933505,
+      "ci_upper": 0.016699555052596918
+    },
+    "B_paper_vs_B_log1p_mse_gene_exon_component": {
+      "paired_effect": 0.0479524600629951,
+      "ci_lower": 0.041355444164988826,
+      "ci_upper": 0.05470205065730122
+    },
+    "B_paper_vs_B_log1p_mse_128bp_component": {
+      "paired_effect": -0.025497073036784845,
+      "ci_lower": -0.0323432640142501,
+      "ci_upper": -0.020178191359645156
+    }
+  },
+  "software": {
+    "analysis": {
+      "executable": "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+      "python": "3.12.13",
+      "numpy": "2.4.4",
+      "dependencies": "Python standard library and NumPy only"
+    },
+    "figure": {
+      "executable": "/home/zelinli6/miniconda3/envs/CellUNetr/bin/python",
+      "python": "3.9.16",
+      "numpy": "1.21.0",
+      "matplotlib": "3.7.0",
+      "pillow": "9.5.0",
+      "backend": "Python/matplotlib only"
+    },
+    "packages_installed_for_analysis": false
+  },
+  "commands": [
+    "/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m py_compile scripts/v2_submission_statistics.py scripts/analyze_v2_p6b_submission.py tests/test_v2_submission_statistics.py",
+    "/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m unittest tests.test_v2_submission_statistics -v",
+    "/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.analyze_v2_p6b_submission --skip-figures",
+    "/home/zelinli6/miniconda3/envs/CellUNetr/bin/python -m scripts.analyze_v2_p6b_submission --render-only",
+    "/home/zelinli6/miniconda3/envs/alphagenome/bin/python /home/zelinli6/.codex/skills/nature-figure/scripts/validate_figure.py scripts/analyze_v2_p6b_submission.py --backend python --json",
+    "/home/zelinli6/miniconda3/envs/alphagenome/bin/python /home/zelinli6/.codex/skills/nature-figure/scripts/audit_pdf_text.py results/v2_p6b_submission_analysis/Figure_1_p6b_competitive_comparison.pdf --min-pt 5 --json"
+  ],
+  "artifacts": [
+    {
+      "path": "results/v2_p6b_submission_analysis/analysis_manifest.json",
+      "sha256": "a9331e115e4f9846a376aa0994d2f96cfdb32ab236b71a21a3dc965044b1b69c",
+      "bytes": 7960
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/QA_REPORT.md",
+      "sha256": "41919310955f7b89f64c353cbda8c3e4446d0f52df33596f0425b3e4f6061efa",
+      "bytes": 3458
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/Figure_1_p6b_competitive_comparison.pdf",
+      "sha256": "26aac3a2472ba2cc772f743f111b177df1ed30d5a4ad6a37f2183b26f66c6cee",
+      "bytes": 41626
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/Figure_1_p6b_competitive_comparison.svg",
+      "sha256": "e157df78119a64d4413237bbc5e54ba0c7365e3c02a081c18f8fb4d98ceef6f4",
+      "bytes": 86299
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/Figure_1_p6b_competitive_comparison.tiff",
+      "sha256": "130ae77b40071dac7bbf8146dec71af8f30930a54f02ea9ca1ec3e264b61d7c3",
+      "bytes": 1514130
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/Figure_1_p6b_competitive_comparison.png",
+      "sha256": "147c86776ed101d564e9d16d775bb72cbf825d9b378075384a36df5802a7b44b",
+      "bytes": 348841
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/Source_Data_Figure_1.csv",
+      "sha256": "20888025ac242b7c62559e9080e784b254b12cbb0a714c6aad4d32d60f923c19",
+      "bytes": 293915,
+      "rows": 1928
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/Source_Data_Figure_1.tsv",
+      "sha256": "d1b5f1dcdd88c3bc04399c4e82d70604c0081fc1b086c8ac6f189b3706593e99",
+      "bytes": 293915,
+      "rows": 1928
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/run_level_metrics.csv",
+      "sha256": "eca45c61d6530b23cb6eee73b936136e33865c127ca1df950cab2216e73b98c6",
+      "bytes": 136573,
+      "rows": 90
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/run_level_metrics.tsv",
+      "sha256": "8c5680333008e95a91f633b53c78590d5033bf3f8d10b16b19becf4395da5627",
+      "bytes": 136573,
+      "rows": 90
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/configuration_bootstrap_estimates.tsv",
+      "sha256": "3558da0871b5f2c34daa6de427807bc04b4d8dfc942cdae3a744e872b5a601e5",
+      "bytes": 13244,
+      "rows": 60
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/paired_fold_seed_contrasts.tsv",
+      "sha256": "fe5cbf05037668f643f6513a5172131601f745157220ca3c623498b9e52e8efd",
+      "bytes": 285989,
+      "rows": 1350
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/paired_contrast_bootstrap_estimates.tsv",
+      "sha256": "97a484c2d3652d31bb520511f460006528a2425b84a9da6ae58a6430aa19bc5c",
+      "bytes": 24715,
+      "rows": 90
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/track_metrics_long.tsv",
+      "sha256": "7c96006c20c9f84e057e0a2d1188438aba572bb74c38afb8517eafc4ec50ac9b",
+      "bytes": 113986591,
+      "rows": 845910
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/track_configuration_summaries.tsv",
+      "sha256": "c62a86e851721ff7075a68e50abf4d42a643e4bf0d78ae607e336cf7271d8b2a",
+      "bytes": 7966069,
+      "rows": 56394
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/track_metadata_strata.tsv",
+      "sha256": "f37e7e86599bf92825f9a631f20d6076dfad411dfd8165aa2cd0f40e86544d1e",
+      "bytes": 44193,
+      "rows": 241
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/stratified_track_summaries.tsv",
+      "sha256": "3a69a9df13db8979c88bfdf27563f48d4e6eb74f8a91d82e526c6e54587422be",
+      "bytes": 344171,
+      "rows": 1504
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/METHODS.md",
+      "sha256": "7aa8f9357118683891788aaa0cd3b7423bf11ab19dac7a2445a220985876cbbc",
+      "bytes": 3058
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/FIGURE_LEGEND.md",
+      "sha256": "2ef3e485f727df43b3532b2505246e2b7bde7dbcba79be0c8a4c96e714a3ec5e",
+      "bytes": 1610
+    },
+    {
+      "path": "results/v2_p6b_submission_analysis/README.md",
+      "sha256": "783c88cd38923ef3a8a518aaa6a2f7b34d427b10e3291e3ba1212a25b3d0d616",
+      "bytes": 2474
+    }
+  ],
+  "figure_qa": {
+    "nature_figure_source_validation": {
+      "pass": 20,
+      "warn": 0,
+      "fail": 0,
+      "ready": true
+    },
+    "pdf_text_audit": {
+      "auditable": true,
+      "text_runs": 78,
+      "minimum_required_pt": 5.0,
+      "minimum_found_pt": 5.5,
+      "below_minimum": 0
+    },
+    "final_size": {
+      "width_mm": 183,
+      "height_mm": 164,
+      "pdf_page_points": [
+        518.74,
+        464.882
+      ],
+      "png_pixels": [
+        2161,
+        1937
+      ],
+      "png_dpi": 300,
+      "tiff_pixels": [
+        4322,
+        3874
+      ],
+      "tiff_dpi": 600
+    },
+    "visual_inspection": {
+      "whole_figure": "pass",
+      "panel_a": "pass: all configuration labels, fold means and confidence intervals are clear",
+      "panel_b": "pass: paired direction, zero line, component labels and confidence intervals are clear",
+      "panel_c": "pass: all 241 track points are retained and legible as a descriptive distribution",
+      "panel_d": "pass: metadata-defined strata, n values, medians and interquartile ranges are clear",
+      "overlap_or_collision": false,
+      "blank_canvas": false
+    },
+    "report": "results/v2_p6b_submission_analysis/QA_REPORT.md"
+  },
+  "test_results": {
+    "focused_unittest": {
+      "tests_run": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "result": "PASS"
+    },
+    "real_input_contract": {
+      "runs": 90,
+      "tracks": 241,
+      "per_track_metric_ids": 39,
+      "locked_test_block_signal_reads": 0,
+      "result": "PASS"
+    },
+    "source_data_consistency": "PASS: all configuration/fold/seed and contrast/metric/fold/seed keys unique; headline estimates exactly equal the five-fold point-estimate definition"
+  },
+  "interpretation_boundary": "This bundle strengthens the matched internal A/B/C comparison but does not replace an external study/laboratory benchmark. Its fold-primary intervals describe the locked development-validation design and are not independent-study generalization intervals."
+}

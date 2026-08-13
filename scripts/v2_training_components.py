@@ -206,6 +206,23 @@ def log1p_mse_loss(
     return total, metrics
 
 
+def derive_128bp_model_space_from_1bp(
+    prediction_1bp_model_space: torch.Tensor,
+    track_means: torch.Tensor | Sequence[float],
+) -> torch.Tensor:
+    """Sum-pool unscaled 1-bp predictions, then return 128-bp model space."""
+
+    if prediction_1bp_model_space.shape[-1] % 128:
+        raise ValueError("1-bp prediction length must be divisible by 128")
+    prediction_1bp = unscale_predictions_experimental_space(
+        prediction_1bp_model_space, track_means, 1
+    )
+    prediction_128bp = prediction_1bp.reshape(
+        *prediction_1bp.shape[:-1], prediction_1bp.shape[-1] // 128, 128
+    ).sum(dim=-1)
+    return scale_targets_model_space(prediction_128bp, track_means, 128)
+
+
 def reverse_complement_item(
     item: Mapping[str, Any],
     strand_pair_index: torch.Tensor | Sequence[int] | None = None,
@@ -303,13 +320,22 @@ def add_c_elegans_organism_embeddings(model: torch.nn.Module) -> list[str]:
 
 
 class DualResolutionRnaHead(torch.nn.Module):
-    def __init__(self, n_tracks: int, track_means: torch.Tensor) -> None:
+    def __init__(
+        self,
+        n_tracks: int,
+        track_means: torch.Tensor,
+        *,
+        resolutions: Sequence[int] = RESOLUTIONS,
+    ) -> None:
         super().__init__()
+        self.resolutions = tuple(int(value) for value in resolutions)
+        if not self.resolutions or any(value not in RESOLUTIONS for value in self.resolutions):
+            raise ValueError(f"Unsupported RNA-head resolutions: {self.resolutions}")
         means = torch.as_tensor(track_means, dtype=torch.float32).reshape(1, n_tracks)
         self.head = GenomeTracksHead(
             in_channels={1: 1536, 128: 3072},
             num_tracks=n_tracks,
-            resolutions=RESOLUTIONS,
+            resolutions=self.resolutions,
             num_organisms=1,
             track_means=means,
             apply_squashing=True,
@@ -338,12 +364,22 @@ class AlphaGenomeRnaModel(torch.nn.Module):
         *,
         base_organism_index: int,
         encode_requires_grad: bool,
+        head_resolutions: Sequence[int] = RESOLUTIONS,
+        derive_128bp_from_1bp: bool = False,
     ) -> None:
         super().__init__()
         self.base_model = base_model
-        self.rna_head = DualResolutionRnaHead(n_tracks, track_means)
+        means = torch.as_tensor(track_means, dtype=torch.float32).reshape(-1)
+        self.register_buffer("track_means", means.clone())
+        self.rna_head = DualResolutionRnaHead(
+            n_tracks, means, resolutions=head_resolutions
+        )
         self.base_organism_index = int(base_organism_index)
         self.encode_requires_grad = bool(encode_requires_grad)
+        self.head_resolutions = tuple(int(value) for value in head_resolutions)
+        self.derive_128bp_from_1bp = bool(derive_128bp_from_1bp)
+        if self.derive_128bp_from_1bp and self.head_resolutions != (1,):
+            raise ValueError("Derived 128-bp output requires a 1-bp-only learned head")
 
     def train(self, mode: bool = True) -> "AlphaGenomeRnaModel":
         super().train(mode)
@@ -363,14 +399,19 @@ class AlphaGenomeRnaModel(torch.nn.Module):
             encoded = self.base_model.encode(
                 dna.transpose(1, 2).contiguous(),
                 organism,
-                resolutions=RESOLUTIONS,
+                resolutions=self.head_resolutions,
                 channels_last=False,
             )
         embeddings = {
-            1: encoded["embeddings_1bp"],
-            128: encoded["embeddings_128bp"],
+            resolution: encoded[f"embeddings_{resolution}bp"]
+            for resolution in self.head_resolutions
         }
-        return self.rna_head(embeddings)
+        predictions = self.rna_head(embeddings)
+        if self.derive_128bp_from_1bp:
+            predictions[128] = derive_128bp_model_space_from_1bp(
+                predictions[1], self.track_means
+            )
+        return predictions
 
 
 class Legacy128bpBaseRnaModel(torch.nn.Module):
@@ -531,6 +572,12 @@ class WormSequenceBaseline(torch.nn.Module):
         }
 
 
+class SizeMatchedWormSequenceBaseline(WormSequenceBaseline):
+    """From-scratch dual-resolution baseline near model B's trainable size."""
+
+    pass
+
+
 @dataclass(frozen=True)
 class ModelSpec:
     model_id: str
@@ -553,7 +600,25 @@ MODEL_SPECS = (
         2,
         "worm_embeddings_only",
     ),
+    ModelSpec(
+        "B_lora_only",
+        "original organism embedding plus final-tower LoRA and dual RNA head",
+        0,
+        "lora_only",
+    ),
+    ModelSpec(
+        "B_1bp_head_only",
+        "worm embedding plus LoRA with a learned 1bp head and deterministic 128bp pooling",
+        2,
+        "worm_embeddings_and_lora_only",
+    ),
     ModelSpec("C", "residual sequence baseline trained from scratch", None, "from_scratch"),
+    ModelSpec(
+        "C_size_matched",
+        "parameter-matched residual sequence baseline trained from scratch",
+        None,
+        "from_scratch",
+    ),
     ModelSpec(
         "D",
         "frozen AlphaGenome trunk with legacy 128bp-base plus 1bp residual head",

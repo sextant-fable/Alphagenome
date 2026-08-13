@@ -17,6 +17,39 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LEGACY_DIR = REPO_ROOT / "alphagenome_custom/metadata/legacy_v1"
 AUDIT_ROOT = REPO_ROOT / "alphagenome_custom/metadata/v2/audits"
+P10_IMPLEMENTATION_PATHS = (
+    "scripts/run_dpy27_internal_application.py",
+    "scripts/v2_biological_validation.py",
+    "scripts/plot_dpy27_internal_application.py",
+    "scripts/train_v2_model.py",
+    "scripts/v2_training_components.py",
+    "scripts/v2_bigwig_dataset.py",
+)
+P10_SOURCE_DATA_CONTRACT = {
+    "panels": [
+        "a_gene_contrasts",
+        "b_fold_x_minus_autosomes",
+        "c_fold_agreement",
+        "c_fold_primary_summary",
+    ],
+    "panel_endpoints": {
+        "a_gene_contrasts": ["gene_log1p_contrast"],
+        "b_fold_x_minus_autosomes": [
+            "observed_median_contrast_x_minus_autosomes",
+            "predicted_median_contrast_x_minus_autosomes",
+        ],
+        "c_fold_agreement": [
+            "x_predicted_observed_direction_concordance",
+            "predicted_observed_gene_spearman",
+        ],
+        "c_fold_primary_summary": [
+            "predicted_median_contrast_x_minus_autosomes",
+            "observed_median_contrast_x_minus_autosomes",
+            "x_predicted_observed_direction_concordance",
+            "predicted_observed_gene_spearman",
+        ],
+    },
+}
 
 
 def utc_now() -> str:
@@ -67,6 +100,198 @@ def check(check_id: str, passed: bool, evidence: str) -> dict[str, Any]:
         "status": "PASS" if passed else "FAIL",
         "evidence": evidence,
     }
+
+
+def _p10_implementation_sha256(repo_root: Path | None = None) -> dict[str, str]:
+    repo_root = REPO_ROOT if repo_root is None else repo_root
+    return {
+        relative: sha256(repo_root / relative)
+        for relative in P10_IMPLEMENTATION_PATHS
+    }
+
+
+def _p10_execution_provenance_ok(execution: dict[str, Any]) -> bool:
+    python_executable = Path(str(execution.get("python_executable", "")))
+    return (
+        bool(execution.get("git_commit"))
+        and bool(execution.get("hostname"))
+        and execution.get("working_directory") == str(REPO_ROOT)
+        and python_executable.is_absolute()
+        and bool(python_executable.name)
+        and execution.get("controller_invocation")
+        == "python -m scripts.v2_phase_controller run --phase P10"
+        and execution.get("registered_phase_command")
+        == "python -m scripts.run_dpy27_internal_application"
+    )
+
+
+def _p10_close(actual: object, expected: object) -> bool:
+    try:
+        return math.isclose(
+            float(actual), float(expected), rel_tol=1e-12, abs_tol=1e-12
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def _p10_summary_recomputation_ok(
+    gene_rows: list[dict[str, Any]],
+    fold_rows: list[dict[str, Any]],
+    summary_rows: list[dict[str, Any]],
+    statistics: dict[str, Any],
+) -> bool:
+    """Independently recompute all fold endpoints and deterministic bootstrap CIs."""
+
+    try:
+        from scripts import v2_biological_validation as biological_validation
+
+        endpoints = tuple(statistics["endpoints"])
+        _, expected_folds, expected_summaries = biological_validation.fold_primary_summary(
+            gene_rows,
+            endpoints=endpoints,
+            bootstrap_replicates=int(statistics["bootstrap_replicates"]),
+            bootstrap_seed=int(statistics["bootstrap_seed"]),
+        )
+        if len(fold_rows) != 5 or len(summary_rows) != len(endpoints):
+            return False
+        recorded_folds = {int(row["fold"]): row for row in fold_rows}
+        recorded_summaries = {row["endpoint"]: row for row in summary_rows}
+        if len(recorded_folds) != 5 or set(recorded_summaries) != set(endpoints):
+            return False
+        for expected in expected_folds:
+            recorded = recorded_folds[int(expected["fold"])]
+            if int(recorded["n_seeds"]) != 3 or any(
+                not _p10_close(recorded[endpoint], expected[endpoint])
+                for endpoint in endpoints
+            ):
+                return False
+        for expected in expected_summaries:
+            recorded = recorded_summaries[str(expected["endpoint"])]
+            if not (
+                int(recorded["n_folds"]) == int(expected["n_folds"]) == 5
+                and int(recorded["n_runs"]) == int(expected["n_runs"]) == 15
+                and recorded["inference_unit"] == expected["inference_unit"]
+                and int(recorded["bootstrap_replicates"])
+                == int(expected["bootstrap_replicates"])
+                and int(recorded["bootstrap_seed"])
+                == int(expected["bootstrap_seed"])
+                and all(
+                    _p10_close(recorded[field], expected[field])
+                    for field in ("estimate", "ci_95_low", "ci_95_high")
+                )
+            ):
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _p10_source_data_ok(
+    source_rows: list[dict[str, Any]],
+    fold_gene_rows: list[dict[str, Any]],
+    fold_rows: list[dict[str, Any]],
+    summary_rows: list[dict[str, Any]],
+    contract: dict[str, Any],
+) -> bool:
+    """Rebuild the expected four-panel Source Data mapping and compare values."""
+
+    try:
+        if contract != P10_SOURCE_DATA_CONTRACT:
+            return False
+        panels = set(contract["panels"])
+        if {row["panel"] for row in source_rows} != panels:
+            return False
+        for panel, endpoints in contract["panel_endpoints"].items():
+            if {row["endpoint"] for row in source_rows if row["panel"] == panel} != set(
+                endpoints
+            ):
+                return False
+        indexed: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+        for row in source_rows:
+            key = (
+                str(row["panel"]),
+                str(row["fold"]),
+                str(row["gene_id"]),
+                str(row["endpoint"]),
+            )
+            if key in indexed:
+                return False
+            indexed[key] = row
+
+        expected_keys: set[tuple[str, str, str, str]] = set()
+        for row in fold_gene_rows:
+            complete = row["complete_exon_coverage"] is True or str(
+                row["complete_exon_coverage"]
+            ) == "True"
+            if not complete:
+                continue
+            key = (
+                "a_gene_contrasts",
+                str(row["fold"]),
+                str(row["gene_id"]),
+                "gene_log1p_contrast",
+            )
+            expected_keys.add(key)
+            actual = indexed.get(key)
+            if not actual or not (
+                actual["seed"] == "seed_mean"
+                and actual["gene_name"] == row["gene_name"]
+                and actual["chromosome"] == row["chromosome"]
+                and _p10_close(
+                    actual["observed"],
+                    row["observed_log1p_contrast_g0005_minus_g0006"],
+                )
+                and _p10_close(
+                    actual["predicted"],
+                    row["predicted_log1p_contrast_g0005_minus_g0006"],
+                )
+            ):
+                return False
+
+        for row in fold_rows:
+            for kind in ("observed", "predicted"):
+                endpoint = f"{kind}_median_contrast_x_minus_autosomes"
+                key = (
+                    "b_fold_x_minus_autosomes",
+                    str(row["fold"]),
+                    "",
+                    endpoint,
+                )
+                expected_keys.add(key)
+                actual = indexed.get(key)
+                if not actual or not (
+                    actual["seed"] == "seed_mean"
+                    and _p10_close(actual["estimate"], row[endpoint])
+                    and _p10_close(actual[kind], row[endpoint])
+                    and str(actual["predicted" if kind == "observed" else "observed"])
+                    == ""
+                ):
+                    return False
+            for endpoint in contract["panel_endpoints"]["c_fold_agreement"]:
+                key = ("c_fold_agreement", str(row["fold"]), "", endpoint)
+                expected_keys.add(key)
+                actual = indexed.get(key)
+                if not actual or not (
+                    actual["seed"] == "seed_mean"
+                    and _p10_close(actual["estimate"], row[endpoint])
+                ):
+                    return False
+
+        for row in summary_rows:
+            endpoint = str(row["endpoint"])
+            key = ("c_fold_primary_summary", "all_folds", "", endpoint)
+            expected_keys.add(key)
+            actual = indexed.get(key)
+            if not actual or not (
+                actual["seed"] == "within_fold_seed_mean"
+                and _p10_close(actual["estimate"], row["estimate"])
+                and _p10_close(actual["ci_95_low"], row["ci_95_low"])
+                and _p10_close(actual["ci_95_high"], row["ci_95_high"])
+            ):
+                return False
+        return set(indexed) == expected_keys
+    except Exception:
+        return False
 
 
 def review_p0() -> dict[str, Any]:
@@ -3821,6 +4046,1230 @@ def review_p8() -> dict[str, Any]:
     }
 
 
+def _p9_ordered_digest(rows: list[tuple[str, ...]]) -> str:
+    digest = hashlib.sha256()
+    for row in rows:
+        digest.update(("\t".join(row) + "\n").encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _review_p9_dataset_contract(spec: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Re-hash the complete P9 training dataset without reading signal values."""
+
+    errors: list[str] = []
+    try:
+        track_rows = read_tsv(repository_file(spec["locked_inputs"]["track_manifest"]))
+        group_rows = read_tsv(repository_file(spec["locked_inputs"]["group_manifest"]))
+        means_rows = read_tsv(repository_file(spec["locked_inputs"]["means"]))
+        expected_count = int(spec.get("dataset_contract", {}).get("track_count", -1))
+        track_ids = [row.get("group_id", "") for row in track_rows]
+        group_ids = [row.get("group_id", "") for row in group_rows]
+        mean_ids = [row.get("group_id", "") for row in means_rows]
+        if not (
+            expected_count
+            == int(spec.get("dataset_contract", {}).get("group_count", -1))
+            == 241
+            and len(track_rows) == len(group_rows) == len(means_rows) == 241
+            and len(set(track_ids)) == 241
+            and track_ids == group_ids == mean_ids
+            and all(row.get("include_formal_v2") == "True" for row in group_rows)
+        ):
+            errors.append("membership_or_order")
+        registered: list[tuple[str, ...]] = []
+        observed: list[tuple[str, ...]] = []
+        total_bytes = 0
+        for row in track_rows:
+            group_id = row.get("group_id", "")
+            relative = row.get("output_path", "")
+            expected_sha = row.get("output_sha256", "")
+            path = repository_file(relative)
+            actual_sha = sha256(path)
+            if len(expected_sha) != 64 or actual_sha != expected_sha:
+                errors.append(f"{group_id}:hash")
+            registered.append((group_id, relative, expected_sha))
+            observed.append((group_id, relative, actual_sha))
+            total_bytes += path.stat().st_size
+        audit = {
+            "status": "passed" if not errors else "failed",
+            "track_count": len(track_rows),
+            "group_count": len(group_rows),
+            "verified_bigwig_count": len(observed),
+            "verified_bigwig_bytes": total_bytes,
+            "ordered_group_ids_sha256": hashlib.sha256(
+                ("\n".join(track_ids) + "\n").encode("utf-8")
+            ).hexdigest(),
+            "registered_bigwig_manifest_digest": _p9_ordered_digest(registered),
+            "observed_bigwig_manifest_digest": _p9_ordered_digest(observed),
+            "bigwig_signal_reads": 0,
+        }
+    except Exception as error:
+        errors.append(f"dataset:{error}")
+        audit = {"status": "failed"}
+    return audit, errors
+
+
+def _review_p9_reuse_contract(spec: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Independently resolve and hash every reused P6B checkpoint/run/validation."""
+
+    errors: list[str] = []
+    contract = spec.get("p6b_reuse_contract", {})
+    records: list[dict[str, Any]] = []
+    digest_rows: list[tuple[str, ...]] = []
+    try:
+        source = json.loads(repository_file(contract.get("source_execution", "")).read_text())
+        selected = [
+            row
+            for row in source.get("formal_jobs", [])
+            if row.get("model") in {"A", "B"} and row.get("loss") == "paper"
+        ]
+        selected.sort(
+            key=lambda row: (str(row["model"]), int(row["fold"]), int(row["seed"]))
+        )
+        expected = {
+            (model, fold, seed)
+            for model in ("A", "B")
+            for fold in spec["matrix"]["folds"]
+            for seed in spec["matrix"]["seeds"]
+        }
+        actual = {
+            (str(row.get("model")), int(row.get("fold", -1)), int(row.get("seed", -1)))
+            for row in selected
+        }
+        if not (
+            contract.get("source_execution") == spec["locked_inputs"]["p6b_execution"]
+            and int(contract.get("record_count", -1)) == len(selected) == 30
+            and int(contract.get("artifact_count", -1)) == 90
+            and actual == expected
+        ):
+            errors.append("membership")
+        for row in selected:
+            output_dir = str(row["output_dir"])
+            paths = {
+                "checkpoint": str(row["checkpoint_path"]),
+                "run": f"{output_dir}/run.json",
+                "validation": str(row["validation_path"]),
+            }
+            hashes = {
+                name: sha256(repository_file(relative))
+                for name, relative in paths.items()
+            }
+            if hashes["checkpoint"] != row.get("checkpoint_sha256"):
+                errors.append(f"{row.get('model')}:{row.get('fold')}:{row.get('seed')}:checkpoint")
+            record = {
+                "model": str(row["model"]),
+                "loss": "paper",
+                "fold": int(row["fold"]),
+                "seed": int(row["seed"]),
+                "checkpoint_path": paths["checkpoint"],
+                "checkpoint_sha256": hashes["checkpoint"],
+                "run_path": paths["run"],
+                "run_sha256": hashes["run"],
+                "validation_path": paths["validation"],
+                "validation_sha256": hashes["validation"],
+            }
+            records.append(record)
+            digest_rows.append(
+                tuple(
+                    str(record[key])
+                    for key in (
+                        "model",
+                        "loss",
+                        "fold",
+                        "seed",
+                        "checkpoint_path",
+                        "checkpoint_sha256",
+                        "run_path",
+                        "run_sha256",
+                        "validation_path",
+                        "validation_sha256",
+                    )
+                )
+            )
+        digest = _p9_ordered_digest(digest_rows)
+        if digest != contract.get("manifest_sha256"):
+            errors.append("manifest_sha256")
+        audit = {
+            "status": "passed" if not errors else "failed",
+            "record_count": len(records),
+            "artifact_count": 3 * len(records),
+            "manifest_sha256": digest,
+            "records": records,
+        }
+    except Exception as error:
+        errors.append(f"reuse:{error}")
+        audit = {"status": "failed"}
+    return audit, errors
+
+
+def _p9_float_equal(first: object, second: object) -> bool:
+    try:
+        return math.isclose(
+            float(first), float(second), rel_tol=1e-12, abs_tol=1e-12
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def _review_p9_statistics(
+    records: list[dict[str, Any]],
+    spec: dict[str, Any],
+    paired_rows: list[dict[str, str]],
+    raw_paired_rows: list[dict[str, str]],
+    raw_factorial_rows: list[dict[str, str]],
+    factorial_rows: list[dict[str, str]],
+) -> list[str]:
+    """Recompute every P9 contrast and hierarchical interval from run records."""
+
+    from scripts import v2_submission_statistics as statistics
+
+    errors: list[str] = []
+    metrics = tuple(spec.get("analysis", {}).get("metrics", []))
+    folds = list(spec["analysis"]["expected_folds"])
+    seeds = list(spec["analysis"]["expected_seeds"])
+    interval = spec["analysis"]["confidence_interval"]
+    if len(metrics) != 11 or len(set(metrics)) != 11:
+        return ["metric_contract"]
+    plan = statistics.make_hierarchical_resample_plan(
+        n_blocks=len(folds),
+        n_repeats=len(seeds),
+        iterations=int(interval["resamples"]),
+        seed=int(interval["seed"]),
+    )
+    by_configuration: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in records:
+        by_configuration[str(row.get("configuration"))].append(row)
+    baseline = by_configuration.get("full_worm_lora", [])
+    try:
+        source = json.loads(
+            repository_file(spec["baseline"]["source_execution"]).read_text()
+        )
+        auxiliary = [
+            row
+            for row in source.get("formal_jobs", [])
+            if row.get("model") == "B" and row.get("loss") == "log1p_mse"
+        ]
+    except Exception as error:
+        return [f"auxiliary:{error}"]
+    comparisons = {
+        configuration: rows
+        for configuration, rows in by_configuration.items()
+        if configuration != "full_worm_lora"
+    }
+    comparisons["b_log1p_mse_auxiliary"] = auxiliary
+
+    expected_raw_paired: dict[tuple[str, str, int, int], dict[str, Any]] = {}
+    expected_paired: dict[tuple[str, str], dict[str, Any]] = {}
+    try:
+        for configuration, candidate in sorted(comparisons.items()):
+            for metric in metrics:
+                differences = statistics.matched_differences(
+                    candidate, baseline, value_key=metric
+                )
+                matrix = statistics.records_to_balanced_matrix(
+                    differences,
+                    value_key="difference",
+                    expected_blocks=folds,
+                    expected_repeats=seeds,
+                )
+                estimate = statistics.hierarchical_block_bootstrap(
+                    matrix.values,
+                    plan,
+                    confidence_level=float(interval["level"]),
+                )
+                expected_paired[(configuration, metric)] = {
+                    "estimate": estimate.estimate,
+                    "low": estimate.ci_lower,
+                    "high": estimate.ci_upper,
+                }
+                for row in differences:
+                    expected_raw_paired[
+                        (configuration, metric, int(row["fold"]), int(row["seed"]))
+                    ] = row
+    except Exception as error:
+        return [f"paired_recompute:{error}"]
+
+    observed_raw_paired = {
+        (row["configuration"], row["metric"], int(row["fold"]), int(row["seed"])): row
+        for row in raw_paired_rows
+    }
+    if len(observed_raw_paired) != len(raw_paired_rows) or set(observed_raw_paired) != set(
+        expected_raw_paired
+    ):
+        errors.append("raw_paired_keys")
+    else:
+        for key, expected in expected_raw_paired.items():
+            observed = observed_raw_paired[key]
+            if not (
+                observed.get("reference") == "B/paper"
+                and _p9_float_equal(observed.get("candidate_value"), expected["candidate_value"])
+                and _p9_float_equal(observed.get("reference_value"), expected["comparator_value"])
+                and _p9_float_equal(observed.get("difference"), expected["difference"])
+            ):
+                errors.append(f"raw_paired:{key}")
+                break
+    observed_paired = {
+        (row["configuration"], row["metric"]): row for row in paired_rows
+    }
+    if len(observed_paired) != len(paired_rows) or set(observed_paired) != set(expected_paired):
+        errors.append("paired_keys")
+    else:
+        for key, expected in expected_paired.items():
+            observed = observed_paired[key]
+            if not (
+                observed.get("reference") == "B/paper"
+                and int(observed.get("paired_runs", -1)) == 15
+                and int(observed.get("folds", -1)) == 5
+                and int(observed.get("seeds", -1)) == 3
+                and _p9_float_equal(observed.get("mean_paired_difference"), expected["estimate"])
+                and _p9_float_equal(observed.get("ci_low"), expected["low"])
+                and _p9_float_equal(observed.get("ci_high"), expected["high"])
+                and _p9_float_equal(observed.get("ci_level"), interval["level"])
+                and observed.get("ci_method") == interval["method"]
+            ):
+                errors.append(f"paired:{key}")
+                break
+
+    keyed = {
+        (str(row.get("configuration")), int(row.get("fold", -1)), int(row.get("seed", -1))): row
+        for row in records
+    }
+    cell_names = {
+        "a": "frozen_no_worm_no_lora",
+        "lora": "lora_only",
+        "worm": "no_lora",
+        "full": "full_worm_lora",
+    }
+    expected_raw_factorial: dict[tuple[str, str, int, int], float] = {}
+    expected_factorial: dict[tuple[str, str], dict[str, float]] = {}
+    try:
+        for metric in metrics:
+            values_by_effect: dict[str, list[dict[str, Any]]] = defaultdict(list)
+            for fold in folds:
+                for seed in seeds:
+                    values = {
+                        name: float(keyed[(configuration, fold, seed)][metric])
+                        for name, configuration in cell_names.items()
+                    }
+                    effects = {
+                        "worm_embedding_main": 0.5
+                        * ((values["worm"] - values["a"]) + (values["full"] - values["lora"])),
+                        "lora_main": 0.5
+                        * ((values["lora"] - values["a"]) + (values["full"] - values["worm"])),
+                        "worm_lora_interaction": values["full"]
+                        - values["worm"]
+                        - values["lora"]
+                        + values["a"],
+                    }
+                    for effect, value in effects.items():
+                        expected_raw_factorial[(effect, metric, fold, seed)] = value
+                        values_by_effect[effect].append(
+                            {"fold": fold, "seed": seed, "difference": value}
+                        )
+            for effect, effect_rows in values_by_effect.items():
+                matrix = statistics.records_to_balanced_matrix(
+                    effect_rows,
+                    value_key="difference",
+                    expected_blocks=folds,
+                    expected_repeats=seeds,
+                )
+                estimate = statistics.hierarchical_block_bootstrap(
+                    matrix.values,
+                    plan,
+                    confidence_level=float(interval["level"]),
+                )
+                expected_factorial[(effect, metric)] = {
+                    "estimate": estimate.estimate,
+                    "low": estimate.ci_lower,
+                    "high": estimate.ci_upper,
+                }
+    except Exception as error:
+        return errors + [f"factorial_recompute:{error}"]
+
+    observed_raw_factorial = {
+        (row["effect"], row["metric"], int(row["fold"]), int(row["seed"])): row
+        for row in raw_factorial_rows
+    }
+    if len(observed_raw_factorial) != len(raw_factorial_rows) or set(
+        observed_raw_factorial
+    ) != set(expected_raw_factorial):
+        errors.append("raw_factorial_keys")
+    else:
+        for key, expected in expected_raw_factorial.items():
+            if not _p9_float_equal(observed_raw_factorial[key].get("value"), expected):
+                errors.append(f"raw_factorial:{key}")
+                break
+    observed_factorial = {
+        (row["effect"], row["metric"]): row for row in factorial_rows
+    }
+    if len(observed_factorial) != len(factorial_rows) or set(observed_factorial) != set(
+        expected_factorial
+    ):
+        errors.append("factorial_keys")
+    else:
+        for key, expected in expected_factorial.items():
+            observed = observed_factorial[key]
+            if not (
+                int(observed.get("paired_runs", -1)) == 15
+                and int(observed.get("folds", -1)) == 5
+                and int(observed.get("seeds", -1)) == 3
+                and _p9_float_equal(observed.get("mean_effect"), expected["estimate"])
+                and _p9_float_equal(observed.get("ci_low"), expected["low"])
+                and _p9_float_equal(observed.get("ci_high"), expected["high"])
+                and _p9_float_equal(observed.get("ci_level"), interval["level"])
+                and observed.get("ci_method") == interval["method"]
+            ):
+                errors.append(f"factorial:{key}")
+                break
+    return errors
+
+
+def review_p9() -> dict[str, Any]:
+    """Review the development-only submission-evidence matrix."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    paths = {
+        "spec": metadata_dir / "p9_submission_evidence_spec.json",
+        "execution": metadata_dir / "p9_submission_evidence_execution.json",
+        "results": metadata_dir / "p9_submission_evidence_results.tsv",
+        "paired": metadata_dir / "p9_submission_evidence_paired_effects.tsv",
+        "raw_paired": metadata_dir / "p9_submission_evidence_raw_paired_effects.tsv",
+        "raw_factorial": metadata_dir / "p9_submission_evidence_raw_factorial_effects.tsv",
+        "factorial": metadata_dir / "p9_submission_evidence_factorial_effects.tsv",
+        "per_track": metadata_dir / "p9_submission_evidence_per_track.tsv",
+    }
+    missing = [
+        str(path.relative_to(REPO_ROOT))
+        for path in paths.values()
+        if not path.is_file()
+    ]
+    checks = [check("R9.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P9",
+            "review": "R9-submission-evidence-matrix",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    spec = json.loads(paths["spec"].read_text())
+    execution = json.loads(paths["execution"].read_text())
+    state = json.loads((metadata_dir / "execution_state.json").read_text())
+    input_errors = []
+    for key, relative in spec.get("locked_inputs", {}).items():
+        try:
+            if sha256(repository_file(relative)) != spec["input_sha256"][key]:
+                input_errors.append(key)
+        except Exception:
+            input_errors.append(key)
+    implementation_errors = []
+    for relative, expected_hash in spec.get("implementation_sha256", {}).items():
+        try:
+            if sha256(repository_file(relative)) != expected_hash:
+                implementation_errors.append(relative)
+        except Exception:
+            implementation_errors.append(relative)
+    if len(spec.get("implementation_sha256", {})) != 10:
+        implementation_errors.append("implementation_manifest_membership")
+    dataset_audit, dataset_errors = _review_p9_dataset_contract(spec)
+    reuse_audit, reuse_errors = _review_p9_reuse_contract(spec)
+    dataset_preflight_ok = (
+        execution.get("dataset_preflight") == dataset_audit
+        and dataset_audit.get("status") == "passed"
+        and dataset_audit.get("verified_bigwig_count") == 241
+        and dataset_audit.get("bigwig_signal_reads") == 0
+        and dataset_audit.get("registered_bigwig_manifest_digest")
+        == dataset_audit.get("observed_bigwig_manifest_digest")
+    )
+    reuse_preflight_ok = (
+        execution.get("p6b_reuse_preflight") == reuse_audit
+        and reuse_audit.get("status") == "passed"
+        and reuse_audit.get("record_count") == 30
+        and reuse_audit.get("artifact_count") == 90
+        and reuse_audit.get("manifest_sha256")
+        == spec.get("p6b_reuse_contract", {}).get("manifest_sha256")
+    )
+    implementation_ok = (
+        not implementation_errors
+        and execution.get("implementation_sha256")
+        == spec.get("implementation_sha256")
+    )
+    records = execution.get("registered_records", [])
+    configurations = Counter(str(row.get("configuration")) for row in records)
+    expected_configurations = {
+        str(row["id"]) for row in spec["matrix"]["configurations"]
+    }
+    reused_sources = Counter(str(row.get("reused_source")) for row in records if row.get("base_job"))
+    registered_p6b_reuse = {
+        (
+            str(row.get("model")),
+            int(row.get("fold", -1)),
+            int(row.get("seed", -1)),
+            str(row.get("checkpoint_path")),
+            str(row.get("checkpoint_sha256")),
+            str(row.get("run_path")),
+            str(row.get("run_sha256")),
+            str(row.get("validation_path")),
+            str(row.get("validation_sha256")),
+        )
+        for row in records
+        if row.get("reused_source") == "P6B"
+    }
+    audited_p6b_reuse = {
+        (
+            str(row.get("model")),
+            int(row.get("fold", -1)),
+            int(row.get("seed", -1)),
+            str(row.get("checkpoint_path")),
+            str(row.get("checkpoint_sha256")),
+            str(row.get("run_path")),
+            str(row.get("run_sha256")),
+            str(row.get("validation_path")),
+            str(row.get("validation_sha256")),
+        )
+        for row in reuse_audit.get("records", [])
+    }
+    identity = {
+        (str(row.get("configuration")), int(row.get("fold", -1)), int(row.get("seed", -1)))
+        for row in records
+    }
+    matrix_ok = (
+        execution.get("phase") == "P9"
+        and execution.get("status") == "completed"
+        and execution.get("final_test_access") == "prohibited"
+        and execution.get("locked_test_block_signal_reads") == 0
+        and execution.get("spec_sha256") == sha256(paths["spec"])
+        and 0 < len(execution.get("selected_physical_gpus", [])) <= 2
+        and set(execution.get("selected_physical_gpus", [])) <= {2, 3}
+        and execution.get("registered_records_expected") == len(records) == 90
+        and execution.get("new_training_jobs_expected")
+        == execution.get("new_training_jobs_completed")
+        == 59
+        and execution.get("reused_records_expected")
+        == execution.get("reused_records")
+        == 31
+        and len(identity) == 90
+        and set(configurations) == expected_configurations
+        and set(configurations.values()) == {15}
+        and reused_sources == {"P6B": 30, "P8": 1}
+        and len(registered_p6b_reuse) == 30
+        and registered_p6b_reuse == audited_p6b_reuse
+        and execution.get("controller_invocation")
+        == "python -m scripts.v2_phase_controller run --phase P9"
+        and execution.get("registered_phase_command")
+        == "python -m scripts.run_v2_p9_submission_evidence"
+        and execution.get("hostname")
+        and execution.get("working_directory") == str(REPO_ROOT)
+        and execution.get("python_executable")
+        and not execution.get("failures")
+    )
+    path_errors = []
+    parameter_errors = []
+    validation_errors = []
+    config_specs = {row["id"]: row for row in spec["matrix"]["configurations"]}
+    for row in records:
+        for key in ("checkpoint_path", "run_path", "validation_path"):
+            try:
+                artifact = repository_file(row.get(key, ""))
+                expected_key = key.replace("_path", "_sha256")
+                if sha256(artifact) != row.get(expected_key):
+                    path_errors.append(f"{row.get('job_id')}:{key}:hash")
+            except Exception:
+                path_errors.append(f"{row.get('job_id')}:{key}:missing")
+        try:
+            validation = json.loads(
+                repository_file(row.get("validation_path", "")).read_text()
+            )
+            fold = int(row.get("fold", -1))
+            expected_interval_hash = spec["input_sha256"][f"fold_{fold}_valid"]
+            if not (
+                validation.get("model") == row.get("model")
+                and validation.get("training_loss") == "paper"
+                and validation.get("fold") == fold
+                and validation.get("seed") == int(row.get("seed", -1))
+                and validation.get("sequence_length")
+                == spec["training"]["sequence_length"]
+                and validation.get("mean_column")
+                == f"fold_{fold}_train_nonzero_mean"
+                and validation.get("intervals_sha256") == expected_interval_hash
+                and validation.get("locked_test_block_signal_reads") is False
+                and float(validation.get("validation_core_coverage_fraction", -1.0))
+                == 1.0
+            ):
+                validation_errors.append(str(row.get("job_id")))
+        except Exception:
+            validation_errors.append(str(row.get("job_id")))
+        registered_parameters = config_specs[str(row.get("configuration"))].get(
+            "expected_trainable_parameters"
+        )
+        if int(row.get("trainable_parameters", -1)) != registered_parameters:
+            parameter_errors.append(str(row.get("job_id")))
+        if row.get("locked_test_block_signal_reads") not in {None, 0, False}:
+            path_errors.append(f"{row.get('job_id')}:final_test")
+    results = read_tsv(paths["results"])
+    paired = read_tsv(paths["paired"])
+    raw_paired = read_tsv(paths["raw_paired"])
+    raw_factorial = read_tsv(paths["raw_factorial"])
+    factorial = read_tsv(paths["factorial"])
+    per_track = read_tsv(paths["per_track"])
+    factorial_counts = Counter(row["effect"] for row in raw_factorial)
+    paired_comparisons = (
+        expected_configurations - {"full_worm_lora"}
+    ) | {"b_log1p_mse_auxiliary"}
+    raw_paired_identity = {
+        (row["configuration"], row["metric"], int(row["fold"]), int(row["seed"]))
+        for row in raw_paired
+    }
+    statistical_recompute_errors = _review_p9_statistics(
+        records,
+        spec,
+        paired,
+        raw_paired,
+        raw_factorial,
+        factorial,
+    )
+    statistical_ok = (
+        len(results) == 6
+        and len(paired) == 6 * 11
+        and len(raw_paired) == 6 * 11 * 15
+        and len(raw_paired_identity) == len(raw_paired)
+        and {row["configuration"] for row in paired} == paired_comparisons
+        and {row["configuration"] for row in raw_paired} == paired_comparisons
+        and all(int(row["paired_runs"]) == 15 for row in paired)
+        and all(int(row["folds"]) == 5 and int(row["seeds"]) == 3 for row in paired)
+        and all(
+            math.isfinite(float(row[column]))
+            for row in raw_paired
+            for column in ("candidate_value", "reference_value", "difference")
+        )
+        and len(raw_factorial) == 3 * 11 * 15
+        and len(factorial) == 3 * 11
+        and factorial_counts
+        == {
+            "worm_embedding_main": 11 * 15,
+            "lora_main": 11 * 15,
+            "worm_lora_interaction": 11 * 15,
+        }
+        and all(int(row["paired_runs"]) == 15 for row in factorial)
+        and all(int(row["folds"]) == 5 and int(row["seeds"]) == 3 for row in factorial)
+        and all(math.isfinite(float(row["mean_effect"])) for row in factorial)
+        and all(float(row["ci_low"]) <= float(row["ci_high"]) for row in factorial)
+        and not statistical_recompute_errors
+    )
+    per_track_ok = (
+        len(per_track) == 90 * 241 * 3
+        and {row["configuration"] for row in per_track} == set(configurations)
+        and len({row["track_id"] for row in per_track}) == 241
+        and {row["metric"] for row in per_track}
+        == {
+            "pearson_128bp_log1p",
+            "gene_exon_coverage_pearson_log1p",
+            "primary_biological_score",
+        }
+    )
+    per_track_values = {
+        (
+            row["configuration"],
+            int(row["fold"]),
+            int(row["seed"]),
+            row["track_id"],
+            row["metric"],
+        ): float(row["value"])
+        for row in per_track
+    }
+    per_track_formula_ok = len(per_track_values) == len(per_track)
+    if per_track_formula_ok:
+        for configuration in configurations:
+            for fold in spec["matrix"]["folds"]:
+                for seed in spec["matrix"]["seeds"]:
+                    for track_id in {
+                        row["track_id"] for row in per_track if row["configuration"] == configuration
+                    }:
+                        prefix = (configuration, fold, seed, track_id)
+                        observed = per_track_values.get((*prefix, "primary_biological_score"))
+                        expected = 0.5 * (
+                            per_track_values.get((*prefix, "pearson_128bp_log1p"), math.nan)
+                            + per_track_values.get(
+                                (*prefix, "gene_exon_coverage_pearson_log1p"),
+                                math.nan,
+                            )
+                        )
+                        if observed is None or not math.isclose(
+                            observed, expected, rel_tol=1e-12, abs_tol=1e-12
+                        ):
+                            per_track_formula_ok = False
+                            break
+                    if not per_track_formula_ok:
+                        break
+                if not per_track_formula_ok:
+                    break
+            if not per_track_formula_ok:
+                break
+    per_track_ok = per_track_ok and per_track_formula_ok
+    lock = repository_file(spec["locked_inputs"]["final_test_lock"])
+    report = repository_file(spec["locked_inputs"]["final_test_report"])
+    lock_data = json.loads(lock.read_text())
+    output_hashes_ok = all(
+        execution.get(key) == sha256(paths[path_key])
+        for key, path_key in (
+            ("results_sha256", "results"),
+            ("paired_effects_sha256", "paired"),
+            ("raw_paired_effects_sha256", "raw_paired"),
+            ("raw_factorial_effects_sha256", "raw_factorial"),
+            ("factorial_effects_sha256", "factorial"),
+            ("per_track_sha256", "per_track"),
+        )
+    )
+    checks.extend(
+        [
+            check(
+                "R9.02_locked_inputs",
+                not input_errors
+                and not dataset_errors
+                and not reuse_errors
+                and dataset_preflight_ok
+                and reuse_preflight_ok
+                and implementation_ok,
+                "input_errors="
+                f"{input_errors} dataset_errors={dataset_errors[:3]} "
+                f"reuse_errors={reuse_errors[:3]} implementation_errors={implementation_errors}",
+            ),
+            check("R9.03_matrix_contract", matrix_ok, f"configs={dict(configurations)} reused={dict(reused_sources)}"),
+            check(
+                "R9.04_artifact_hashes",
+                not path_errors and not validation_errors and output_hashes_ok,
+                f"path_errors={path_errors[:5]} validation_errors={validation_errors[:5]}",
+            ),
+            check("R9.05_parameter_contract", not parameter_errors, f"errors={parameter_errors[:5]}"),
+            check(
+                "R9.06_paired_factorial_statistics",
+                statistical_ok,
+                f"raw_paired={len(raw_paired)} raw_factorial={len(raw_factorial)} "
+                f"summary={len(factorial)} recompute_errors={statistical_recompute_errors[:3]}",
+            ),
+            check("R9.07_per_track_source_data", per_track_ok, f"rows={len(per_track)} tracks={len({row['track_id'] for row in per_track})}"),
+            check(
+                "R9.08_final_test_preserved",
+                lock_data.get("test_consumed") is True
+                and lock_data.get("test_status") == "completed"
+                and sha256(lock) == spec["input_sha256"]["final_test_lock"]
+                and sha256(report) == spec["input_sha256"]["final_test_report"],
+                "P6C lock and report hashes unchanged",
+            ),
+            check(
+                "R9.09_controller_scope",
+                state.get("current_phase") == "P9"
+                and state.get("status") == "REVIEWING"
+                and state.get("approvals", {})
+                .get("G4_gpu_experiments", {})
+                .get("approved")
+                is True
+                and state.get("approvals", {}).get("G4_gpu_experiments", {}).get("scope")
+                == "p9_submission_evidence_matrix",
+                f"phase={state.get('current_phase')}",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P9",
+        "review": "R9-submission-evidence-matrix",
+        "reviewed_at": utc_now(),
+        "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
+        "checks": checks,
+    }
+
+
+def review_p10() -> dict[str, Any]:
+    """Review the development-only DPY-27 internal application."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    spec_path = metadata_dir / "p10_dpy27_internal_application_spec.json"
+
+    def failed_required_outputs(missing: list[str]) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "phase": "P10",
+            "review": "R10-dpy27-internal-application",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": [
+                check("R10.01_required_outputs", False, f"missing={missing}")
+            ],
+        }
+
+    if not spec_path.is_file():
+        return failed_required_outputs(
+            [str(spec_path.relative_to(REPO_ROOT))]
+        )
+    spec = json.loads(spec_path.read_text())
+    outputs = spec.get("output_paths", {})
+    output_keys = (
+        "analysis_audit",
+        "preflight_audit",
+        "gene_contrasts",
+        "run_endpoints",
+        "fold_endpoints",
+        "fold_gene_contrasts",
+        "summary_endpoints",
+        "figure_source_data",
+        "figure_pdf",
+        "figure_svg",
+        "figure_tiff",
+        "figure_png",
+        "figure_qa",
+    )
+    paths: dict[str, Path] = {"spec": spec_path}
+    invalid_paths = []
+    for key in output_keys:
+        try:
+            relative = Path(str(outputs[key]))
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError(relative)
+            paths[key] = REPO_ROOT / relative
+        except Exception:
+            invalid_paths.append(key)
+    missing = invalid_paths + [
+        str(path.relative_to(REPO_ROOT))
+        for key, path in paths.items()
+        if key != "spec" and not path.is_file()
+    ]
+    if missing:
+        return failed_required_outputs(missing)
+    checks = [check("R10.01_required_outputs", True, "all frozen outputs present")]
+    spec_sha = sha256(spec_path)
+    state = json.loads((metadata_dir / "execution_state.json").read_text())
+    preflight = json.loads(paths["preflight_audit"].read_text())
+    execution = json.loads(paths["analysis_audit"].read_text())
+    figure_qa = json.loads(paths["figure_qa"].read_text())
+
+    input_errors = []
+    for key, relative in spec.get("locked_inputs", {}).items():
+        try:
+            if sha256(repository_file(relative)) != spec["input_sha256"][key]:
+                input_errors.append(f"{key}:hash")
+        except Exception:
+            input_errors.append(f"{key}:missing")
+    expected_pairs = {
+        (seed, fold)
+        for seed in spec.get("expected_seeds", [])
+        for fold in spec.get("expected_folds", [])
+    }
+    checkpoint_pairs = set()
+    checkpoint_errors = []
+    for row in spec.get("checkpoint_matrix", []):
+        try:
+            pair = (int(row["seed"]), int(row["fold"]))
+            checkpoint_pairs.add(pair)
+            if sha256(repository_file(row["checkpoint_path"])) != row["checkpoint_sha256"]:
+                checkpoint_errors.append(f"{pair}:checkpoint")
+            if sha256(repository_file(row["run_path"])) != row["run_sha256"]:
+                checkpoint_errors.append(f"{pair}:run")
+        except Exception:
+            checkpoint_errors.append(f"{row.get('seed')}:{row.get('fold')}:missing")
+    static_contract_ok = (
+        spec.get("schema_version") == 1
+        and spec.get("phase") == "P10"
+        and spec.get("analysis_contract")
+        == "dpy27_internal_genomic_block_validation_v1"
+        and spec.get("analysis_label") == "internal_genomic_block_validation"
+        and spec.get("final_test_access") == "prohibited"
+        and spec.get("expected_folds") == [1, 2, 3, 4, 5]
+        and spec.get("expected_seeds") == [20260714, 20260715, 20260716]
+        and spec.get("expected_subwindows_per_fold") == 83
+        and spec.get("gpu_policy", {}).get("allowed_physical_indices") == [2, 3]
+        and spec.get("model_contract", {}).get("model") == "B"
+        and spec.get("model_contract", {}).get("loss") == "paper"
+        and spec.get("statistics", {}).get("inference_unit")
+        == "fold_after_within_fold_gene_condition_seed_mean"
+        and spec.get("figure_source_data_contract") == P10_SOURCE_DATA_CONTRACT
+        and set(spec.get("implementation_sha256", {}))
+        == set(P10_IMPLEMENTATION_PATHS)
+        and spec.get("implementation_sha256") == _p10_implementation_sha256()
+        and len(spec.get("checkpoint_matrix", [])) == 15
+        and checkpoint_pairs == expected_pairs
+        and not checkpoint_errors
+    )
+
+    current_implementation = _p10_implementation_sha256()
+    interval_audit = preflight.get("dataset", {}).get("intervals", {})
+    preflight_ok = (
+        preflight.get("status") == "passed"
+        and preflight.get("analysis_contract") == spec.get("analysis_contract")
+        and preflight.get("controller_enforced") is True
+        and preflight.get("spec_sha256") == spec_sha
+        and preflight.get("locked_input_sha256") == spec.get("input_sha256")
+        and preflight.get("checkpoint_count") == 15
+        and preflight.get("dataset", {}).get("track_count") == 241
+        and preflight.get("final_test_access") == "prohibited"
+        and preflight.get("locked_test_block_signal_reads") == 0
+        and preflight.get("model_or_bigwig_reads") == 0
+        and preflight.get("implementation_sha256") == current_implementation
+        and all(
+            int(interval_audit.get(str(fold), interval_audit.get(fold, {})).get("subwindows", -1))
+            == 83
+            for fold in spec["expected_folds"]
+        )
+    )
+
+    worker_results = execution.get("worker_results", [])
+    worker_pairs = {
+        (int(row.get("seed", -1)), int(row.get("fold", -1)))
+        for row in worker_results
+    }
+    physical_gpus = execution.get("physical_gpus", [])
+    execution_ok = (
+        execution.get("phase") == "P10"
+        and execution.get("analysis_contract") == spec.get("analysis_contract")
+        and execution.get("status") == "completed"
+        and execution.get("spec_sha256") == spec_sha
+        and execution.get("preflight_sha256") == sha256(paths["preflight_audit"])
+        and 0 < len(physical_gpus) <= 2
+        and set(physical_gpus) <= {2, 3}
+        and len(worker_results) == 15
+        and worker_pairs == expected_pairs
+        and all(int(row.get("physical_gpu", -1)) in {2, 3} for row in worker_results)
+        and execution.get("run_count") == 15
+        and execution.get("fold_count") == 5
+        and execution.get("final_test_access") == "prohibited"
+        and execution.get("locked_test_block_signal_reads") == 0
+        and execution.get("preflight_model_or_bigwig_reads") == 0
+        and execution.get("implementation_sha256") == current_implementation
+        and execution.get("git_commit") == preflight.get("git_commit")
+        and _p10_execution_provenance_ok(execution)
+        and not execution.get("failures")
+    )
+
+    gene_fields = (
+        "analysis_label",
+        "fold",
+        "seed",
+        "gene_id",
+        "gene_name",
+        "chromosome",
+        "strand",
+        "block_id",
+        "exon_bases_evaluated",
+        "exon_bases_total",
+        "exon_coverage_fraction",
+        "complete_exon_coverage",
+        "predicted_dpy27_rnai_mean",
+        "predicted_vector_rnai_mean",
+        "observed_dpy27_rnai_mean",
+        "observed_vector_rnai_mean",
+        "predicted_log1p_contrast_g0005_minus_g0006",
+        "observed_log1p_contrast_g0005_minus_g0006",
+    )
+    endpoints = tuple(spec["statistics"]["endpoints"])
+    shard_errors = []
+    shard_gene_rows: list[dict[str, str]] = []
+    for row in sorted(
+        spec["checkpoint_matrix"], key=lambda item: (int(item["seed"]), int(item["fold"]))
+    ):
+        seed, fold = int(row["seed"]), int(row["fold"])
+        shard_root = (
+            REPO_ROOT
+            / outputs["run_root"]
+            / "shards"
+            / f"seed_{seed}"
+            / f"fold_{fold}"
+        )
+        gene_path = shard_root / "gene_contrasts.tsv"
+        endpoint_path = shard_root / "run_endpoint.json"
+        audit_path = shard_root / "shard_audit.json"
+        try:
+            genes = read_tsv(gene_path)
+            endpoint = json.loads(endpoint_path.read_text())
+            audit = json.loads(audit_path.read_text())
+            if not genes or tuple(genes[0]) != gene_fields:
+                raise ValueError("gene schema")
+            if not (
+                audit.get("status") == "completed"
+                and audit.get("analysis_contract") == spec["analysis_contract"]
+                and audit.get("spec_sha256") == spec_sha
+                and audit.get("seed") == seed
+                and audit.get("fold") == fold
+                and audit.get("physical_gpu") in {2, 3}
+                and audit.get("checkpoint_sha256") == row["checkpoint_sha256"]
+                and audit.get("validation_sha256")
+                == spec["input_sha256"][f"fold_{fold}_valid"]
+                and audit.get("subwindows_evaluated") == 83
+                and audit.get("gene_contrasts_sha256") == sha256(gene_path)
+                and audit.get("run_endpoint_sha256") == sha256(endpoint_path)
+                and audit.get("final_test_access") == "prohibited"
+                and audit.get("locked_test_block_signal_reads") == 0
+                and audit.get("implementation_sha256") == current_implementation
+                and endpoint.get("seed") == seed
+                and endpoint.get("fold") == fold
+                and endpoint.get("checkpoint_sha256") == row["checkpoint_sha256"]
+                and all(math.isfinite(float(endpoint[key])) for key in endpoints)
+            ):
+                raise ValueError("shard contract")
+            if len({gene["gene_id"] for gene in genes}) != len(genes):
+                raise ValueError("duplicate gene")
+            shard_gene_rows.extend(genes)
+        except Exception as error:
+            shard_errors.append(f"seed={seed},fold={fold}:{error}")
+
+    aggregate_genes = read_tsv(paths["gene_contrasts"])
+    run_rows = read_tsv(paths["run_endpoints"])
+    fold_rows = read_tsv(paths["fold_endpoints"])
+    fold_gene_rows = read_tsv(paths["fold_gene_contrasts"])
+    summary_rows = read_tsv(paths["summary_endpoints"])
+    source_rows = read_tsv(paths["figure_source_data"])
+    fold_gene_index = {
+        (int(row["fold"]), row["gene_id"]): row for row in fold_gene_rows
+    }
+    fold_recomputation_ok = True
+    grouped_aggregate: dict[tuple[int, str], list[dict[str, str]]] = defaultdict(list)
+    for row in aggregate_genes:
+        grouped_aggregate[(int(row["fold"]), row["gene_id"])].append(row)
+    if set(grouped_aggregate) != set(fold_gene_index):
+        fold_recomputation_ok = False
+    else:
+        for key, rows in grouped_aggregate.items():
+            if len(rows) != 3 or {int(row["seed"]) for row in rows} != set(
+                spec["expected_seeds"]
+            ):
+                fold_recomputation_ok = False
+                break
+            expected_row = fold_gene_index[key]
+            predicted_case = sum(
+                float(row["predicted_dpy27_rnai_mean"]) for row in rows
+            ) / 3.0
+            predicted_control = sum(
+                float(row["predicted_vector_rnai_mean"]) for row in rows
+            ) / 3.0
+            expected_contrast = math.log1p(max(predicted_case, 0.0)) - math.log1p(
+                max(predicted_control, 0.0)
+            )
+            if not (
+                math.isclose(
+                    float(expected_row["predicted_dpy27_rnai_mean"]),
+                    predicted_case,
+                    rel_tol=1e-12,
+                    abs_tol=1e-12,
+                )
+                and math.isclose(
+                    float(expected_row["predicted_vector_rnai_mean"]),
+                    predicted_control,
+                    rel_tol=1e-12,
+                    abs_tol=1e-12,
+                )
+                and math.isclose(
+                    float(
+                        expected_row[
+                            "predicted_log1p_contrast_g0005_minus_g0006"
+                        ]
+                    ),
+                    expected_contrast,
+                    rel_tol=1e-12,
+                    abs_tol=1e-12,
+                )
+            ):
+                fold_recomputation_ok = False
+                break
+    fold_endpoint_recomputation_ok = fold_recomputation_ok
+    if fold_endpoint_recomputation_ok:
+        try:
+            from scripts import v2_biological_validation as biological_validation
+
+            fold_endpoint_index = {int(row["fold"]): row for row in fold_rows}
+            for fold in spec["expected_folds"]:
+                typed_rows = []
+                for row in fold_gene_rows:
+                    if int(row["fold"]) != fold:
+                        continue
+                    typed = dict(row)
+                    typed["complete_exon_coverage"] = (
+                        row["complete_exon_coverage"] == "True"
+                    )
+                    typed_rows.append(typed)
+                recomputed = biological_validation.dpy27_run_endpoints(typed_rows)
+                recorded = fold_endpoint_index[fold]
+                if any(
+                    not math.isclose(
+                        float(recorded[endpoint]),
+                        float(recomputed[endpoint]),
+                        rel_tol=1e-12,
+                        abs_tol=1e-12,
+                    )
+                    for endpoint in endpoints
+                ):
+                    fold_endpoint_recomputation_ok = False
+                    break
+        except Exception:
+            fold_endpoint_recomputation_ok = False
+    summary_recomputation_ok = _p10_summary_recomputation_ok(
+        aggregate_genes,
+        fold_rows,
+        summary_rows,
+        spec["statistics"],
+    )
+    source_data_ok = _p10_source_data_ok(
+        source_rows,
+        fold_gene_rows,
+        fold_rows,
+        summary_rows,
+        spec["figure_source_data_contract"],
+    )
+    aggregate_ok = (
+        aggregate_genes == shard_gene_rows
+        and len(aggregate_genes) == int(execution.get("gene_rows", -1))
+        and fold_gene_rows
+        and tuple(fold_gene_rows[0]) == gene_fields
+        and {int(row["fold"]) for row in fold_gene_rows}
+        == set(spec["expected_folds"])
+        and {row["seed"] for row in fold_gene_rows} == {"seed_mean"}
+        and len({(row["fold"], row["gene_id"]) for row in fold_gene_rows})
+        == len(fold_gene_rows)
+        and fold_recomputation_ok
+        and fold_endpoint_recomputation_ok
+        and summary_recomputation_ok
+        and len(run_rows) == 15
+        and {
+            (int(row["seed"]), int(row["fold"])) for row in run_rows
+        }
+        == expected_pairs
+        and all(math.isfinite(float(row[key])) for row in run_rows for key in endpoints)
+        and len(fold_rows) == 5
+        and {int(row["fold"]) for row in fold_rows} == set(spec["expected_folds"])
+        and all(int(row["n_seeds"]) == 3 for row in fold_rows)
+        and all(math.isfinite(float(row[key])) for row in fold_rows for key in endpoints)
+        and len(summary_rows) == len(endpoints) == 4
+        and {row["endpoint"] for row in summary_rows} == set(endpoints)
+        and all(
+            int(row["n_folds"]) == 5
+            and int(row["n_runs"]) == 15
+            and row["inference_unit"]
+            == "fold_after_within_fold_gene_condition_seed_mean"
+            and int(row["bootstrap_replicates"])
+            == int(spec["statistics"]["bootstrap_replicates"])
+            and int(row["bootstrap_seed"])
+            == int(spec["statistics"]["bootstrap_seed"])
+            and math.isfinite(float(row["estimate"]))
+            and float(row["ci_95_low"]) <= float(row["ci_95_high"])
+            for row in summary_rows
+        )
+        and source_data_ok
+    )
+
+    base_artifacts = {
+        "preflight_audit",
+        "gene_contrasts",
+        "run_endpoints",
+        "fold_endpoints",
+        "fold_gene_contrasts",
+        "summary_endpoints",
+        "figure_source_data",
+        "figure_pdf",
+        "figure_svg",
+        "figure_tiff",
+        "figure_png",
+        "figure_qa",
+    }
+    artifact_errors = []
+    for key in base_artifacts:
+        record = execution.get("artifacts", {}).get(key, {})
+        if not (
+            record.get("path") == outputs[key]
+            and record.get("sha256") == sha256(paths[key])
+            and int(record.get("size_bytes", -1)) == paths[key].stat().st_size
+        ):
+            artifact_errors.append(key)
+    qa_artifact_errors = []
+    for key in ("pdf", "svg", "tiff", "png"):
+        output_key = f"figure_{key}"
+        record = figure_qa.get("artifacts", {}).get(key, {})
+        if not (
+            record.get("path") == outputs[output_key]
+            and record.get("sha256") == sha256(paths[output_key])
+            and int(record.get("size_bytes", -1)) == paths[output_key].stat().st_size
+        ):
+            qa_artifact_errors.append(output_key)
+    figure_ok = (
+        figure_qa.get("status") == "passed"
+        and figure_qa.get("spec_sha256") == spec_sha
+        and figure_qa.get("source_data_path") == outputs["figure_source_data"]
+        and figure_qa.get("source_data_sha256") == sha256(paths["figure_source_data"])
+        and figure_qa.get("static_preflight", {}).get("summary", {}).get("ready")
+        is True
+        and figure_qa.get("pdf_text_audit", {}).get("auditable") is True
+        and figure_qa.get("pdf_text_audit", {}).get("below_minimum_count") == 0
+        and figure_qa.get("png_pixel_audit", {}).get("passed") is True
+        and figure_qa.get("tiff_pixel_audit", {}).get("passed") is True
+        and not qa_artifact_errors
+    )
+
+    lock = repository_file(spec["locked_inputs"]["final_test_lock"])
+    final_report = repository_file(spec["locked_inputs"]["final_test_report"])
+    lock_data = json.loads(lock.read_text())
+    controller_ok = (
+        state.get("current_phase") == "P10"
+        and state.get("status") == "REVIEWING"
+        and state.get("approvals", {}).get("G4_gpu_experiments", {}).get("approved")
+        is True
+        and state.get("approvals", {}).get("G4_gpu_experiments", {}).get("scope")
+        == "p10_dpy27_internal_application"
+    )
+    checks.extend(
+        [
+            check(
+                "R10.02_frozen_contract",
+                static_contract_ok and not input_errors,
+                f"input_errors={input_errors} checkpoint_errors={checkpoint_errors}",
+            ),
+            check(
+                "R10.03_preflight",
+                preflight_ok,
+                f"checkpoints={preflight.get('checkpoint_count')} tracks={preflight.get('dataset', {}).get('track_count')}",
+            ),
+            check(
+                "R10.04_execution_matrix",
+                execution_ok,
+                f"status={execution.get('status')} workers={len(worker_results)} gpus={physical_gpus}",
+            ),
+            check(
+                "R10.05_restart_shards",
+                not shard_errors,
+                f"shards={15 - len(shard_errors)}/15 errors={shard_errors[:3]}",
+            ),
+            check(
+                "R10.06_fold_primary_source_data",
+                aggregate_ok and not artifact_errors,
+                f"runs={len(run_rows)} folds={len(fold_rows)} summaries={len(summary_rows)} artifact_errors={artifact_errors}",
+            ),
+            check(
+                "R10.07_figure_qa",
+                figure_ok,
+                f"qa={figure_qa.get('status')} artifact_errors={qa_artifact_errors}",
+            ),
+            check(
+                "R10.08_final_test_preserved",
+                lock_data.get("test_consumed") is True
+                and lock_data.get("test_status") == "completed"
+                and sha256(lock) == spec["input_sha256"]["final_test_lock"]
+                and sha256(final_report)
+                == spec["input_sha256"]["final_test_report"],
+                "P6C lock and report hashes unchanged",
+            ),
+            check(
+                "R10.09_controller_scope",
+                controller_ok,
+                f"phase={state.get('current_phase')} status={state.get('status')}",
+            ),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P10",
+        "review": "R10-dpy27-internal-application",
+        "reviewed_at": utc_now(),
+        "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
+        "checks": checks,
+    }
+
+
 def write_report(report: dict[str, Any]) -> None:
     audit_dir = AUDIT_ROOT / report["phase"]
     audit_dir.mkdir(parents=True, exist_ok=True)
@@ -3861,6 +5310,8 @@ def parse_args() -> argparse.Namespace:
             "P6C",
             "P7",
             "P8",
+            "P9",
+            "P10",
         ],
     )
     return parser.parse_args()
@@ -3890,8 +5341,12 @@ def main() -> None:
         report = review_p6c()
     elif args.phase == "P7":
         report = review_p7()
-    else:
+    elif args.phase == "P8":
         report = review_p8()
+    elif args.phase == "P9":
+        report = review_p9()
+    else:
+        report = review_p10()
     assert report is not None
     write_report(report)
     print(json.dumps(report, indent=2, sort_keys=True))

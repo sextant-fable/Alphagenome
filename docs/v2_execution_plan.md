@@ -20,6 +20,9 @@ The canonical state is `alphagenome_custom/metadata/v2/execution_state.json`. Ph
 8. `P6A/R6A`: run the approved GPU smoke/pilot and validate environment, numerics, resource use, logging, and checkpoint reload.
 9. `P6B/R6B`: run the pre-registered ablations and fair A/B/C blocked-CV comparison without reading any locked test block; select and lock one checkpoint.
 10. `P6C/R6C`: after a separate final-test approval, read the six locked chromosome blocks once, permanently close the test entry point, and issue the final report.
+11. `P7/R7` and `P8/R8`: preserve the completed final-test lineage while running the two bounded, development-only follow-ups already recorded for the legacy 1 bp residual and fold-1 B-noLoRA checks.
+12. `P9/R9`: register 90 component records across five folds and three seeds. Reuse the 15 A/paper and 15 B/paper P6B records plus the one exact P8 B-noLoRA record; train the remaining 59 no-LoRA, LoRA-only, learned-1-bp-output-head, and size-matched from-scratch jobs. Report raw fold/seed pairs, fold-first seed-within-fold bootstrap intervals, worm/LoRA factorial effects, and all 241 per-track distributions without final-test access.
+13. `P10/R10`: after P9 PASS and a separate `G4:p10_dpy27_internal_application` approval, apply the 15 existing B/paper checkpoints to the DPY-27 RNAi versus vector RNAi tracks on fold validation cores. Require 15 restart shards, fold-primary endpoints, source data, PDF/SVG/TIFF/PNG figure outputs, and passing figure QA. This is an internal application because both conditions were training targets; it is not the missing independent benchmark.
 
 ## Mandatory Approval Boundaries
 
@@ -34,6 +37,8 @@ Approvals are records with an exact scope, note, and timestamp rather than reusa
 The controller records `p4_six_chromosome_block_split` while the superseded P6C state is still active, then runs `prepare-six-chromosome-revision` to archive the holdout evidence and reopen P4. The same scoped record remains required for P4 itself; it grants neither G4 nor G5.
 
 The original `six_chromosome_blocks_v1` evaluation geometry is invalid because its nearest-window cores covered only 84.35% of eligible validation bases in the first P6B job. `six_chromosome_blocks_v2` preserves block assignments and training data but requires one complete aligned metric core per valid/test context row and excludes every v1 P6B artifact from selection.
+
+P9 and P10 have distinct G4 scopes and remain development-only. P9 may be opened only from completed P8 with `start-p9-submission-evidence`; a passing R9 advances the controller to P10/PENDING, where the P10-specific approval must be recorded before execution. Neither phase can reopen G5, alter the P6B selection, or replace the immutable P6C report.
 
 ## Completion Standard
 

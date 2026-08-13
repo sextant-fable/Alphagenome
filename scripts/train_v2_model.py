@@ -25,7 +25,7 @@ from scripts import v2_training_components as components
 REPO_ROOT = Path(__file__).resolve().parents[1]
 METADATA_DIR = REPO_ROOT / "alphagenome_custom/metadata/v2"
 WEIGHTS_PATH = REPO_ROOT / "weights/alphagenome_pytorch/model_all_folds.safetensors"
-B_MODEL_IDS = {"B", "B_no_lora"}
+B_MODEL_IDS = {"B", "B_no_lora", "B_lora_only", "B_1bp_head_only"}
 LORA_TARGET_MODULES = ["tower.blocks.8.mha", "tower.blocks.8.mlp"]
 
 
@@ -50,6 +50,40 @@ def adaptation_metadata(model_id: str) -> dict[str, object]:
             "lora_target_modules": [],
             "trunk_policy": "worm_embeddings_only",
         }
+    if model_id == "B_lora_only":
+        return {
+            "base_organism_index": 0,
+            "c_elegans_organism_embedding": False,
+            "lora_enabled": True,
+            "lora_rank": 8,
+            "lora_alpha": 16,
+            "lora_target_modules": LORA_TARGET_MODULES,
+            "trunk_policy": "lora_only",
+        }
+    if model_id == "B_1bp_head_only":
+        return {
+            "base_organism_index": 2,
+            "c_elegans_organism_embedding": True,
+            "lora_enabled": True,
+            "lora_rank": 8,
+            "lora_alpha": 16,
+            "lora_target_modules": LORA_TARGET_MODULES,
+            "trunk_policy": "worm_embeddings_and_lora_only",
+            "learned_head_resolutions": [1],
+            "derived_output_resolutions": [128],
+            "derived_128bp_policy": "sum_pool_unscaled_1bp_then_rescale_128bp",
+            "output_head_policy": "learned_1bp_branch_only_with_full_b_adaptation",
+        }
+    if model_id == "C_size_matched":
+        return {
+            "base_organism_index": None,
+            "c_elegans_organism_embedding": False,
+            "lora_enabled": False,
+            "lora_rank": None,
+            "lora_alpha": None,
+            "lora_target_modules": [],
+            "trunk_policy": "from_scratch_size_matched",
+        }
     return {
         "base_organism_index": 0 if model_id in {"A", "D_base", "D"} else None,
         "c_elegans_organism_embedding": False,
@@ -64,7 +98,12 @@ def adaptation_metadata(model_id: str) -> dict[str, object]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model", choices=["A", "B", "B_no_lora", "C", "D_base", "D"], required=True
+        "--model",
+        choices=[
+            "A", "B", "B_no_lora", "B_lora_only", "B_1bp_head_only",
+            "C", "C_size_matched", "D_base", "D",
+        ],
+        required=True,
     )
     parser.add_argument("--fold", type=int, choices=range(0, 6), default=1)
     parser.add_argument("--seed", type=int, default=20260714)
@@ -85,6 +124,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--device", default="cuda")
     return parser.parse_args()
+
+
+def trainable_parameter_count(model: torch.nn.Module) -> int:
+    return sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
 
 
 def sha256(path: Path) -> str:
@@ -152,8 +195,15 @@ def build_model(
     hidden_channels: int,
     frozen_base_checkpoint: Path | None = None,
 ) -> torch.nn.Module:
-    if model_id == "C":
-        return components.WormSequenceBaseline(
+    if model_id in {"C", "C_size_matched"}:
+        if model_id == "C_size_matched" and hidden_channels != 152:
+            raise ValueError("C_size_matched requires hidden_channels=152")
+        baseline_class = (
+            components.SizeMatchedWormSequenceBaseline
+            if model_id == "C_size_matched"
+            else components.WormSequenceBaseline
+        )
+        return baseline_class(
             n_tracks=fold_means.numel(), hidden_channels=hidden_channels
         ).to(device)
     base_model = AlphaGenome.from_pretrained(WEIGHTS_PATH, device=device)
@@ -186,11 +236,12 @@ def build_model(
         return model
     if model_id not in B_MODEL_IDS:
         raise ValueError(f"Unsupported model {model_id}")
-    components.add_c_elegans_organism_embeddings(base_model)
+    if model_id != "B_lora_only":
+        components.add_c_elegans_organism_embeddings(base_model)
     base_model.encoder.gradient_checkpointing = True
     base_model.tower.gradient_checkpointing = True
     base_model.decoder.gradient_checkpointing = True
-    if model_id == "B":
+    if model_id != "B_no_lora":
         apply_lora(
             base_model,
             target_modules=LORA_TARGET_MODULES,
@@ -201,8 +252,10 @@ def build_model(
         base_model,
         n_tracks=fold_means.numel(),
         track_means=fold_means,
-        base_organism_index=2,
+        base_organism_index=0 if model_id == "B_lora_only" else 2,
         encode_requires_grad=True,
+        head_resolutions=(1,) if model_id == "B_1bp_head_only" else components.RESOLUTIONS,
+        derive_128bp_from_1bp=model_id == "B_1bp_head_only",
     ).to(device)
 
 
@@ -420,7 +473,7 @@ def main() -> None:
         ),
         "physical_cuda_visible_devices": visible,
         "cuda_device_name": torch.cuda.get_device_name(0),
-        "trainable_parameters": sum(parameter.numel() for parameter in trainable),
+        "trainable_parameters": trainable_parameter_count(model),
         "hidden_channels": args.hidden_channels,
         "metrics": metrics_rows,
         "checkpoint_path": str(checkpoint_path.relative_to(REPO_ROOT)),

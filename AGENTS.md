@@ -58,7 +58,7 @@ As recorded on 2026-07-20, P6B was reopened because the original validation matr
 
 ## Controlled v2 Workflow
 
-- The phase sequence is `P0 -> P1 -> P2 -> P3A -> P3B -> P4 -> P5 -> P6A -> P6B -> P6C -> P7 -> P8`.
+- The phase sequence is `P0 -> P1 -> P2 -> P3A -> P3B -> P4 -> P5 -> P6A -> P6B -> P6C -> P7 -> P8 -> P9 -> P10`.
 - Formal phase work must go through `scripts/v2_phase_controller.py`; do not bypass the controller by invoking training or evaluation entry points directly.
 - G1 protects large downloads and realignment, G2 protects scientific manifest acceptance, G3 protects large generated data, G4 protects GPU experiments, and G5 protects the single chromosome-X evaluation.
 - Scoped approvals are records, not reusable booleans. A prior approval does not authorize a different scope.
@@ -67,6 +67,8 @@ As recorded on 2026-07-20, P6B was reopened because the original validation matr
 - P6C may consume chromosome `X` only once, after P6B locks one non-superseded checkpoint and the user separately approves G5.
 - P7 is a one-off, user-authorized post-completion port of the legacy 1bp-B architecture to all 241 v2 tracks. It is development-only, must retain the P6C lock/report hashes, must not read the final-test block, and cannot replace the P6B selection or P6C result.
 - P8 is a one-off, user-authorized development-only B-noLoRA ablation on fold 1 and seed `20260714`. It retains the C. elegans embedding and dual-resolution RNA head, removes only LoRA, must retain the P6C lock/report hashes, must not read the final-test block, and cannot replace the P6B selection or P6C result.
+- P9 is the user-authorized development-only submission-evidence matrix. It registers 90 component records, reusing 30 P6B A/B records and one P8 no-LoRA record while training 59 new jobs. It requires `G4:p9_submission_evidence_matrix`, uses only fold validation, and preserves P6B/P6C evidence and final-test lock/report hashes.
+- P10 is the user-authorized DPY-27 internal biological application. It starts automatically in `PENDING` only after P9 passes, then requires `G4:p10_dpy27_internal_application`. It reuses the 15 B/paper CV checkpoints on their matching validation cores, is explicitly not an unseen-condition benchmark, and cannot pass review until all source-data and figure-QA artifacts are complete.
 
 ## EEHPC Archival Host Policy
 

@@ -1,0 +1,233 @@
+{
+  "analysis_id": "P6B-SIXCHR-SUBMISSION-1",
+  "analysis_version": 1,
+  "locked_date": "2026-08-13",
+  "lock_status": "locked_before_submission_analysis_execution",
+  "preregistration_boundary": "This specification was frozen before executing the submission analysis described here, but after the model-training and validation results existed. It is a retrospective locked analysis plan, not a prospective or public preregistration.",
+  "input_contract": {
+    "execution_record": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_execution.json",
+    "execution_record_sha256": "e98b1e2cfed5f3ccedcb6e6aaf6d5013c17f23d7ed4f320d2a92378740a9502c",
+    "training_spec": "alphagenome_custom/metadata/v2/p6b_six_chromosome_v2_spec.json",
+    "training_spec_sha256": "7f50967e1e53427b5b0ac6630c1b19c9b7344a79e67b60cfb36cb0c1a9289a05",
+    "track_manifest": "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv",
+    "track_manifest_sha256": "06bfc6109b08dc22007601d9c406cd4772701901f069f16ad1ea26b3d6134737",
+    "track_signal_means": "alphagenome_custom/metadata/v2/track_nonzero_means_v2.tsv",
+    "track_signal_means_sha256": "a6af4f0f9fdc6925fe4707313440b66357fa1aa3a2033efac322cb61412f1669",
+    "validation_root": "runs/v2_p6b_six_chromosome_corefix_20260722/formal",
+    "validation_filename": "validation_full_metrics.json",
+    "validation_manifest_sha256": "7c6be7c62364074ba5b9a6437f0f71d8fd31b2bf0de0d1ec57461b4ec7a4c25f",
+    "validation_manifest_digest_algorithm": "sha256 of sorted lines '<file_sha256>  <repo_relative_path>\\n'",
+    "expected_jobs": 90,
+    "expected_tracks": 241,
+    "models": [
+      "A",
+      "B",
+      "C"
+    ],
+    "training_losses": [
+      "paper",
+      "log1p_mse"
+    ],
+    "folds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "seeds": [
+      20260714,
+      20260715,
+      20260716
+    ],
+    "required_validation_guards": {
+      "locked_test_block_signal_reads": false,
+      "minimum_validation_core_coverage_fraction": 0.999
+    },
+    "prohibited_inputs": [
+      "alphagenome_custom/intervals/v2/test_locked.tsv",
+      "alphagenome_custom/metadata/v2/final_test_report.json",
+      "runs/v2_p6b_six_chromosome_corefix_20260722/development_selected"
+    ]
+  },
+  "design": {
+    "independent_resampling_unit": "development-validation fold",
+    "algorithmic_repeat": "training seed nested within fold for resampling",
+    "track_role": "descriptive repeated endpoint; tracks are not treated as independent inferential replicates",
+    "pairing_key": [
+      "fold",
+      "seed"
+    ],
+    "point_estimate": "unweighted mean of the five fold-specific means, each fold mean averaging its three seeds",
+    "missing_data": "retain all run and track rows; summaries use finite values and report the contributing count",
+    "hypothesis_tests": "none; effect estimates and confidence intervals are reported without p values",
+    "multiplicity": "three primary contrasts are identified in advance for emphasis; remaining matched contrasts and diagnostic endpoints are labelled secondary"
+  },
+  "run_level_endpoints": [
+    {
+      "id": "primary_biological_score",
+      "direction": "higher",
+      "role": "primary",
+      "definition": "0.5 * gene-exon coverage Pearson on log1p values + 0.5 * 128-bp per-track Pearson on log1p values"
+    },
+    {
+      "id": "gene_exon_coverage_pearson_log1p",
+      "direction": "higher",
+      "role": "primary_component"
+    },
+    {
+      "id": "per_track_pearson_128bp_log1p",
+      "direction": "higher",
+      "role": "primary_component"
+    },
+    {
+      "id": "spearman_128bp",
+      "direction": "higher",
+      "role": "secondary"
+    },
+    {
+      "id": "gene_body_mse_log1p_1bp",
+      "direction": "lower",
+      "role": "diagnostic"
+    },
+    {
+      "id": "exon_mse_log1p_1bp",
+      "direction": "lower",
+      "role": "diagnostic"
+    },
+    {
+      "id": "local_gradient_mse_log1p_1bp",
+      "direction": "lower",
+      "role": "diagnostic"
+    },
+    {
+      "id": "log1p_mse",
+      "direction": "lower",
+      "role": "diagnostic"
+    },
+    {
+      "id": "paper_loss",
+      "direction": "lower",
+      "role": "diagnostic"
+    },
+    {
+      "id": "top1_mse_128bp",
+      "direction": "lower",
+      "role": "diagnostic"
+    }
+  ],
+  "paired_contrasts": [
+    {
+      "id": "B_paper_vs_A_paper",
+      "candidate": "B/paper",
+      "comparator": "A/paper",
+      "family": "architecture_within_objective",
+      "priority": "primary"
+    },
+    {
+      "id": "B_paper_vs_C_paper",
+      "candidate": "B/paper",
+      "comparator": "C/paper",
+      "family": "architecture_within_objective",
+      "priority": "primary"
+    },
+    {
+      "id": "B_paper_vs_B_log1p_mse",
+      "candidate": "B/paper",
+      "comparator": "B/log1p_mse",
+      "family": "objective_within_architecture",
+      "priority": "primary"
+    },
+    {
+      "id": "B_log1p_mse_vs_A_log1p_mse",
+      "candidate": "B/log1p_mse",
+      "comparator": "A/log1p_mse",
+      "family": "architecture_within_objective",
+      "priority": "secondary"
+    },
+    {
+      "id": "B_log1p_mse_vs_C_log1p_mse",
+      "candidate": "B/log1p_mse",
+      "comparator": "C/log1p_mse",
+      "family": "architecture_within_objective",
+      "priority": "secondary"
+    },
+    {
+      "id": "A_paper_vs_C_paper",
+      "candidate": "A/paper",
+      "comparator": "C/paper",
+      "family": "architecture_within_objective",
+      "priority": "secondary"
+    },
+    {
+      "id": "A_log1p_mse_vs_C_log1p_mse",
+      "candidate": "A/log1p_mse",
+      "comparator": "C/log1p_mse",
+      "family": "architecture_within_objective",
+      "priority": "secondary"
+    },
+    {
+      "id": "A_paper_vs_A_log1p_mse",
+      "candidate": "A/paper",
+      "comparator": "A/log1p_mse",
+      "family": "objective_within_architecture",
+      "priority": "secondary"
+    },
+    {
+      "id": "C_paper_vs_C_log1p_mse",
+      "candidate": "C/paper",
+      "comparator": "C/log1p_mse",
+      "family": "objective_within_architecture",
+      "priority": "secondary"
+    }
+  ],
+  "bootstrap": {
+    "method": "hierarchical paired percentile bootstrap",
+    "iterations": 20000,
+    "rng": "numpy.random.Generator(PCG64)",
+    "seed": 20260813,
+    "confidence_level": 0.95,
+    "resampling": "sample five folds with replacement; for every sampled fold occurrence sample its three paired seeds with replacement; average seeds within occurrence and then average the five sampled fold means",
+    "paired_contrast_resampling": "form candidate-minus-comparator differences at identical fold and seed before applying the common hierarchical resampling scheme"
+  },
+  "track_analysis": {
+    "long_form_scope": "every 241-entry per-track dictionary in each of the 90 validation JSON files, plus the exact derived per-track primary score",
+    "configuration_summary": "for each configuration and track, average the 15 fold-by-seed values; report standard deviation, range and finite count descriptively",
+      "stratified_metrics": [
+      "primary.primary_biological_score",
+      "gene_exon_coverage.pearson",
+      "log1p_128bp_sum.pearson",
+      "distribution_128bp.spearman"
+      ],
+      "panel_d_category_selection": "For study, stage, tissue and treatment, show the two largest categories with at least five tracks, breaking ties lexicographically; show all three signal-strength tertiles. Selection depends only on manifest prevalence, never on model performance.",
+    "strata": {
+      "study": "exact sra_study_accession; missing values retained as Missing/unknown",
+      "stage": "development_stage collapsed only into explicit embryo, L1-L4, young-adult, dauer and larval-time-course classes; all other values retained verbatim",
+      "tissue": "case-insensitive whole-organism and embryo synonyms collapsed; all other tissue_or_cell_type values retained verbatim",
+      "treatment": "Reported treatment/selection if a non-administrative condition is present or genotype/strain explicitly contains treated or RNAi; Missing/unknown only when condition, genotype and strain are all missing; otherwise No reported treatment",
+      "signal_strength": "tertiles of development_train_nonzero_mean across all 241 tracks using linear quantiles; boundaries and counts are emitted in analysis_manifest.json"
+    },
+    "stratum_inference": "descriptive only; no track-level p values or confidence intervals"
+  },
+  "figure_contract": {
+    "core_conclusion": "Under matched development cross-validation, Model B trained with paper loss has the strongest composite biological score, with paired fold-seed gains over A and C and heterogeneous track-level effects.",
+    "archetype": "quantitative grid",
+    "backend": "python_matplotlib_only",
+    "target": "Nature Methods submission preparation",
+    "final_width_mm": 183,
+    "final_height_mm": 164,
+    "minimum_text_pt": 5,
+    "formats": [
+      "PDF",
+      "SVG",
+      "TIFF_600dpi",
+      "PNG_300dpi"
+    ],
+    "panels": {
+      "a": "six configuration estimates with fold-primary 95% confidence intervals and five fold means",
+      "b": "three primary paired contrasts decomposed into the composite and its two components",
+      "c": "descriptive distributions of 241 per-track composite scores",
+      "d": "descriptive B/paper minus A/paper per-track differences across metadata-defined strata"
+    }
+  }
+}

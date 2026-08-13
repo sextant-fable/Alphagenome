@@ -28,6 +28,8 @@ PHASES = (
     "P6C",
     "P7",
     "P8",
+    "P9",
+    "P10",
 )
 GATE_KEYS = {
     "G1": "G1_large_source_download_or_realignment",
@@ -55,6 +57,8 @@ APPROVAL_SCOPES = {
         "r6_gpu_auto_available_2_3",
         "p7_single_legacy_residual_fold1",
         "p8_b_no_lora_fold1",
+        "p9_submission_evidence_matrix",
+        "p10_dpy27_internal_application",
     },
     "G5": {
         "r6c_single_chr_x_test",
@@ -79,6 +83,8 @@ APPROVAL_SCOPE_PHASES = {
     "r6c_single_six_chromosome_block_test": {"P6C"},
     "p7_single_legacy_residual_fold1": {"P7"},
     "p8_b_no_lora_fold1": {"P8"},
+    "p9_submission_evidence_matrix": {"P9"},
+    "p10_dpy27_internal_application": {"P10"},
 }
 PHASE_REQUIRED_APPROVALS = {
     "P3A": (
@@ -100,6 +106,8 @@ PHASE_REQUIRED_APPROVALS = {
     ),
     "P7": (("G4", "p7_single_legacy_residual_fold1"),),
     "P8": (("G4", "p8_b_no_lora_fold1"),),
+    "P9": (("G4", "p9_submission_evidence_matrix"),),
+    "P10": (("G4", "p10_dpy27_internal_application"),),
 }
 def module_command(module: str, *arguments: str) -> list[str]:
     return [sys.executable, "-m", f"scripts.{module}", *arguments]
@@ -118,6 +126,8 @@ PHASE_COMMANDS = {
     "P6C": module_command("run_v2_p6c"),
     "P7": module_command("run_v2_p7_legacy_residual"),
     "P8": module_command("run_v2_p8_b_no_lora"),
+    "P9": module_command("run_v2_p9_submission_evidence"),
+    "P10": module_command("run_dpy27_internal_application"),
 }
 REVIEW_COMMANDS = {
     phase: module_command("review_v2_phase", "--phase", phase)
@@ -446,6 +456,30 @@ def start_p8_b_no_lora(state: dict[str, Any]) -> int:
     return 0
 
 
+def start_p9_submission_evidence(state: dict[str, Any]) -> int:
+    """Open the registered post-completion submission-evidence matrix."""
+
+    if state.get("current_phase") != "P8" or state.get("status") != "COMPLETE":
+        raise SystemExit("P9 may start only after the completed P8 ablation")
+    lock_path = REPO_ROOT / "alphagenome_custom/metadata/v2/final_test_lock.json"
+    report_path = REPO_ROOT / "alphagenome_custom/metadata/v2/final_test_report.json"
+    if not lock_path.is_file() or not report_path.is_file():
+        raise SystemExit("P9 requires the completed P6C lock and report")
+    lock = json.loads(lock_path.read_text())
+    if not (lock.get("test_consumed") is True and lock.get("test_status") == "completed"):
+        raise SystemExit("P9 requires the preserved completed P6C test lock")
+    state["current_phase"] = "P9"
+    state["status"] = "PENDING"
+    append_history(
+        state,
+        "P9",
+        "PENDING",
+        "User requested the 59-job submission-evidence matrix; development validation only and no final-test access.",
+    )
+    save_state(state)
+    return 0
+
+
 def run_until_boundary(state: dict[str, Any], first_phase: str) -> int:
     phase = first_phase
     while True:
@@ -472,6 +506,7 @@ def parse_args() -> argparse.Namespace:
     subparsers.add_parser("prepare-six-chromosome-revision")
     subparsers.add_parser("start-p7-legacy-residual")
     subparsers.add_parser("start-p8-b-no-lora")
+    subparsers.add_parser("start-p9-submission-evidence")
     approve_parser = subparsers.add_parser("approve")
     approve_parser.add_argument("--gate", required=True, choices=sorted(GATE_KEYS))
     approve_parser.add_argument("--scope", required=True)
@@ -505,6 +540,8 @@ def main() -> None:
         raise SystemExit(start_p7_legacy_residual(state))
     if args.command == "start-p8-b-no-lora":
         raise SystemExit(start_p8_b_no_lora(state))
+    if args.command == "start-p9-submission-evidence":
+        raise SystemExit(start_p9_submission_evidence(state))
     if args.command in {"approve", "revoke"}:
         approved = args.command == "approve"
         if approved:
