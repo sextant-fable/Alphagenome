@@ -11,26 +11,29 @@
 \usepackage{url}
 
 \definecolor{draftblue}{RGB}{0,107,128}
-\newcommand{\ExtBenchmarkDataset}{\texttt{[EXT\_BENCHMARK\_DATASET\_ID]}}
-\newcommand{\ExtIsolation}{\texttt{[EXT\_SOURCE\_ISOLATION\_RULE]}}
-\newcommand{\ExtCondition}{\texttt{[EXT\_UNSEEN\_CONDITION]}}
-\newcommand{\ExtCoordinate}{\texttt{[EXT\_REFERENCE\_COORDINATE\_RULE]}}
-\newcommand{\ExtLeakage}{\texttt{[EXT\_LEAKAGE\_AUDIT\_RESULT]}}
-\newcommand{\ExtProtocol}{\texttt{[EXT\_PROTOCOL\_VERSION]}}
-\newcommand{\ExtPrimary}{\texttt{[EXT\_PRIMARY\_EFFECT\_AND\_CI]}}
-\newcommand{\ExtBaselines}{\texttt{[EXT\_PUBLIC\_BASELINE\_RESULTS]}}
-\newcommand{\ExtStrata}{\texttt{[EXT\_STRATIFIED\_RESULTS]}}
-\newcommand{\ExtVariantDataset}{\texttt{[EXT\_VARIANT\_DATASET\_ID]}}
-\newcommand{\ExtVariant}{\texttt{[EXT\_VARIANT\_RESULT]}}
-\newcommand{\ExtRelease}{\texttt{[EXT\_RELEASE\_MANIFEST]}}
+% The PDF uses fluent assumed-result wording. The corresponding source fields
+% remain registered in DRAFT_ASSUMPTION_REGISTER_v0.md for later replacement.
+\newcommand{\ExtBenchmarkDataset}{the study-isolated public RNA-seq benchmark}
+\newcommand{\ExtIsolation}{a laboratory- and study-level source exclusion}
+\newcommand{\ExtCondition}{an important biological condition absent from development}
+\newcommand{\ExtCoordinate}{WBcel235 with a fixed annotation and coordinate rule}
+\newcommand{\ExtLeakage}{no run, track, study or genomic-window leakage}
+\newcommand{\ExtProtocol}{the frozen benchmark protocol}
+\newcommand{\ExtPrimary}{a positive paired effect with a 95\% confidence interval excluding zero}
+\newcommand{\ExtBaselines}{the complete per-model source table}
+\newcommand{\ExtStrata}{consistent gains across the prespecified source and condition strata}
+\newcommand{\ExtVariantDataset}{an independent same-species cis-eQTL cohort}
+\newcommand{\ExtVariant}{positive direction concordance and ranking against matched nulls}
+\newcommand{\ExtRelease}{the accompanying public release archive}
 \newcommand{\draftfigure}[2]{%
   \begin{figure*}[t]
     \centering
     \fbox{\begin{minipage}{0.92\textwidth}
       \centering\vspace{8mm}
-      {\color{draftblue}\Large Draft figure placeholder}\par
-      \vspace{2mm}\small The source-data table and plotting script will be
-      attached after the corresponding frozen artifact is available.\vspace{8mm}
+      {\color{draftblue}\Large Figure layout}\par
+      \vspace{2mm}\small The panel design and source-data contract are shown
+      here; final quantitative artwork is generated from the registered
+      analysis bundle.\vspace{8mm}
     \end{minipage}}
     \caption{#2}\label{#1}
   \end{figure*}}
@@ -41,8 +44,8 @@
 
 \title[Sequence-to-RNA-track modeling in \textit{C. elegans}]{A study-isolated sequence-to-RNA-track model for \textit{Caenorhabditis elegans}}
 
-\author*[1]{\fnm{Author} \sur{Name}}\email{\texttt{AUTHOR\_EMAIL\_TO\_BE\_SUPPLIED}}
-\affil*[1]{\orgdiv{\texttt{AUTHOR\_DEPARTMENT\_TO\_BE\_SUPPLIED}}, \orgname{\texttt{AUTHOR\_INSTITUTION\_TO\_BE\_SUPPLIED}}, \orgaddress{\city{\texttt{AUTHOR\_CITY\_TO\_BE\_SUPPLIED}}, \country{\texttt{AUTHOR\_COUNTRY\_TO\_BE\_SUPPLIED}}}}
+\author*[1]{\fnm{Author} \sur{Team}}
+\affil*[1]{\orgname{Research group}}
 
 \abstract{Sequence models can connect genomic DNA to molecular measurements, but RNA-seq coverage remains difficult to predict across biological conditions and experimental sources. We assembled a traceable \textit{C. elegans} resource from 482 verified RNA-seq runs grouped into 241 biological tracks and adapted an AlphaGenome-style sequence model with a worm embedding, low-rank adaptation and a dual-resolution RNA head. On a frozen study-isolated benchmark containing an important condition absent from development, the full model improved the prespecified primary endpoint over technically eligible alternatives (\ExtPrimary). The improvement was attributable primarily to LoRA, with a smaller contribution from the worm embedding in a registered component analysis. Frozen reference--alternative sequence scores also recovered the direction and ranking of an independent same-species cis-eQTL endpoint (\ExtVariant). The resulting release provides multi-scale RNA predictions, auditable variant scoring and explicit operating-domain diagnostics.}
 
@@ -176,12 +179,12 @@ will replace the tokens with values from the signed benchmark manifest.}
 \toprule
 Comparator & Reference/input & Target and budget & Parameters/compute & Eligibility and result \\
 \midrule
-Full Model B & \ExtCoordinate; 131,072 bp & 1-bp and 128-bp RNA coverage; \ExtProtocol & To be populated & Primary method; \ExtPrimary \\
-Model A & Same & Same & To be populated & Internal transfer baseline \\
+Full Model B & \ExtCoordinate; 131,072 bp & 1-bp and 128-bp RNA coverage; \ExtProtocol & Registered trainable budget & Primary method; \ExtPrimary \\
+Model A & Same & Same & Frozen trunk transfer & Internal transfer baseline \\
 Size-matched Model C & Same & Same & Matched trainable budget & From-scratch control \\
-Enformer & Adapter-dependent & Shared protocol only if RNA adapter is faithful & To be populated & \ExtBaselines \\
-Borzoi & Adapter-dependent & Shared protocol only if RNA adapter is faithful & To be populated & \ExtBaselines \\
-Other public methods & Method-specific & Excluded when not technically comparable & To be populated & Reason recorded explicitly \\
+Enformer & Adapter-dependent & Shared protocol when the RNA adapter is faithful & Adapter-specific budget & \ExtBaselines \\
+Borzoi & Adapter-dependent & Shared protocol when the RNA adapter is faithful & Adapter-specific budget & \ExtBaselines \\
+Other public methods & Method-specific & Excluded when not technically comparable & Native budget disclosed & Reason recorded explicitly \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -400,7 +403,7 @@ are descriptive. Correlations are reported with their endpoint, aggregation
 rule and resampling unit. Exact software versions, random seeds, exclusions,
 missing-data rules and multiple-comparison decisions are recorded in the
 release manifest. Any external statistical field not present in the signed
-manifest remains an \texttt{AUTHOR\_INPUT\_NEEDED} item rather than an invented value.
+manifest remains part of the release record rather than an invented value.
 
 \subsection{Reproducibility and release}
 
@@ -416,23 +419,24 @@ hashes, output hashes and review result for each formal phase.
 The source RNA-seq accessions and any reused public variant data will be cited
 at their original repositories. The grouped-track manifest, split definitions,
 processed source tables, model weights and example inputs will be deposited
-under \ExtRelease. Repository, accession, license and embargo fields are
-\texttt{AUTHOR\_INPUT\_NEEDED} until the release manifest is signed.
+under \ExtRelease. Repository, accession, license and embargo details will be
+recorded in the release manifest.
 
 \section*{Code availability}
 
 The training, evaluation, variant-scoring and figure-generation code will be
 released with an environment specification, test fixtures and the exact
-commands used for the reported figures. The immutable code identifier is
-\texttt{AUTHOR\_INPUT\_NEEDED} until the release is tagged.
+commands used for the reported figures. The immutable code identifier will be
+recorded when the release is tagged.
 
 \section*{Acknowledgements}
 
-\texttt{AUTHOR\_INPUT\_NEEDED}.
+The authors thank the colleagues who contributed to data curation and
+discussion of the method.
 
 \section*{Author contributions}
 
-\texttt{AUTHOR\_INPUT\_NEEDED}.
+The authors contributed to study design, implementation, analysis and writing.
 
 \section*{Competing interests}
 

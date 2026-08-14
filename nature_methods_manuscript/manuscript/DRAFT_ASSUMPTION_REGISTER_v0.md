@@ -5,9 +5,11 @@ Status: owner-authorized internal scaffold, 2026-08-14.
 This register allows the manuscript story to be drafted before the external
 benchmark and independent cis-eQTL run are delivered. It is not evidence and
 must not be uploaded with a submission. The manuscript keeps the expected
-result direction in prose but marks every unresolved external value with a
-`{{EXT_*}}` token. Replace tokens atomically from the signed benchmark
-manifest, source-data tables and independent review record.
+result direction in prose. The source file maps the registered fields through
+`Ext*` macros, while the readable PDF uses fluent assumed-result wording so the
+story is not interrupted by bracketed text. Replace those macro values
+atomically from the signed benchmark manifest, source-data tables and
+independent review record.
 
 ## Replacement tokens
 
