@@ -16,6 +16,7 @@ from scripts.v2_biological_validation import AnnotatedGene
 
 
 VARIANT_SCORING_CONTRACT = "v2_variant_scoring_v1"
+EXPECTED_PREDICTION_RESOLUTIONS = frozenset({1, 128})
 DNA_ALPHABET = frozenset("ACGTN")
 CANONICAL_BASES = "ACGT"
 DNA_TO_INDEX = {base: index for index, base in enumerate(CANONICAL_BASES)}
@@ -287,6 +288,10 @@ def validate_prediction_map(
         if not np.isfinite(values).all():
             raise ValueError("Predictor returned non-finite values")
         result[resolution] = values
+    if set(result) != EXPECTED_PREDICTION_RESOLUTIONS:
+        raise ValueError(
+            "Predictor must return exactly the 1-bp and 128-bp heads"
+        )
     return result
 
 

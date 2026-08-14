@@ -497,6 +497,8 @@ def run_scoring(spec_path: str | Path) -> dict[str, Any]:
             if biology.sha256(path) != preflight["verified_input_sha256"][key]:
                 raise RuntimeError(f"Variant-scoring input changed after preflight: {key}")
         predictor = ModelBPredictor(spec, paths)
+        audit["model_loads"] = 1
+        biology.write_json(audit_path, audit)
         genes, _ = biology.load_annotated_genes(paths["gtf"])
         track_rows: list[dict[str, object]] = []
         gene_rows: list[dict[str, object]] = []
@@ -577,7 +579,6 @@ def run_scoring(spec_path: str | Path) -> dict[str, Any]:
                 "status": "completed",
                 "completed_at": utc_now(),
                 "elapsed_seconds": time.monotonic() - started,
-                "model_loads": 1,
                 "variant_count": len(windows),
                 "variant_track_rows": len(track_rows),
                 "variant_gene_exon_rows": len(gene_rows),

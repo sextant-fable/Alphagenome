@@ -32,6 +32,10 @@ gene-body and unique-exon summaries for coordinate-aligned substitutions.
 Optional ISM enumerates all three substitutions at each requested canonical
 base and enforces a frozen mutant cap.
 
+The prediction contract is fail-closed: every model call must return exactly
+the 1-bp and 128-bp heads. Missing either head or returning an unregistered
+resolution is rejected before variant statistics are emitted.
+
 ## Minimal spec shape
 
 ```json

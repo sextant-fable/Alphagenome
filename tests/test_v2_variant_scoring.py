@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import csv
 import gzip
 import hashlib
 import json
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
 from scripts import v2_biological_validation as biology
+from scripts import score_v2_variants as scorer
 from scripts.score_v2_variants import validate_cuda_authorization, validate_variant_spec
 from scripts import v2_variant_scoring as variants
 
@@ -24,6 +27,148 @@ def write_fasta(path: Path, name: str, sequence: str, line_bases: int = 64) -> P
     fai = path.with_suffix(".fa.fai")
     fai.write_text(f"{name}\t{len(sequence)}\t{len(name) + 2}\t{line_bases}\t{line_bases + 1}\n")
     return fai
+
+
+class SyntheticModelBPredictor:
+    def __init__(self, spec, paths) -> None:
+        self.track_ids = [f"G{index:04d}" for index in range(1, 242)]
+
+    def __call__(self, batch: np.ndarray) -> dict[int, np.ndarray]:
+        gc_signal = batch[:, 1] + batch[:, 2]
+        fine = np.repeat(gc_signal[:, None, :], len(self.track_ids), axis=1)
+        coarse = fine.reshape(fine.shape[0], fine.shape[1], -1, 128).sum(axis=-1)
+        return {1: fine.astype(np.float32), 128: coarse.astype(np.float32)}
+
+
+class FailingSyntheticModelBPredictor(SyntheticModelBPredictor):
+    def __call__(self, batch: np.ndarray) -> dict[int, np.ndarray]:
+        raise RuntimeError("synthetic inference failure")
+
+
+def write_synthetic_scoring_spec(root: Path) -> tuple[Path, dict[str, Path]]:
+    sequence = "ACGT" * 128
+    fasta = root / "genome.fa"
+    fai = write_fasta(fasta, "I", sequence)
+    vcf = root / "input.vcf"
+    vcf.write_text(
+        "##fileformat=VCFv4.2\n"
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+        f"I\t129\tsnv\t{sequence[128]}\tC\t.\tPASS\t.\n"
+        f"I\t133\tins\t{sequence[132]}\t{sequence[132]}GG\t.\tPASS\t.\n"
+    )
+    checkpoint = root / "checkpoint.pt"
+    checkpoint.write_bytes(b"checkpoint-placeholder")
+    model_weights = root / "weights.safetensors"
+    model_weights.write_bytes(b"weights-placeholder")
+    means = root / "means.tsv"
+    means.write_text(
+        "group_id\tfold_1_train_nonzero_mean\n"
+        + "".join(f"G{index:04d}\t1.0\n" for index in range(1, 242))
+    )
+    tracks = root / "tracks.tsv"
+    tracks.write_text(
+        "group_id\toutput_path\n"
+        + "".join(f"G{index:04d}\tunused_{index}.bw\n" for index in range(1, 242))
+    )
+    groups = root / "groups.tsv"
+    groups.write_text(
+        "group_id\tstrand\n"
+        + "".join(f"G{index:04d}\t.\n" for index in range(1, 242))
+    )
+    gtf = root / "genes.gtf"
+    gtf.write_text(
+        'I\ttest\tgene\t101\t160\t.\t+\t.\tgene_id "g1"; gene_name "g1";\n'
+        'I\ttest\texon\t111\t150\t.\t+\t.\tgene_id "g1"; gene_name "g1";\n'
+    )
+    model_specs = root / "model_specs.json"
+    model_specs.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "n_tracks": 241,
+                "resolutions": [1, 128],
+                "model_b_organism_index": 2,
+                "model_b_lora_rank": 8,
+                "model_b_lora_alpha": 16,
+                "model_b_lora_targets": [
+                    "tower.blocks.8.mha",
+                    "tower.blocks.8.mlp",
+                ],
+                "models": [
+                    {
+                        "model_id": "B",
+                        "base_organism_index": 2,
+                        "trunk_policy": "worm_embeddings_and_lora_only",
+                    }
+                ],
+            }
+        )
+        + "\n"
+    )
+    run = root / "run.json"
+    run.write_text(
+        json.dumps(
+            {
+                "model": "B",
+                "fold": 1,
+                "seed": 7,
+                "loss": "paper",
+                "sequence_length": 128,
+                "hidden_channels": 64,
+                "mean_column": "fold_1_train_nonzero_mean",
+                "checkpoint_sha256": sha256(checkpoint),
+                "checkpoint_reload_verified": True,
+            }
+        )
+        + "\n"
+    )
+    locked = {
+        "checkpoint": checkpoint,
+        "checkpoint_run": run,
+        "fasta": fasta,
+        "fai": fai,
+        "gtf": gtf,
+        "group_manifest": groups,
+        "means": means,
+        "track_manifest": tracks,
+        "model_specs": model_specs,
+        "model_weights": model_weights,
+        "vcf": vcf,
+    }
+    output_dir = root / "output"
+    payload = {
+        "schema_version": 1,
+        "contract": variants.VARIANT_SCORING_CONTRACT,
+        "final_test_access": "prohibited",
+        "device": "cpu",
+        "model": {
+            "model_id": "B",
+            "loss": "paper",
+            "fold": 1,
+            "seed": 7,
+            "sequence_length": 128,
+            "hidden_channels": 64,
+            "mean_column": "fold_1_train_nonzero_mean",
+        },
+        "inference": {
+            "forward_reverse_complement_ensemble": True,
+            "allele_window_policy": "variant_start_anchored_right_context_crop_or_extend",
+            "track_semantics": "all_241_tracks_unstranded_no_rc_permutation",
+            "maximum_alleles": 10,
+            "require_pass": True,
+        },
+        "ism": {
+            "enabled": True,
+            "radius_bp": 0,
+            "max_mutants_per_variant": 3,
+        },
+        "locked_inputs": {key: str(path) for key, path in locked.items()},
+        "input_sha256": {key: sha256(path) for key, path in locked.items()},
+        "output_dir": str(output_dir),
+    }
+    spec_path = root / "spec.json"
+    spec_path.write_text(json.dumps(payload) + "\n")
+    return spec_path, {**locked, "output_dir": output_dir}
 
 
 class V2VariantScoringTests(unittest.TestCase):
@@ -114,11 +259,27 @@ class V2VariantScoringTests(unittest.TestCase):
 
         def predictor(batch: np.ndarray):
             calls.append(batch.copy())
-            return {1: batch[:, 0:1, :] + 2 * batch[:, 3:4, :]}
+            fine = batch[:, 0:1, :] + 2 * batch[:, 3:4, :]
+            return {1: fine, 128: fine.sum(axis=-1, keepdims=True)}
 
         result = variants.forward_reverse_complement_ensemble(predictor, ["AAAC"])
         np.testing.assert_allclose(result[1][0, 0], [1.5, 1.5, 1.5, 0.0])
+        self.assertEqual(set(result), {1, 128})
         self.assertEqual(len(calls), 2)
+
+        with self.assertRaisesRegex(ValueError, "exactly the 1-bp and 128-bp"):
+            variants.forward_reverse_complement_ensemble(
+                lambda batch: {1: batch[:, :1, :]}, ["AAAC"]
+            )
+        with self.assertRaisesRegex(ValueError, "exactly the 1-bp and 128-bp"):
+            variants.forward_reverse_complement_ensemble(
+                lambda batch: {
+                    1: batch[:, :1, :],
+                    128: batch[:, :1, :1],
+                    256: batch[:, :1, :1],
+                },
+                ["AAAC"],
+            )
 
     def test_gene_and_exon_delta_aggregation(self) -> None:
         gene = biology.AnnotatedGene("g1", "gene-1", "I", "+", 2, 8, ((2, 4), (6, 8)))
@@ -164,7 +325,8 @@ class V2VariantScoringTests(unittest.TestCase):
         self.assertEqual({mutation.alternate for mutation in mutations}, {"C", "G", "T"})
 
         def predictor(batch: np.ndarray):
-            return {1: batch[:, :1, :]}
+            fine = batch[:, :1, :]
+            return {1: fine, 128: fine.sum(axis=-1, keepdims=True)}
 
         with self.assertRaisesRegex(RuntimeError, "max_mutants"):
             list(
@@ -176,6 +338,96 @@ class V2VariantScoringTests(unittest.TestCase):
                     max_mutants=2,
                 )
             )
+
+    def test_run_scoring_synthetic_end_to_end(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            spec_path, paths = write_synthetic_scoring_spec(Path(directory))
+            with patch.object(scorer, "ModelBPredictor", SyntheticModelBPredictor):
+                audit = scorer.run_scoring(spec_path)
+
+            self.assertEqual(audit["status"], "completed")
+            self.assertEqual(audit["model_loads"], 1)
+            self.assertEqual(audit["variant_count"], 2)
+            self.assertEqual(audit["variant_track_rows"], 964)
+            self.assertEqual(audit["variant_gene_exon_rows"], 482)
+            self.assertEqual(audit["ism_track_rows"], 2892)
+            self.assertEqual(audit["skipped_indel_gene_aggregation"], 1)
+            for record in audit["outputs"].values():
+                self.assertEqual(sha256(Path(record["path"])), record["sha256"])
+
+            with Path(audit["outputs"]["variant_track_deltas"]["path"]).open(
+                newline=""
+            ) as handle:
+                track_rows = list(csv.DictReader(handle, delimiter="\t"))
+            with Path(audit["outputs"]["variant_gene_exon_deltas"]["path"]).open(
+                newline=""
+            ) as handle:
+                gene_rows = list(csv.DictReader(handle, delimiter="\t"))
+            with Path(audit["outputs"]["ism_track_deltas"]["path"]).open(
+                newline=""
+            ) as handle:
+                ism_rows = list(csv.DictReader(handle, delimiter="\t"))
+
+            insertion_key = "I:133:A>AGG:alt1"
+            insertion_track_rows = [
+                row for row in track_rows if row["variant_key"] == insertion_key
+            ]
+            self.assertTrue(insertion_track_rows)
+            self.assertEqual(
+                {row["result_scope"] for row in insertion_track_rows},
+                {"fixed_window_index_aligned_diagnostic"},
+            )
+            self.assertFalse(
+                any(row["variant_key"] == insertion_key for row in gene_rows)
+            )
+
+            snv_key = "I:129:A>C:alt1"
+            snv_gene_rows = {
+                int(row["resolution"]): row
+                for row in gene_rows
+                if row["variant_key"] == snv_key and row["track_id"] == "G0001"
+            }
+            self.assertAlmostEqual(
+                float(snv_gene_rows[1]["gene_body_delta_sum"]), 1.0
+            )
+            self.assertAlmostEqual(
+                float(snv_gene_rows[128]["gene_body_delta_sum"]), 60.0 / 128.0
+            )
+
+            snv_ism = {
+                row["alternate"]: float(row["delta_sum"])
+                for row in ism_rows
+                if row["parent_variant_key"] == snv_key
+                and row["track_id"] == "G0001"
+                and row["resolution"] == "1"
+            }
+            self.assertEqual(set(snv_ism), {"C", "G", "T"})
+            self.assertAlmostEqual(snv_ism["C"], 1.0)
+            self.assertAlmostEqual(snv_ism["G"], 1.0)
+            self.assertAlmostEqual(snv_ism["T"], 0.0)
+            persisted = scorer.read_json(paths["output_dir"] / "scoring_audit.json")
+            self.assertEqual(persisted["status"], "completed")
+            self.assertEqual(persisted["model_loads"], 1)
+
+    def test_preflight_rejects_input_hash_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            spec_path, paths = write_synthetic_scoring_spec(Path(directory))
+            paths["vcf"].write_text(paths["vcf"].read_text() + "# changed\n")
+            with self.assertRaisesRegex(RuntimeError, "input hash mismatch: vcf"):
+                validate_variant_spec(spec_path)
+
+    def test_failed_scoring_audit_records_loaded_model(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            spec_path, paths = write_synthetic_scoring_spec(Path(directory))
+            with patch.object(
+                scorer, "ModelBPredictor", FailingSyntheticModelBPredictor
+            ):
+                with self.assertRaisesRegex(RuntimeError, "synthetic inference failure"):
+                    scorer.run_scoring(spec_path)
+            failed = scorer.read_json(paths["output_dir"] / "scoring_audit.json")
+            self.assertEqual(failed["status"], "failed")
+            self.assertEqual(failed["model_loads"], 1)
+            self.assertEqual(failed["failures"], ["synthetic inference failure"])
 
     def test_full_preflight_locks_hashes_and_validates_vcf_reference_without_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
