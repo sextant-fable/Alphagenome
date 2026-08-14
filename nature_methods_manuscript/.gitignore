@@ -1,0 +1,15 @@
+# Publisher-provided material is kept locally with a tracked provenance record.
+template/vendor/
+
+# Draft prose and rendered submission artifacts are intentionally local until approved.
+manuscript/drafts/
+manuscript/rendered/
+
+# Local tool caches and editor artifacts.
+.cache/
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.pdf

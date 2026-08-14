@@ -1,0 +1,4 @@
+interface:
+  display_name: "AlphaGenome Nature Methods Voice"
+  short_description: "Evidence-bound natural prose for the C. elegans manuscript"
+  default_prompt: "Use $alphagenome-nature-methods-voice to revise this AlphaGenome Nature Methods section while preserving its evidence boundaries."
