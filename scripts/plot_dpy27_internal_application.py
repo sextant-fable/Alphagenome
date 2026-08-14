@@ -351,17 +351,30 @@ def _run_json(command: list[str]) -> dict[str, object]:
     return payload
 
 
+def _json_safe_dpi(raw_dpi: object) -> list[float | None]:
+    if not isinstance(raw_dpi, (list, tuple)) or len(raw_dpi) != 2:
+        return [None, None]
+    normalized: list[float | None] = []
+    for value in raw_dpi:
+        if value is None:
+            normalized.append(None)
+            continue
+        numeric = float(value)
+        normalized.append(numeric if np.isfinite(numeric) else None)
+    return normalized
+
+
 def _image_audit(path: Path) -> dict[str, object]:
     with Image.open(path) as image:
         grayscale = np.asarray(image.convert("L"), dtype=np.uint8)
         width, height = image.size
-        dpi = image.info.get("dpi", (None, None))
+        dpi = _json_safe_dpi(image.info.get("dpi"))
     nonwhite_fraction = float(np.mean(grayscale < 250))
     standard_deviation = float(grayscale.std())
     result = {
         "width_pixels": width,
         "height_pixels": height,
-        "dpi": list(dpi),
+        "dpi": dpi,
         "nonwhite_fraction": nonwhite_fraction,
         "grayscale_standard_deviation": standard_deviation,
         "passed": (

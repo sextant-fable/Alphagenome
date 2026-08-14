@@ -126,8 +126,11 @@ class Dpy27FigureTests(unittest.TestCase):
                 plot.plt.close(figure)
             self.assertTrue(all(path.stat().st_size > 0 for path in paths.values()))
             self.assertIn("<text", paths["svg"].read_text())
-            self.assertTrue(plot._image_audit(paths["png"])["passed"])
-            self.assertTrue(plot._image_audit(paths["tiff"])["passed"])
+            png_audit = plot._image_audit(paths["png"])
+            tiff_audit = plot._image_audit(paths["tiff"])
+            self.assertTrue(png_audit["passed"])
+            self.assertTrue(tiff_audit["passed"])
+            json.dumps({"png": png_audit, "tiff": tiff_audit})
             pdf_audit = plot._run_json(
                 [
                     sys.executable,
@@ -140,6 +143,23 @@ class Dpy27FigureTests(unittest.TestCase):
             )
             self.assertTrue(pdf_audit["auditable"])
             self.assertEqual(pdf_audit["below_minimum_count"], 0)
+
+    def test_ifd_rational_dpi_is_normalized_for_json(self) -> None:
+        from PIL.TiffImagePlugin import IFDRational
+
+        from scripts import plot_dpy27_internal_application as plot
+
+        raw_dpi = (IFDRational(600, 1), IFDRational(300, 1))
+        with self.assertRaisesRegex(TypeError, "IFDRational"):
+            json.dumps({"dpi": list(raw_dpi)})
+
+        normalized = plot._json_safe_dpi(raw_dpi)
+        self.assertEqual(normalized, [600.0, 300.0])
+        self.assertTrue(all(type(value) is float for value in normalized))
+        self.assertEqual(
+            json.loads(json.dumps({"dpi": normalized})),
+            {"dpi": [600.0, 300.0]},
+        )
 
 
 if __name__ == "__main__":

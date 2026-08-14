@@ -1,0 +1,355 @@
+{
+  "analysis_contract": "dpy27_internal_genomic_block_validation_v1",
+  "analysis_label": "internal_genomic_block_validation",
+  "artifacts": {
+    "figure_source_data": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_source_data.tsv",
+      "sha256": "0597ee87f5afd87ec49036e523a0ab82c5de8a008b892e5289437939c6b096a0",
+      "size_bytes": 2395555
+    },
+    "fold_endpoints": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/fold_endpoints.tsv",
+      "sha256": "d010c527c020c2ea3349904b24486e4f09918b39665f9d13de7cac76ef7a8f65",
+      "size_bytes": 788
+    },
+    "fold_gene_contrasts": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/fold_gene_contrasts.tsv",
+      "sha256": "0e38107409cf5612bbe39e183beabfa57a1dafc3f205fe2bb3efb1862fbaaa55",
+      "size_bytes": 4287201
+    },
+    "gene_contrasts": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/gene_contrasts.tsv",
+      "sha256": "8f86ad9617644e2ead9a4e9ec4757f7f1b4cb6f36fda8a8d30a9094b92e8abfd",
+      "size_bytes": 12800796
+    },
+    "preflight_audit": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/preflight_audit.json",
+      "sha256": "7b36e9dd1822701f66ff72d75c00a9b1150a5e91cbb79e8455d8f8611d23f4bc",
+      "size_bytes": 14323
+    },
+    "run_endpoints": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/run_endpoints.tsv",
+      "sha256": "b4a8fc112d193e9f32a9be468d90d114c28f481019d01d06514bd8e9492e3e94",
+      "size_bytes": 5827
+    },
+    "summary_endpoints": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/summary_endpoints.tsv",
+      "sha256": "743d4f35302ed7875d1e405434ef899a5e5113891c7d4dc33e4260506bafa4d7",
+      "size_bytes": 938
+    }
+  },
+  "biological_claim_boundary": "Tests whether Model B recovers the DPY-27 RNAi versus vector RNAi chromosome-X relative expression pattern in held-out genomic blocks. The conditions and tracks were model targets during training, so this is not unseen-condition, independent-study, causal, or final-test validation.",
+  "complete_gene_rows": 62046,
+  "completed_at": "2026-08-14T01:36:49+00:00",
+  "controller_invocation": "python -m scripts.v2_phase_controller run --phase P10",
+  "elapsed_seconds": 195.09442198369652,
+  "failures": [
+    "P10 plot finalizer failed (1):\n\nTraceback (most recent call last):\n  File \"/home/zelinli6/miniconda3/envs/CellUNetr/lib/python3.9/runpy.py\", line 197, in _run_module_as_main\n    return _run_code(code, main_globals, None,\n  File \"/home/zelinli6/miniconda3/envs/CellUNetr/lib/python3.9/runpy.py\", line 87, in _run_code\n    exec(code, run_globals)\n  File \"/home/zelinli6/Alphagenome/scripts/plot_dpy27_internal_application.py\", line 469, in <module>\n    main()\n  File \"/home/zelinli6/Alphagenome/scripts/plot_dpy27_internal_application.py\", line 464, in main\n    result = render_and_audit(args.spec.resolve(), args.spec_sha256)\n  File \"/home/zelinli6/Alphagenome/scripts/plot_dpy27_internal_application.py\", line 450, in render_and_audit\n    temporary.write_text(json.dumps(qa, indent=2, sort_keys=True) + \"\\n\")\n  File \"/home/zelinli6/miniconda3/envs/CellUNetr/lib/python3.9/json/__init__.py\", line 234, in dumps\n    return cls(\n  File \"/home/zelinli6/miniconda3/envs/CellUNetr/lib/python3.9/json/encoder.py\", line 201, in encode\n    chunks = list(chunks)\n  File \"/home/zelinli6/miniconda3/envs/CellUNetr/lib/python3.9/json/encoder.py\", line 431, in _iterencode\n    yield from _iterencode_dict(o, _current_indent_level)\n  File \"/home/zelinli6/miniconda3/envs/CellUNetr/lib/python3.9/json/encoder.py\", line 405, in _iterencode_dict\n    yield from chunks\n  File \"/home/zelinli6/miniconda3/envs/CellUNetr/lib/python3.9/json/encoder.py\", line 405, in _iterencode_dict\n    yield from chunks\n  File \"/home/zelinli6/miniconda3/envs/CellUNetr/lib/python3.9/json/encoder.py\", line 325, in _iterencode_list\n    yield from chunks\n  File \"/home/zelinli6/miniconda3/envs/CellUNetr/lib/python3.9/json/encoder.py\", line 438, in _iterencode\n    o = _default(o)\n  File \"/home/zelinli6/miniconda3/envs/CellUNetr/lib/python3.9/json/encoder.py\", line 179, in default\n    raise TypeError(f'Object of type {o.__class__.__name__} '\nTypeError: Object of type IFDRational is not JSON serializable\n"
+  ],
+  "final_test_access": "prohibited",
+  "fold_count": 5,
+  "gene_rows": 62175,
+  "git_commit": "8063a06734833814f7ab17f8fee8bfa7286f2568",
+  "gpu_snapshot_after": {
+    "commands": [
+      [
+        "nvidia-smi",
+        "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+        "--format=csv,noheader,nounits"
+      ],
+      [
+        "nvidia-smi",
+        "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+        "--format=csv,noheader,nounits"
+      ]
+    ],
+    "gpus": [
+      {
+        "index": 0,
+        "memory_free_mib": 1081,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 80073,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+      },
+      {
+        "index": 1,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+      },
+      {
+        "index": 2,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+      },
+      {
+        "index": 3,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+      }
+    ],
+    "processes": [
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 2103240,
+        "process_name": "VLLM::EngineCore",
+        "used_memory_mib": 70588
+      },
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 4118262,
+        "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+        "used_memory_mib": 9470
+      }
+    ]
+  },
+  "gpu_snapshot_before": {
+    "commands": [
+      [
+        "nvidia-smi",
+        "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+        "--format=csv,noheader,nounits"
+      ],
+      [
+        "nvidia-smi",
+        "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+        "--format=csv,noheader,nounits"
+      ]
+    ],
+    "gpus": [
+      {
+        "index": 0,
+        "memory_free_mib": 1081,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 80073,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+      },
+      {
+        "index": 1,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+      },
+      {
+        "index": 2,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+      },
+      {
+        "index": 3,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+      }
+    ],
+    "processes": [
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 2103240,
+        "process_name": "VLLM::EngineCore",
+        "used_memory_mib": 70588
+      },
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 4118262,
+        "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+        "used_memory_mib": 9470
+      }
+    ]
+  },
+  "hostname": "hy8",
+  "implementation_sha256": {
+    "scripts/plot_dpy27_internal_application.py": "6b06739fd851ef6bd6764f278f38b36cb0be6b3abd781b7e639c2c1744a62297",
+    "scripts/run_dpy27_internal_application.py": "76e94ee0b06b8c43997268e865d27914e5ede1fef2a976cb6ae86a352e3625fe",
+    "scripts/train_v2_model.py": "36404f5d0a65aaab19b20938ffa5912ac37a33bfc7e0f9b8c130798c912e2de8",
+    "scripts/v2_bigwig_dataset.py": "06e20dfe0e9b3b979da6f119464ae6ac81ab58302af4968e2051966da26562d9",
+    "scripts/v2_biological_validation.py": "ec7126f74273777504431cc391b39fca909cf082588328b0054bab42f6a8dfd9",
+    "scripts/v2_training_components.py": "20e1eb984a35ba41299edc44ad89829d76815e9be8aa5337687a30c2d8a5d381"
+  },
+  "locked_test_block_signal_reads": 0,
+  "normalization_boundary": "Both grouped RNA-seq tracks were independently rescaled to a decoded total signal of 1e8. All endpoints are relative G0005-G0006 contrasts; no absolute global-RNA or spike-in interpretation is permitted.",
+  "phase": "P10",
+  "physical_gpus": [
+    2,
+    3
+  ],
+  "preflight_model_or_bigwig_reads": 0,
+  "preflight_path": "runs/v2_p10_dpy27_internal_application_20260813/preflight_audit.json",
+  "preflight_sha256": "7b36e9dd1822701f66ff72d75c00a9b1150a5e91cbb79e8455d8f8611d23f4bc",
+  "python_executable": "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+  "registered_phase_command": "python -m scripts.run_dpy27_internal_application",
+  "run_count": 15,
+  "schema_version": 1,
+  "spec_path": "alphagenome_custom/metadata/v2/p10_dpy27_internal_application_spec.json",
+  "spec_sha256": "6baec148025f93346cd6ec198e1526f24fbac9050a5f9c2a37d1693d7cff0602",
+  "started_at": "2026-08-14T01:33:35+00:00",
+  "status": "failed",
+  "summary": [
+    {
+      "analysis_label": "internal_genomic_block_validation",
+      "bootstrap_replicates": 10000,
+      "bootstrap_seed": 20260813,
+      "ci_95_high": -0.0003692291180741224,
+      "ci_95_low": -0.0053518956729581135,
+      "endpoint": "predicted_median_contrast_x_minus_autosomes",
+      "estimate": -0.00273966414239616,
+      "inference_unit": "fold_after_within_fold_gene_condition_seed_mean",
+      "n_folds": 5,
+      "n_runs": 15
+    },
+    {
+      "analysis_label": "internal_genomic_block_validation",
+      "bootstrap_replicates": 10000,
+      "bootstrap_seed": 20260813,
+      "ci_95_high": 0.004236529386799761,
+      "ci_95_low": 0.001979710768072924,
+      "endpoint": "observed_median_contrast_x_minus_autosomes",
+      "estimate": 0.0030650244698043477,
+      "inference_unit": "fold_after_within_fold_gene_condition_seed_mean",
+      "n_folds": 5,
+      "n_runs": 15
+    },
+    {
+      "analysis_label": "internal_genomic_block_validation",
+      "bootstrap_replicates": 10000,
+      "bootstrap_seed": 20260813,
+      "ci_95_high": 0.717641698455246,
+      "ci_95_low": 0.6120231181857707,
+      "endpoint": "x_predicted_observed_direction_concordance",
+      "estimate": 0.6674447635361336,
+      "inference_unit": "fold_after_within_fold_gene_condition_seed_mean",
+      "n_folds": 5,
+      "n_runs": 15
+    },
+    {
+      "analysis_label": "internal_genomic_block_validation",
+      "bootstrap_replicates": 10000,
+      "bootstrap_seed": 20260813,
+      "ci_95_high": 0.09445905622283582,
+      "ci_95_low": 0.07067131620876846,
+      "endpoint": "predicted_observed_gene_spearman",
+      "estimate": 0.08457079103241756,
+      "inference_unit": "fold_after_within_fold_gene_condition_seed_mean",
+      "n_folds": 5,
+      "n_runs": 15
+    }
+  ],
+  "worker_results": [
+    {
+      "fold": 2,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260714_fold_2.log",
+      "physical_gpu": 3,
+      "seed": 20260714
+    },
+    {
+      "fold": 4,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260714_fold_4.log",
+      "physical_gpu": 3,
+      "seed": 20260714
+    },
+    {
+      "fold": 1,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260715_fold_1.log",
+      "physical_gpu": 3,
+      "seed": 20260715
+    },
+    {
+      "fold": 3,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260715_fold_3.log",
+      "physical_gpu": 3,
+      "seed": 20260715
+    },
+    {
+      "fold": 5,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260715_fold_5.log",
+      "physical_gpu": 3,
+      "seed": 20260715
+    },
+    {
+      "fold": 2,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260716_fold_2.log",
+      "physical_gpu": 3,
+      "seed": 20260716
+    },
+    {
+      "fold": 4,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260716_fold_4.log",
+      "physical_gpu": 3,
+      "seed": 20260716
+    },
+    {
+      "fold": 1,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260714_fold_1.log",
+      "physical_gpu": 2,
+      "seed": 20260714
+    },
+    {
+      "fold": 3,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260714_fold_3.log",
+      "physical_gpu": 2,
+      "seed": 20260714
+    },
+    {
+      "fold": 5,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260714_fold_5.log",
+      "physical_gpu": 2,
+      "seed": 20260714
+    },
+    {
+      "fold": 2,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260715_fold_2.log",
+      "physical_gpu": 2,
+      "seed": 20260715
+    },
+    {
+      "fold": 4,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260715_fold_4.log",
+      "physical_gpu": 2,
+      "seed": 20260715
+    },
+    {
+      "fold": 1,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260716_fold_1.log",
+      "physical_gpu": 2,
+      "seed": 20260716
+    },
+    {
+      "fold": 3,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260716_fold_3.log",
+      "physical_gpu": 2,
+      "seed": 20260716
+    },
+    {
+      "fold": 5,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260716_fold_5.log",
+      "physical_gpu": 2,
+      "seed": 20260716
+    }
+  ],
+  "working_directory": "/home/zelinli6/Alphagenome"
+}
