@@ -1,9 +1,12 @@
 # Draft Staging Status
 
-No manuscript prose has been started in this directory.
+Initial drafting is authorized by the owner on 2026-08-14. The working source
+is `alphagenome_nature_methods_draft_v0.tex`, using the official Springer Nature
+`sn-nature` template as its document-class skeleton. The manuscript is a
+coherent assumed-results scaffold: verified internal results are written as
+facts, while external benchmark and cis-eQTL fields remain explicit tokens
+listed in `DRAFT_ASSUMPTION_REGISTER_v0.md`.
 
-Begin a draft only after the external benchmark placeholder contract is frozen,
-the terminology ledger is approved and the owner explicitly authorizes writing.
-Use the official publisher template kept under `../template/vendor/` as a local
-authoring skeleton, then verify current Nature Methods instructions before any
-submission-format decision.
+This version is not submission-ready. Before submission, replace every external
+token from a frozen manifest and reviewed source-data package, then rerun the
+voice, terminology, statistics, citation, data-availability and figure audits.

@@ -8,9 +8,11 @@ manuscript workspace, not a new model-development area. Do not run training,
 change v2 phase state, read the locked final-test block, regenerate biology
 results, or alter source data from this directory.
 
-The current task is planning only. Do not create manuscript prose in
-`manuscript/` until the owner explicitly says to begin drafting. Keep concrete
-section plans in `plans/`, never in this file.
+The owner has authorized an initial manuscript draft. Prose may now be created
+under `manuscript/`, but this is an internal draft and not a submission-ready
+record. Keep concrete section plans in `plans/`, never in this file. Preserve
+the explicit external-result placeholders defined below until signed external
+artifacts are available.
 
 ## Evidence Contract
 
@@ -18,8 +20,10 @@ section plans in `plans/`, never in this file.
   planned manuscript inputs, not as verified repository results, until their
   signed manifests and source data are supplied.
 - Use the placeholders defined in
-  `plans/08_external_benchmark_placeholder_contract.md` verbatim. Never replace
-  them with guessed values, generic claims, or invented dataset names.
+  `plans/08_external_benchmark_placeholder_contract.md` verbatim. In the
+  owner-authorized assumed-results draft, placeholders may sit inside fluent
+  sentences, but they must remain visibly marked and must never be replaced by
+  guessed values or invented dataset names.
 - Distinguish `external benchmark`, `internal genomic-block validation`, and
   `locked final evaluation`. They are not interchangeable.
 - Preserve the P10 DPY-27 result as a negative internal diagnostic. It cannot
@@ -41,7 +45,9 @@ section plans in `plans/`, never in this file.
 - `template/`: official template provenance. `template/vendor/` is an ignored,
   unmodified third-party artifact.
 - `skills/alphagenome-nature-methods-voice/`: project-local writing skill.
-- `manuscript/`: empty staging area for a later owner-approved draft.
+- `manuscript/`: owner-approved initial draft, assumption register and later
+  template-ready source. The assumption register is not part of the submitted
+  manuscript.
 
 Keep planning files in English. Use stable, descriptive filenames. Do not put
 raw data, model weights, generated figures or external benchmark downloads in
@@ -99,8 +105,10 @@ finding manually.
 
 ## Draft and Release Gates
 
-1. Before drafting: complete the terminology ledger and all required external
-   benchmark placeholders.
+1. Before drafting: complete the terminology ledger and preserve all required
+   external benchmark placeholders. The owner may authorize an assumed-results
+   scaffold before those fields are filled; that scaffold must be labeled in
+   `manuscript/DRAFT_ASSUMPTION_REGISTER_v0.md`.
 2. Before a figure is rendered: complete its figure contract and select the
    plotting backend.
 3. Before internal review: run the local voice audit, terminology audit,

@@ -15,8 +15,9 @@ interpretation or missing experiment.
    `../../plans/TERMINOLOGY_LEDGER.md`.
 2. Read the plan for the requested manuscript part under `../../plans/parts/`.
 3. Load `references/project-boundaries.md` before changing scientific claims.
-4. If the text contains an `EXTERNAL_*` placeholder, preserve it and report a
-   drafting blocker. Do not replace it with generic positive wording.
+4. If the text contains an `EXTERNAL_*` or template-escaped `EXT_*`
+   placeholder, preserve it and report a drafting blocker. Do not replace it
+   with generic positive wording.
 5. If a result is unsupported, mark the sentence `[EVIDENCE NEEDED]` rather
    than softening it into an apparently factual sentence.
 

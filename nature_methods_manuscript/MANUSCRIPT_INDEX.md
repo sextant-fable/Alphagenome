@@ -2,10 +2,11 @@
 
 ## Status
 
-This workspace is a planning and governance package for a prospective Nature
-Methods Article on AlphaGenome-style sequence-to-RNA-track modeling in
-*Caenorhabditis elegans*. It deliberately contains no drafted manuscript
-prose. A full draft may begin only after the owner explicitly authorizes it.
+This workspace is a planning, governance and owner-authorized initial-draft
+package for a prospective Nature Methods Article on AlphaGenome-style
+sequence-to-RNA-track modeling in *Caenorhabditis elegans*. The working draft
+is a coherent assumed-results scaffold; it is not a submission record while
+the external tokens remain unresolved.
 
 The narrative is planned on the user's requested assumption that the external
 benchmark and independent biological application have been completed under a
@@ -23,7 +24,7 @@ fictional one.
 | `literature/` | Verified Nature Portfolio writing and figure audit. |
 | `plans/` | The master story, claim contract and section-by-section writing plans. |
 | `skills/alphagenome-nature-methods-voice/` | Project-local natural-prose and claim-boundary skill. |
-| `manuscript/` | Reserved for an approved future draft. |
+| `manuscript/` | Owner-authorized draft, assumption register and claim--evidence map. |
 
 ## Article Target
 
@@ -35,10 +36,10 @@ fictional one.
   more than six main display items. The current official guidance remains the
   controlling source if it changes before submission.
 
-## First Draft Gate
+## Initial Draft Gate
 
-Before writing any abstract, introduction, result paragraph, figure legend or
-cover letter, freeze the following inputs in `plans/08_external_benchmark_placeholder_contract.md`:
+Before replacing an external token or labeling the manuscript final, freeze the
+following inputs in `plans/08_external_benchmark_placeholder_contract.md`:
 
 1. Exact external benchmark datasets, laboratory or study isolation rule, and
    unseen biological condition.

@@ -1,0 +1,505 @@
+% Owner-authorized initial draft for the prospective Nature Methods Article.
+% This file uses the official Springer Nature sn-nature class as a local
+% authoring skeleton. External-result tokens are intentionally visible.
+\documentclass[pdflatex,sn-nature]{sn-jnl}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{url}
+
+\definecolor{draftblue}{RGB}{0,107,128}
+\newcommand{\ExtBenchmarkDataset}{\texttt{[EXT\_BENCHMARK\_DATASET\_ID]}}
+\newcommand{\ExtIsolation}{\texttt{[EXT\_SOURCE\_ISOLATION\_RULE]}}
+\newcommand{\ExtCondition}{\texttt{[EXT\_UNSEEN\_CONDITION]}}
+\newcommand{\ExtCoordinate}{\texttt{[EXT\_REFERENCE\_COORDINATE\_RULE]}}
+\newcommand{\ExtLeakage}{\texttt{[EXT\_LEAKAGE\_AUDIT\_RESULT]}}
+\newcommand{\ExtProtocol}{\texttt{[EXT\_PROTOCOL\_VERSION]}}
+\newcommand{\ExtPrimary}{\texttt{[EXT\_PRIMARY\_EFFECT\_AND\_CI]}}
+\newcommand{\ExtBaselines}{\texttt{[EXT\_PUBLIC\_BASELINE\_RESULTS]}}
+\newcommand{\ExtStrata}{\texttt{[EXT\_STRATIFIED\_RESULTS]}}
+\newcommand{\ExtVariantDataset}{\texttt{[EXT\_VARIANT\_DATASET\_ID]}}
+\newcommand{\ExtVariant}{\texttt{[EXT\_VARIANT\_RESULT]}}
+\newcommand{\ExtRelease}{\texttt{[EXT\_RELEASE\_MANIFEST]}}
+\newcommand{\draftfigure}[2]{%
+  \begin{figure*}[t]
+    \centering
+    \fbox{\begin{minipage}{0.92\textwidth}
+      \centering\vspace{8mm}
+      {\color{draftblue}\Large Draft figure placeholder}\par
+      \vspace{2mm}\small The source-data table and plotting script will be
+      attached after the corresponding frozen artifact is available.\vspace{8mm}
+    \end{minipage}}
+    \caption{#2}\label{#1}
+  \end{figure*}}
+
+\raggedbottom
+
+\begin{document}
+
+\title[Sequence-to-RNA-track modeling in \textit{C. elegans}]{A study-isolated sequence-to-RNA-track model for \textit{Caenorhabditis elegans}}
+
+\author*[1]{\fnm{Author} \sur{Name}}\email{\texttt{AUTHOR\_EMAIL\_TO\_BE\_SUPPLIED}}
+\affil*[1]{\orgdiv{\texttt{AUTHOR\_DEPARTMENT\_TO\_BE\_SUPPLIED}}, \orgname{\texttt{AUTHOR\_INSTITUTION\_TO\_BE\_SUPPLIED}}, \orgaddress{\city{\texttt{AUTHOR\_CITY\_TO\_BE\_SUPPLIED}}, \country{\texttt{AUTHOR\_COUNTRY\_TO\_BE\_SUPPLIED}}}}
+
+\abstract{Sequence models can connect genomic DNA to molecular measurements, but RNA-seq coverage remains difficult to predict across biological conditions and experimental sources. We assembled a traceable \textit{C. elegans} resource from 482 verified RNA-seq runs grouped into 241 biological tracks and adapted an AlphaGenome-style sequence model with a worm embedding, low-rank adaptation and a dual-resolution RNA head. On a frozen study-isolated benchmark containing an important condition absent from development, the full model improved the prespecified primary endpoint over technically eligible alternatives (\ExtPrimary). The improvement was attributable primarily to LoRA, with a smaller contribution from the worm embedding in a registered component analysis. Frozen reference--alternative sequence scores also recovered the direction and ranking of an independent same-species cis-eQTL endpoint (\ExtVariant). The resulting release provides multi-scale RNA predictions, auditable variant scoring and explicit operating-domain diagnostics.}
+
+\keywords{sequence-to-function modeling, RNA-seq coverage, \textit{Caenorhabditis elegans}, low-rank adaptation, cis-eQTL, regulatory variation}
+
+\maketitle
+
+\section{Introduction}\label{sec:introduction}
+
+Genomic sequence carries information about transcription, but the relationship
+between sequence and measured RNA output depends on promoter architecture,
+chromatin state, developmental context and the assay used to observe it.
+Sequence models have begun to capture this relationship at long genomic
+contexts. Enformer predicted multiple regulatory tracks from megabase-scale
+sequence windows\cite{enformer}; Akita showed that sequence models can recover
+long-range chromatin contacts\cite{akita}; and more recent models such as
+Borzoi and AlphaGenome extended the range of assays and biological tasks that
+can be addressed from sequence\cite{borzoi,alphagenome}. These advances make
+the next question concrete: can the same class of models be adapted to predict
+RNA-seq coverage in a genetically and experimentally diverse animal system?
+
+RNA-seq coverage is a demanding target for three reasons. It is continuous and
+highly uneven along the genome, it mixes regulatory signal with transcript
+structure and library-specific scale, and it is collected under conditions
+that are rarely balanced across studies. A useful method therefore needs more
+than a high average score on randomly held-out windows. It must expose data
+provenance, separate genomic interpolation from source-level generalization,
+compare only technically eligible alternatives and make its sequence-derived
+outputs useful for a biological endpoint.
+
+\textit{C. elegans} is a compact setting in which to make these requirements
+explicit. Its reference genome is small enough for dense sequence coverage,
+its developmental and genetic perturbation literature provides a rich set of
+RNA measurements, and its natural variation enables independent allele-level
+tests. At the same time, public RNA-seq collections span laboratories, stages,
+tissues and perturbations, so pooling them without a source-isolated test can
+make a model appear more general than it is.
+
+Here we develop a traceable sequence-to-RNA-track resource and a species-
+adapted model, which we call full Model B. The model retains a frozen sequence
+trunk, adds a learnable worm embedding, applies LoRA to the registered
+adaptation modules and predicts RNA coverage at both 1-bp and 128-bp
+resolution. We evaluate it on a benchmark held out by study source and an
+unseen biological condition (\ExtIsolation; \ExtCondition), use a harmonized
+comparison with Model A, size-matched Model C and eligible public methods, and
+then test sequence-difference scores against an independent cis-eQTL endpoint.
+The central result is that species adaptation and low-rank parameterization
+turn a general sequence representation into a reproducible worm RNA predictor
+whose external performance and variant utility can be measured under one
+declared protocol.
+
+\section{Results}\label{sec:results}
+
+\subsection{A traceable RNA resource and species-adapted model}
+
+We first converted a heterogeneous public collection into a single auditable
+prediction task. The provenance inventory contains 482 verified RNA-seq runs,
+which were uniformly reprocessed and grouped into 241 biological RNA tracks.
+All tracks use the WBcel235 reference and retain study, stage, tissue and
+condition metadata. The loader reads coverage on demand rather than exporting
+a monolithic training matrix, so the same source files support the 1-bp and
+128-bp targets used by the model. The resource therefore preserves both the
+fine-scale sequence signal needed for local regulatory effects and the binned
+output used for stable genome-scale evaluation.
+
+The model receives a 131,072-bp DNA window and returns two RNA predictions. A
+frozen sequence trunk supplies the long-context representation; a learnable
+worm embedding identifies the target organism; LoRA modifies only the
+registered low-rank adaptation modules; and a dual-resolution RNA head emits
+1-bp coverage together with a 128-bp summary. This design separates the
+organism-specific and assay-specific changes from the sequence representation,
+which makes their contribution testable rather than implicit. The training
+and development folds were defined on genomic cores, while the external
+benchmark was frozen by its source-isolation rule before its predictions were
+inspected (Fig.~\ref{fig:resource}).
+
+\draftfigure{fig:resource}{A traceable resource and model. (a) Verified RNA-seq
+runs flow into 241 grouped biological tracks with study and condition metadata.
+(b) A 131,072-bp DNA window passes through the frozen trunk, worm embedding and
+LoRA modules to the dual-resolution RNA head. (c) The development folds and
+study-isolated external source are separated before score inspection. (d) A
+preselected external locus will show observed and predicted coverage at both
+resolutions once the frozen benchmark artifact is attached.}
+
+\subsection{A frozen study-isolated benchmark establishes comparative performance}
+
+The primary test asks whether the full model retains an advantage when the
+evaluation source is unseen during training, selection and tuning. The frozen
+benchmark uses \ExtBenchmarkDataset, an isolation rule of \ExtIsolation and an
+important biological condition defined as \ExtCondition. The reference build,
+coordinate convention and annotation are fixed by \ExtCoordinate. The leakage
+audit reports \ExtLeakage, including genomic-window, run/track and study-level
+overlap checks. These decisions define ``external'' as a property of the
+experimental design, rather than as a synonym for a different chromosome or a
+randomly held-out window.
+
+All eligible models receive the same reference sequence, 131,072-bp context,
+RNA target definition, training-data budget, optimization budget and primary
+evaluation set. The protocol is versioned as \ExtProtocol. Model A is the
+frozen-trunk RNA-head baseline; size-matched Model C is trained from scratch
+with the same trainable-parameter budget as full Model B. Enformer and Borzoi
+are included in the shared table only when their RNA adapters preserve the
+scientific meaning of the target and their compute allowance is disclosed.
+Methods that cannot satisfy those conditions are listed with their technical
+reason for exclusion rather than being given a superficial score.
+
+On the frozen primary endpoint, full Model B improved over the eligible
+comparison set (\ExtPrimary). The complete per-model results, parameter counts,
+compute, adaptation notes and eligibility decisions are reported together in
+Table~\ref{tab:benchmark}; the result is not reduced to a single leaderboard
+number. Across the prespecified study and condition strata, the effect was
+\ExtStrata. Gene/exon and 128-bp coverage endpoints showed the same ordering
+under the registered blocked interval calculation. This establishes the main
+performance claim at the level at which the method is intended to be used:
+sequence-conditioned prediction of RNA coverage from an unseen biological
+source.
+
+\draftfigure{fig:benchmark}{Harmonized study-isolated comparison. (a) Primary
+paired effects for full Model B against each technically eligible comparator,
+with the frozen blocked 95\% intervals. (b) Effects within source and condition
+strata. (c) Gene/exon and 128-bp endpoints on the same evaluation units. (d)
+Accuracy, total/trainable parameters and compute. Every plotted value will be
+linked to the external source-data manifest.}
+
+\begin{table*}[t]
+\centering
+\caption{Frozen external benchmark and comparator contract. The final version
+will replace the tokens with values from the signed benchmark manifest.}
+\label{tab:benchmark}
+\begin{tabular}{p{0.17\textwidth}p{0.19\textwidth}p{0.16\textwidth}p{0.15\textwidth}p{0.18\textwidth}}
+\toprule
+Comparator & Reference/input & Target and budget & Parameters/compute & Eligibility and result \\
+\midrule
+Full Model B & \ExtCoordinate; 131,072 bp & 1-bp and 128-bp RNA coverage; \ExtProtocol & To be populated & Primary method; \ExtPrimary \\
+Model A & Same & Same & To be populated & Internal transfer baseline \\
+Size-matched Model C & Same & Same & Matched trainable budget & From-scratch control \\
+Enformer & Adapter-dependent & Shared protocol only if RNA adapter is faithful & To be populated & \ExtBaselines \\
+Borzoi & Adapter-dependent & Shared protocol only if RNA adapter is faithful & To be populated & \ExtBaselines \\
+Other public methods & Method-specific & Excluded when not technically comparable & To be populated & Reason recorded explicitly \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Controlled attribution identifies the measured value of adaptation}
+
+After establishing the external comparison, we asked which components account
+for the gain. The registered P9 matrix keeps five genomic folds as the primary
+blocked units and three seeds nested within each fold. The 241 tracks are shown
+as a descriptive distribution, not as 241 independent experiments. In the
+primary paired comparison, size-matched Model C minus full Model B was
+\(-0.0920167\) (95\% CI, \(-0.0997615\) to \(-0.0849763\)). The full model
+therefore outperformed a from-scratch model even after trainable parameter
+count was matched.
+
+The factorial analysis separated the two adaptation choices. The LoRA main
+effect was \(0.1013801\) (95\% CI, \(0.0979171\) to \(0.1055677\)); the worm
+embedding main effect was \(0.0098003\) (95\% CI, \(0.0089332\) to
+\(0.0108411\)). Their interaction was \(-0.0139765\) (95\% CI,
+\(-0.0158702\) to \(-0.0120685\)), which we interpret as statistical
+non-additivity in the registered endpoint, not as a mechanistic interaction.
+The 1-bp-head-only primary interval crossed zero, so the present experiment
+does not establish that the learned 1-bp head is necessary for the primary
+score. Together, these results identify LoRA as the dominant measured
+adaptation effect while preserving the smaller contribution of organism
+conditioning (Fig.~\ref{fig:attribution}).
+
+\draftfigure{fig:attribution}{Component attribution. (a) Paired effects of
+complete and component-replacement models relative to full Model B. (b) The
+registered worm-embedding, LoRA and interaction effects. (c) The descriptive
+distribution of paired effects across all 241 tracks. Intervals use five
+genomic folds with three seeds nested within fold and 10,000 fold-first
+bootstrap replicates; track-level points are not independent inferential
+replicates.}
+
+\subsection{Frozen sequence differences prioritize an independent regulatory endpoint}
+
+The second test asks whether the model's sequence outputs support a biological
+use case outside the RNA collection used for training. We froze a reference--
+alternative scoring procedure and evaluated it against \ExtVariantDataset, an
+independent same-species cis-eQTL endpoint. The sequence and annotation
+alignment followed \ExtCoordinate; variants with ambiguous reference alleles,
+unresolved indels or hyper-divergent sequence were handled by the predeclared
+rules in Online Methods. No model parameter or score threshold was adjusted to
+the external labels.
+
+For each variant, the procedure validates the reference allele against the
+genome, generates matched reference and alternative windows, averages the
+forward and reverse-complement predictions, and aggregates the difference to a
+gene-level score. The primary analysis uses local cis-eQTLs, because a local
+sequence difference can directly test a local regulatory signal. Trans-eQTLs
+are retained only as a separate sensitivity analysis. A matched-null set controls
+for genomic distance, allele frequency, local GC content and target-gene
+opportunity before ranking is evaluated.
+
+The frozen score recovered the prespecified direction and ranking endpoint
+(\ExtVariant). Figure~\ref{fig:variants} will show the signed effect
+concordance, discrimination against matched nulls and one locus selected by a
+rule fixed before score inspection. The locus panel is an illustration of the
+quantitative endpoint, not a substitute for the genome-wide analysis. This
+result connects the model's sequence difference to an independent regulatory
+measurement without claiming that a prediction alone proves causal biology.
+
+\draftfigure{fig:variants}{Independent cis-eQTL application. (a) Frozen variant
+scoring and null-matching workflow. (b) Predicted versus observed signed
+effects with the direction endpoint. (c) ROC and precision--recall curves for
+cis-eQTLs versus matched nulls. (d) One prespecified locus with reference and
+alternative coverage, the aggregated gene score and sequence attribution.}
+
+\subsection{External stratification defines the model's useful domain}
+
+The pooled external score is accompanied by a use-domain analysis. Effects are
+reported for each prespecified source, condition, signal and annotation stratum
+rather than being assumed to transfer uniformly. The complete stratified result
+is \ExtStrata. We also report the inference cost, total and trainable parameter
+counts, output format and a minimal prediction command so that users can judge
+whether a new locus or condition lies within the tested operating domain.
+
+\draftfigure{fig:domain}{External use domain. (a) Ordered effects across source
+and condition strata. (b) Performance across predefined signal and annotation
+bins. (c) Calibration or risk--coverage analysis for variant prioritization.
+(d) Three preselected success and failure examples with identical axes.}
+
+\section{Discussion}\label{sec:discussion}
+
+This study presents a traceable route from heterogeneous \textit{C. elegans}
+RNA-seq coverage to a sequence-to-RNA-track model that can be compared across
+sources and used for sequence-difference scoring. The main advance is not a
+new loss in isolation. It is the combination of an auditable multi-track
+resource, a species-adapted parameterization, a study-isolated benchmark and a
+biological endpoint defined before variant scores are inspected. On that
+framework, the full model's external advantage (\ExtPrimary) and its independent
+cis-eQTL result (\ExtVariant) form one evidence chain: the method predicts a
+measured RNA signal and its frozen sequence differences carry information about
+regulatory variation.
+
+The component analysis clarifies what is doing the work. LoRA supplied the
+largest measured contribution in the registered factorial design, whereas the
+worm embedding supplied a smaller but reproducible shift. Matching the
+trainable parameter budget to size-matched Model C made this comparison about adaptation and
+optimization rather than a hidden capacity difference. The interaction term
+shows that the two changes are not additive on the primary score, but it does
+not identify a biological mechanism. The learned 1-bp head remains useful for
+resolution and downstream interpretation, yet its present interval does not
+support a necessity claim.
+
+The method is intended as a measurement tool for sequence-conditioned RNA
+prediction, not as a replacement for an experiment. The P10 DPY-27 internal
+diagnostic makes this boundary concrete: the observed X-minus-autosome
+contrast was \(0.003065\) (95\% CI, \(0.001980\) to \(0.004237\)), whereas the
+predicted contrast was \(-0.002740\) (95\% CI, \(-0.005352\) to \(-0.000369\));
+direction concordance was 0.6674 and gene-level Spearman correlation was 0.0846.
+This internal diagnostic did not recover the prespecified chromosome-level
+response and is therefore reported as a boundary test, not as biological
+validation. It also illustrates why relative, track-normalized RNA coverage
+should not be described as an absolute dosage measurement.
+
+The limitation of the study is defined by the evidence that remains outside
+the frozen protocol. The external result depends on the source-isolation,
+unseen-condition and comparator-eligibility records represented by the tokens
+in this draft; the final manuscript will replace them only with reviewed
+artifacts. The model is evaluated in \textit{C. elegans} and should not be
+described as cross-species generalization without a separate species-isolated
+test. Cis-eQTL agreement is a molecular association endpoint, not proof of
+causality, and reporter, CRISPR or quantitative validation would extend rather
+than merely repeat the computational result. Finally, study-level performance
+does not guarantee accuracy for every tissue, perturbation or genomic region.
+These are operating boundaries for responsible use, not reasons to dilute the
+central result within the main comparison.
+
+The release is designed to make the next experiment easy to audit. It includes
+the model weights, grouped-track manifest, reference and annotation versions,
+variant-scoring command, source-data tables and a clean reproduction record
+identified by \ExtRelease. With those artifacts, a new study can be evaluated
+without changing the model or silently changing the endpoint.
+
+\section{Online Methods}\label{sec:methods}
+
+\subsection{Study design and data provenance}
+
+The source inventory contains 482 verified RNA-seq runs and three excluded
+ChIP-seq runs. Uniform processing produces 241 grouped biological RNA tracks.
+All sequence coordinates refer to WBcel235 and use zero-based half-open
+intervals in machine-readable split files. Group metadata retain accession,
+study, laboratory, developmental stage, tissue, perturbation and processing
+labels. Raw and grouped bigWig files are not modified in place. The data loader
+reads requested intervals at 1-bp and 128-bp resolution, applying the registered
+track transformation at read time.
+
+\subsection{Sequence model}
+
+The input is a 131,072-bp one-hot DNA window. The frozen sequence trunk produces
+long-context features. Full Model B adds a learnable worm embedding and LoRA
+updates in the target modules, followed by a dual-resolution RNA head. The head
+produces a 1-bp prediction and a 128-bp prediction; gene and exon scores are
+formed by the prespecified aggregation of the corresponding coverage output.
+Model A retains the frozen trunk with the RNA head but omits the species
+adaptation. Size-matched Model C is trained from scratch with the same
+trainable-parameter budget, input, target, optimizer budget and evaluation
+protocol as Model B.
+
+\subsection{Development and external benchmark}
+
+Development uses five leave-one-chromosome-out genomic folds across chromosomes
+I--V. Three seeds are nested within each fold. The external benchmark is
+\ExtBenchmarkDataset and uses \ExtIsolation, \ExtCondition, \ExtCoordinate,
+\ExtLeakage and \ExtProtocol. The complete isolation proof records the source
+and laboratory exclusion, run/track overlap, genomic-window overlap and any
+annotation or liftover operations. The benchmark is read only after the model,
+comparators, trainable budget, primary metric and test set are frozen.
+
+\subsection{Comparator adaptation and eligibility}
+
+Each candidate method is evaluated against the same reference, input window,
+target definition, training budget and test set when its architecture permits a
+scientifically faithful adapter. Enformer and Borzoi are included in the main
+table only when their native outputs can be mapped to the RNA target without
+changing the biological question. Native-window analyses that cannot meet the
+shared protocol are reported separately with their exact input and output
+definitions. Total and trainable parameters, hardware, wall time and peak
+memory are recorded for every eligible comparator. The external per-model
+results are \ExtBaselines.
+
+\subsection{Component attribution}
+
+P9 evaluates the registered 2-by-2 component design on five genomic folds and
+three nested seeds. The analysis includes full Model B, B without LoRA,
+LoRA-only, 1-bp-head-only and size-matched Model C configurations. Paper loss
+and log1p loss are already represented by the complete P6B matrix. Paired
+effects are computed within fold and seed. Confidence intervals use 10,000
+fold-first bootstrap replicates with seeds sampled within fold. The 241-track
+panel is descriptive; it does not change the inferential unit.
+
+\subsection{Variant scoring}
+
+The variant scorer validates chromosome, position, reference allele and
+alternative allele against the selected FASTA. It creates reference and
+alternative windows with a fixed center and context, runs both strands when
+the model protocol requires reverse-complement ensembling, and writes the raw
+track-level delta before gene/exon aggregation. Insertions and deletions use
+the registered alignment policy; hyper-divergent regions are excluded by the
+frozen mask. The primary endpoint is the independent local cis-eQTL set
+\ExtVariantDataset. Null variants are matched on the predeclared genomic and
+allelic variables. Direction concordance, rank correlation, AUROC and AUPRC
+are estimated with the gene or genomic-block bootstrap unit specified in the
+external analysis manifest; the result is \ExtVariant.
+
+\subsection{Statistical analysis}
+
+The independent unit for model-comparison inference is the genomic fold, with
+seeds treated as nested algorithmic repeats. We report paired effect sizes and
+95\% confidence intervals from the registered hierarchical bootstrap rather
+than treating tracks or output bins as independent replicates. All point
+estimates are written before rounding to source-data tables. Track-wise values
+are descriptive. Correlations are reported with their endpoint, aggregation
+rule and resampling unit. Exact software versions, random seeds, exclusions,
+missing-data rules and multiple-comparison decisions are recorded in the
+release manifest. Any external statistical field not present in the signed
+manifest remains an \texttt{AUTHOR\_INPUT\_NEEDED} item rather than an invented value.
+
+\subsection{Reproducibility and release}
+
+The release records the source manifest, split files, model and plotting code,
+environment lock, checkpoint checksums, data hashes, figure source data and a
+clean-room reproduction command. The final identifiers are \ExtRelease. The
+training and evaluation controller forbids reads from the locked final-test
+block during development analyses and records the command, host, GPU, input
+hashes, output hashes and review result for each formal phase.
+
+\section*{Data availability}
+
+The source RNA-seq accessions and any reused public variant data will be cited
+at their original repositories. The grouped-track manifest, split definitions,
+processed source tables, model weights and example inputs will be deposited
+under \ExtRelease. Repository, accession, license and embargo fields are
+\texttt{AUTHOR\_INPUT\_NEEDED} until the release manifest is signed.
+
+\section*{Code availability}
+
+The training, evaluation, variant-scoring and figure-generation code will be
+released with an environment specification, test fixtures and the exact
+commands used for the reported figures. The immutable code identifier is
+\texttt{AUTHOR\_INPUT\_NEEDED} until the release is tagged.
+
+\section*{Acknowledgements}
+
+\texttt{AUTHOR\_INPUT\_NEEDED}.
+
+\section*{Author contributions}
+
+\texttt{AUTHOR\_INPUT\_NEEDED}.
+
+\section*{Competing interests}
+
+The authors declare no competing interests. Replace this sentence if the author
+team reports a different declaration.
+
+\section*{Reporting summary}
+
+Further information on research design is available in the Nature Portfolio
+Reporting Summary associated with this article. The final submission package
+will attach the completed reporting form and software checklist.
+
+\draftfigure{fig:extended}{Extended Data figure package. Extended Data Fig.~1
+contains the complete P6B matrix; Fig.~2 contains architecture and parameter
+accounting; Fig.~3 contains external leakage and coordinate audits; Fig.~4
+contains all external strata; Fig.~5 contains additional loci; Fig.~6 contains
+the negative DPY-27 internal diagnostic; Fig.~7 contains variant-score
+sensitivity analyses; and Fig.~8 contains clean-room reproduction checks.}
+
+\begin{thebibliography}{10}
+
+\bibitem{enformer}
+Avsec, \v{Z}. et al. Effective gene expression prediction from sequence by
+integrating long-range interactions. \textit{Nat. Methods} \textbf{18},
+1196--1203 (2021). doi:10.1038/s41592-021-01252-x.
+
+\bibitem{borzoi}
+Linder, J. et al. Predicting RNA-seq coverage from DNA sequence as a unifying
+model of gene regulation. \textit{Nat. Genet.} \textbf{57}, 949--961 (2025).
+doi:10.1038/s41588-024-02053-6.
+
+\bibitem{alphagenome}
+Avsec, \v{Z}. et al. Advancing regulatory variant effect prediction with
+AlphaGenome. \textit{Nature} \textbf{649}, 1206--1218 (2026).
+doi:10.1038/s41586-025-10014-0.
+
+\bibitem{akita}
+Fudenberg, G. et al. Predicting 3D genome folding from DNA sequence with
+Akita. \textit{Nat. Methods} \textbf{17}, 1111--1117 (2020).
+doi:10.1038/s41592-020-0958-x.
+
+\bibitem{deepsea}
+Zhou, J. \& Troyanskaya, O. G. Predicting effects of noncoding variants with
+deep learning-based sequence model. \textit{Nat. Methods} \textbf{12},
+931--934 (2015). doi:10.1038/nmeth.3547.
+
+\bibitem{nt}
+Dalla-Torre, H. et al. The nucleotide transformer: building and evaluating
+foundation models for human genomics. \textit{Nat. Methods} (2025).
+doi:10.1038/s41592-024-02523-z.
+
+\bibitem{crested}
+Kempynck, J. et al. CREsted: modeling genomic and synthetic cell-type-specific
+enhancers across tissues and species. \textit{Nat. Methods} \textbf{23},
+946--959 (2026). doi:10.1038/s41592-026-03057-2.
+
+\bibitem{personalgenome}
+Spiro, A. et al. A scalable approach to investigating sequence-to-function
+predictions from personal genomes. \textit{Nat. Methods} \textbf{23},
+1308--1312 (2026). doi:10.1038/s41592-026-03124-8.
+
+\bibitem{personaltranscriptome}
+Huang, Y. et al. Personal transcriptome variation is poorly explained by
+current genomic deep learning models. \textit{Nat. Genet.} \textbf{55},
+2056--2059 (2023).
+doi:10.1038/s41588-023-01574-w.
+
+\end{thebibliography}
+
+\end{document}

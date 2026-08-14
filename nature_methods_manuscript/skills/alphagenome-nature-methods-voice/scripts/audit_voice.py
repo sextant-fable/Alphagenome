@@ -20,7 +20,7 @@ FLAG_RULES = (
 )
 
 BLOCKER_RULES = (
-    ("placeholder", r"\bEXTERNAL_[A-Z0-9_]+\b", "Freeze the corresponding external artifact before drafting final prose."),
+    ("placeholder", r"\bEXTERNAL_[A-Z0-9_]+\b|\bEXT(?:_|\\_)[A-Z0-9_\\]+", "Freeze the corresponding external artifact before drafting final prose."),
     ("boundary", r"\b(?:DPY-27 response recovery|DPY-27 biological validation)\b", "P10 is a negative internal diagnostic and cannot support this framing."),
 )
 
