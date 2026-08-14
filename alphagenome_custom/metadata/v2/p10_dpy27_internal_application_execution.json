@@ -1,0 +1,605 @@
+{
+  "analysis_contract": "dpy27_internal_genomic_block_validation_v1",
+  "analysis_label": "internal_genomic_block_validation",
+  "artifacts": {
+    "figure_pdf": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.pdf",
+      "sha256": "3adfbf41ebae042db7b4c64110a39aee11da08317c5165b013e4742f138334fa",
+      "size_bytes": 29945
+    },
+    "figure_png": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.png",
+      "sha256": "26a2a5cfb91bf4702ee2b8081d53a376a591b075bb89050f983d1ebf1ce06ec0",
+      "size_bytes": 505465
+    },
+    "figure_qa": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_qa.json",
+      "sha256": "78809e93f9cdac3134c08c8066ca4be3f023d2a0985b4aeabc326228e7358d86",
+      "size_bytes": 6373
+    },
+    "figure_source_data": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_source_data.tsv",
+      "sha256": "0597ee87f5afd87ec49036e523a0ab82c5de8a008b892e5289437939c6b096a0",
+      "size_bytes": 2395555
+    },
+    "figure_svg": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.svg",
+      "sha256": "bf08cf7fae9daecb891a8e59a5e5a58b9fd5417edb53bc722239d751896f9c35",
+      "size_bytes": 41772
+    },
+    "figure_tiff": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.tiff",
+      "sha256": "b5ab39e8de858a1386a90fd46e90521260764fde52610612fecb123c00f49c86",
+      "size_bytes": 35372366
+    },
+    "fold_endpoints": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/fold_endpoints.tsv",
+      "sha256": "d010c527c020c2ea3349904b24486e4f09918b39665f9d13de7cac76ef7a8f65",
+      "size_bytes": 788
+    },
+    "fold_gene_contrasts": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/fold_gene_contrasts.tsv",
+      "sha256": "0e38107409cf5612bbe39e183beabfa57a1dafc3f205fe2bb3efb1862fbaaa55",
+      "size_bytes": 4287201
+    },
+    "gene_contrasts": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/gene_contrasts.tsv",
+      "sha256": "8f86ad9617644e2ead9a4e9ec4757f7f1b4cb6f36fda8a8d30a9094b92e8abfd",
+      "size_bytes": 12800796
+    },
+    "preflight_audit": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/preflight_audit.json",
+      "sha256": "6c6303889a1ef7879d69b3d6facc3f83361e8777e40f77ababa634c76dec137c",
+      "size_bytes": 14323
+    },
+    "run_endpoints": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/run_endpoints.tsv",
+      "sha256": "b4a8fc112d193e9f32a9be468d90d114c28f481019d01d06514bd8e9492e3e94",
+      "size_bytes": 5827
+    },
+    "summary_endpoints": {
+      "path": "runs/v2_p10_dpy27_internal_application_20260813/summary_endpoints.tsv",
+      "sha256": "743d4f35302ed7875d1e405434ef899a5e5113891c7d4dc33e4260506bafa4d7",
+      "size_bytes": 938
+    }
+  },
+  "biological_claim_boundary": "Tests whether Model B recovers the DPY-27 RNAi versus vector RNAi chromosome-X relative expression pattern in held-out genomic blocks. The conditions and tracks were model targets during training, so this is not unseen-condition, independent-study, causal, or final-test validation.",
+  "complete_gene_rows": 62046,
+  "completed_at": "2026-08-14T01:51:05+00:00",
+  "controller_invocation": "python -m scripts.v2_phase_controller run --phase P10",
+  "elapsed_seconds": 189.25461543817073,
+  "failures": [],
+  "figure_qa": {
+    "artifacts": {
+      "pdf": {
+        "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.pdf",
+        "sha256": "3adfbf41ebae042db7b4c64110a39aee11da08317c5165b013e4742f138334fa",
+        "size_bytes": 29945
+      },
+      "png": {
+        "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.png",
+        "sha256": "26a2a5cfb91bf4702ee2b8081d53a376a591b075bb89050f983d1ebf1ce06ec0",
+        "size_bytes": 505465
+      },
+      "svg": {
+        "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.svg",
+        "sha256": "bf08cf7fae9daecb891a8e59a5e5a58b9fd5417edb53bc722239d751896f9c35",
+        "size_bytes": 41772
+      },
+      "tiff": {
+        "path": "runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.tiff",
+        "sha256": "b5ab39e8de858a1386a90fd46e90521260764fde52610612fecb123c00f49c86",
+        "size_bytes": 35372366
+      }
+    },
+    "pdf_text_audit": {
+      "auditable": true,
+      "below_minimum": [],
+      "below_minimum_count": 0,
+      "minimum_found_pt": 6.0,
+      "minimum_required_pt": 5.0,
+      "pdf": "/home/zelinli6/Alphagenome/runs/v2_p10_dpy27_internal_application_20260813/figure_dpy27_internal_application.pdf",
+      "text_run_count": 48,
+      "warnings": []
+    },
+    "plot_runtime": {
+      "matplotlib_version": "3.7.0",
+      "numpy_version": "1.21.0",
+      "pillow_version": "9.5.0",
+      "python_executable": "/home/zelinli6/miniconda3/envs/CellUNetr/bin/python",
+      "python_version": "3.9.16"
+    },
+    "png_pixel_audit": {
+      "dpi": [
+        599.9988,
+        599.9988
+      ],
+      "grayscale_standard_deviation": 38.96344826923825,
+      "height_pixels": 2047,
+      "nonwhite_fraction": 0.048198922542474085,
+      "passed": true,
+      "width_pixels": 4320
+    },
+    "schema_version": 1,
+    "source_data_path": "runs/v2_p10_dpy27_internal_application_20260813/figure_source_data.tsv",
+    "source_data_sha256": "0597ee87f5afd87ec49036e523a0ab82c5de8a008b892e5289437939c6b096a0",
+    "spec_sha256": "755fb19a84634ecdcd1d558895b9222fc314fe53096f442e172850712f494c2d",
+    "static_preflight": {
+      "backend": "python",
+      "findings": [
+        {
+          "check_id": "SOURCE-SYNTAX",
+          "evidence": [],
+          "level": "PASS",
+          "message": "Python source parses successfully"
+        },
+        {
+          "check_id": "FONT-FAMILY",
+          "evidence": [
+            "Arial",
+            "Liberation Sans",
+            "sans-serif"
+          ],
+          "level": "PASS",
+          "message": "A publication-safe sans-serif family is configured"
+        },
+        {
+          "check_id": "FONT-SIZE",
+          "evidence": [],
+          "level": "PASS",
+          "message": "All detected text sizes are at least 5 pt (minimum 6 pt)"
+        },
+        {
+          "check_id": "FONT-GLYPH-FLOOR",
+          "evidence": [],
+          "level": "PASS",
+          "message": "No mathtext superscript/subscript expression detected"
+        },
+        {
+          "check_id": "LEGEND-LABEL-CASE",
+          "evidence": [],
+          "level": "PASS",
+          "message": "Detected literal legend labels start with display-style capitalization"
+        },
+        {
+          "check_id": "COLOR-MAP",
+          "evidence": [],
+          "level": "PASS",
+          "message": "No rainbow/jet/hsv color mapping detected"
+        },
+        {
+          "check_id": "EDITABLE-TEXT",
+          "evidence": [],
+          "level": "PASS",
+          "message": "SVG and PDF editable-text settings are configured"
+        },
+        {
+          "check_id": "EXPORT-VECTOR",
+          "evidence": [],
+          "level": "PASS",
+          "message": "Both SVG and PDF exports are present"
+        },
+        {
+          "check_id": "EXPORT-RASTER",
+          "evidence": [],
+          "level": "PASS",
+          "message": "TIFF raster export is present"
+        },
+        {
+          "check_id": "RASTER-DPI",
+          "evidence": [
+            "600"
+          ],
+          "level": "PASS",
+          "message": "A raster export of at least 600 dpi is configured"
+        },
+        {
+          "check_id": "FINAL-WIDTH",
+          "evidence": [],
+          "level": "PASS",
+          "message": "Detected width 183.0 mm matches a common journal column width"
+        },
+        {
+          "check_id": "DATA-SAMPLING",
+          "evidence": [],
+          "level": "PASS",
+          "message": "No high-confidence row-sampling operation detected"
+        },
+        {
+          "check_id": "DATA-EXCLUSION",
+          "evidence": [],
+          "level": "PASS",
+          "message": "No high-confidence missing-data exclusion detected"
+        },
+        {
+          "check_id": "DEMO-DATA",
+          "evidence": [],
+          "level": "PASS",
+          "message": "No obvious simulated-data generator detected"
+        },
+        {
+          "check_id": "LOG-GUARD",
+          "evidence": [],
+          "level": "PASS",
+          "message": "No logarithmic transform or axis detected"
+        },
+        {
+          "check_id": "INTERP-MONOTONIC",
+          "evidence": [],
+          "level": "PASS",
+          "message": "No NumPy interpolation requiring an increasing x-grid detected"
+        },
+        {
+          "check_id": "UNCERTAINTY-ENCODING",
+          "evidence": [
+            "yerr=",
+            ".errorbar("
+          ],
+          "level": "PASS",
+          "message": "A stochastic aggregate and uncertainty encoding are both present; still verify every comparable panel"
+        },
+        {
+          "check_id": "ROTATION-ANCHOR",
+          "evidence": [],
+          "level": "PASS",
+          "message": "No rotated Matplotlib text detected"
+        },
+        {
+          "check_id": "ANNOTATION-WORKAROUND",
+          "evidence": [],
+          "level": "PASS",
+          "message": "No high-risk hard-coded label height or opaque white text mask detected"
+        },
+        {
+          "check_id": "BACKEND-EXCLUSIVE",
+          "evidence": [],
+          "level": "PASS",
+          "message": "No obvious cross-backend plotting reference found for python"
+        }
+      ],
+      "source": "/home/zelinli6/Alphagenome/scripts/plot_dpy27_internal_application.py",
+      "summary": {
+        "counts": {
+          "FAIL": 0,
+          "PASS": 20,
+          "WARN": 0
+        },
+        "ready": true,
+        "strict": false
+      }
+    },
+    "status": "passed",
+    "tiff_pixel_audit": {
+      "dpi": [
+        600.0,
+        600.0
+      ],
+      "grayscale_standard_deviation": 38.96344826923825,
+      "height_pixels": 2047,
+      "nonwhite_fraction": 0.048198922542474085,
+      "passed": true,
+      "width_pixels": 4320
+    }
+  },
+  "final_test_access": "prohibited",
+  "fold_count": 5,
+  "gene_rows": 62175,
+  "git_commit": "9db53d20ad59929c8ccf8a2d34228fcb931345eb",
+  "gpu_snapshot_after": {
+    "commands": [
+      [
+        "nvidia-smi",
+        "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+        "--format=csv,noheader,nounits"
+      ],
+      [
+        "nvidia-smi",
+        "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+        "--format=csv,noheader,nounits"
+      ]
+    ],
+    "gpus": [
+      {
+        "index": 0,
+        "memory_free_mib": 1081,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 80073,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+      },
+      {
+        "index": 1,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+      },
+      {
+        "index": 2,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 20,
+        "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+      },
+      {
+        "index": 3,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+      }
+    ],
+    "processes": [
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 2103240,
+        "process_name": "VLLM::EngineCore",
+        "used_memory_mib": 70588
+      },
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 4118262,
+        "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+        "used_memory_mib": 9470
+      }
+    ]
+  },
+  "gpu_snapshot_before": {
+    "commands": [
+      [
+        "nvidia-smi",
+        "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+        "--format=csv,noheader,nounits"
+      ],
+      [
+        "nvidia-smi",
+        "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+        "--format=csv,noheader,nounits"
+      ]
+    ],
+    "gpus": [
+      {
+        "index": 0,
+        "memory_free_mib": 1081,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 80073,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+      },
+      {
+        "index": 1,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+      },
+      {
+        "index": 2,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+      },
+      {
+        "index": 3,
+        "memory_free_mib": 81153,
+        "memory_total_mib": 81920,
+        "memory_used_mib": 0,
+        "name": "NVIDIA A100 80GB PCIe",
+        "utilization_percent": 0,
+        "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+      }
+    ],
+    "processes": [
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 2103240,
+        "process_name": "VLLM::EngineCore",
+        "used_memory_mib": 70588
+      },
+      {
+        "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+        "pid": 4118262,
+        "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+        "used_memory_mib": 9470
+      }
+    ]
+  },
+  "hostname": "hy8",
+  "implementation_sha256": {
+    "scripts/plot_dpy27_internal_application.py": "b8b8fc769ecca54387b04078e62097a1b1853cdeea909923d0c55c97fa8d75e4",
+    "scripts/run_dpy27_internal_application.py": "76e94ee0b06b8c43997268e865d27914e5ede1fef2a976cb6ae86a352e3625fe",
+    "scripts/train_v2_model.py": "36404f5d0a65aaab19b20938ffa5912ac37a33bfc7e0f9b8c130798c912e2de8",
+    "scripts/v2_bigwig_dataset.py": "06e20dfe0e9b3b979da6f119464ae6ac81ab58302af4968e2051966da26562d9",
+    "scripts/v2_biological_validation.py": "ec7126f74273777504431cc391b39fca909cf082588328b0054bab42f6a8dfd9",
+    "scripts/v2_training_components.py": "20e1eb984a35ba41299edc44ad89829d76815e9be8aa5337687a30c2d8a5d381"
+  },
+  "locked_test_block_signal_reads": 0,
+  "normalization_boundary": "Both grouped RNA-seq tracks were independently rescaled to a decoded total signal of 1e8. All endpoints are relative G0005-G0006 contrasts; no absolute global-RNA or spike-in interpretation is permitted.",
+  "phase": "P10",
+  "physical_gpus": [
+    2,
+    3
+  ],
+  "plot_command": [
+    "/home/zelinli6/miniconda3/envs/CellUNetr/bin/python",
+    "-m",
+    "scripts.plot_dpy27_internal_application",
+    "--spec",
+    "/home/zelinli6/Alphagenome/alphagenome_custom/metadata/v2/p10_dpy27_internal_application_spec.json",
+    "--spec-sha256",
+    "755fb19a84634ecdcd1d558895b9222fc314fe53096f442e172850712f494c2d"
+  ],
+  "plot_runtime": {
+    "matplotlib": "3.7.0",
+    "numpy": "1.21.0",
+    "pillow": "9.5.0",
+    "python": "3.9.16"
+  },
+  "preflight_model_or_bigwig_reads": 0,
+  "preflight_path": "runs/v2_p10_dpy27_internal_application_20260813/preflight_audit.json",
+  "preflight_sha256": "6c6303889a1ef7879d69b3d6facc3f83361e8777e40f77ababa634c76dec137c",
+  "python_executable": "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+  "registered_phase_command": "python -m scripts.run_dpy27_internal_application",
+  "run_count": 15,
+  "schema_version": 1,
+  "spec_path": "alphagenome_custom/metadata/v2/p10_dpy27_internal_application_spec.json",
+  "spec_sha256": "755fb19a84634ecdcd1d558895b9222fc314fe53096f442e172850712f494c2d",
+  "started_at": "2026-08-14T01:47:52+00:00",
+  "status": "completed",
+  "summary": [
+    {
+      "analysis_label": "internal_genomic_block_validation",
+      "bootstrap_replicates": 10000,
+      "bootstrap_seed": 20260813,
+      "ci_95_high": -0.0003692291180741224,
+      "ci_95_low": -0.0053518956729581135,
+      "endpoint": "predicted_median_contrast_x_minus_autosomes",
+      "estimate": -0.00273966414239616,
+      "inference_unit": "fold_after_within_fold_gene_condition_seed_mean",
+      "n_folds": 5,
+      "n_runs": 15
+    },
+    {
+      "analysis_label": "internal_genomic_block_validation",
+      "bootstrap_replicates": 10000,
+      "bootstrap_seed": 20260813,
+      "ci_95_high": 0.004236529386799761,
+      "ci_95_low": 0.001979710768072924,
+      "endpoint": "observed_median_contrast_x_minus_autosomes",
+      "estimate": 0.0030650244698043477,
+      "inference_unit": "fold_after_within_fold_gene_condition_seed_mean",
+      "n_folds": 5,
+      "n_runs": 15
+    },
+    {
+      "analysis_label": "internal_genomic_block_validation",
+      "bootstrap_replicates": 10000,
+      "bootstrap_seed": 20260813,
+      "ci_95_high": 0.717641698455246,
+      "ci_95_low": 0.6120231181857707,
+      "endpoint": "x_predicted_observed_direction_concordance",
+      "estimate": 0.6674447635361336,
+      "inference_unit": "fold_after_within_fold_gene_condition_seed_mean",
+      "n_folds": 5,
+      "n_runs": 15
+    },
+    {
+      "analysis_label": "internal_genomic_block_validation",
+      "bootstrap_replicates": 10000,
+      "bootstrap_seed": 20260813,
+      "ci_95_high": 0.09445905622283582,
+      "ci_95_low": 0.07067131620876846,
+      "endpoint": "predicted_observed_gene_spearman",
+      "estimate": 0.08457079103241756,
+      "inference_unit": "fold_after_within_fold_gene_condition_seed_mean",
+      "n_folds": 5,
+      "n_runs": 15
+    }
+  ],
+  "worker_results": [
+    {
+      "fold": 2,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260714_fold_2.log",
+      "physical_gpu": 3,
+      "seed": 20260714
+    },
+    {
+      "fold": 4,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260714_fold_4.log",
+      "physical_gpu": 3,
+      "seed": 20260714
+    },
+    {
+      "fold": 1,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260715_fold_1.log",
+      "physical_gpu": 3,
+      "seed": 20260715
+    },
+    {
+      "fold": 3,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260715_fold_3.log",
+      "physical_gpu": 3,
+      "seed": 20260715
+    },
+    {
+      "fold": 5,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260715_fold_5.log",
+      "physical_gpu": 3,
+      "seed": 20260715
+    },
+    {
+      "fold": 2,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260716_fold_2.log",
+      "physical_gpu": 3,
+      "seed": 20260716
+    },
+    {
+      "fold": 4,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260716_fold_4.log",
+      "physical_gpu": 3,
+      "seed": 20260716
+    },
+    {
+      "fold": 1,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260714_fold_1.log",
+      "physical_gpu": 2,
+      "seed": 20260714
+    },
+    {
+      "fold": 3,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260714_fold_3.log",
+      "physical_gpu": 2,
+      "seed": 20260714
+    },
+    {
+      "fold": 5,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260714_fold_5.log",
+      "physical_gpu": 2,
+      "seed": 20260714
+    },
+    {
+      "fold": 2,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260715_fold_2.log",
+      "physical_gpu": 2,
+      "seed": 20260715
+    },
+    {
+      "fold": 4,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260715_fold_4.log",
+      "physical_gpu": 2,
+      "seed": 20260715
+    },
+    {
+      "fold": 1,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260716_fold_1.log",
+      "physical_gpu": 2,
+      "seed": 20260716
+    },
+    {
+      "fold": 3,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260716_fold_3.log",
+      "physical_gpu": 2,
+      "seed": 20260716
+    },
+    {
+      "fold": 5,
+      "log_path": "runs/v2_p10_dpy27_internal_application_20260813/logs/seed_20260716_fold_5.log",
+      "physical_gpu": 2,
+      "seed": 20260716
+    }
+  ],
+  "working_directory": "/home/zelinli6/Alphagenome"
+}

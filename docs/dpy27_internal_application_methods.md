@@ -14,6 +14,24 @@ Both grouped tracks were independently rescaled to a decoded total signal of
 total-signal-normalized space. It cannot establish an absolute change in total
 RNA output without an external spike-in or equivalent calibration.
 
+## Formal result
+
+P10 completed all 15 checkpoint jobs and passed the terminal R10 review. The
+observed chromosome-X-minus-autosome median contrast was positive
+(`0.003065`, 95% fold-bootstrap CI `0.001980` to `0.004237`), whereas the
+predicted contrast was negative (`-0.002740`, 95% CI `-0.005352` to
+`-0.000369`). X-linked gene direction concordance was `0.6674` (95% CI
+`0.6120` to `0.7176`) and the predicted-observed gene-level Spearman
+correlation was `0.0846` (95% CI `0.0707` to `0.0945`).
+
+The prespecified chromosome-level endpoint therefore did not show recovery of
+the DPY-27 dosage-compensation response. The positive but weak gene-level
+agreement is retained as an internal diagnostic and must not be presented as a
+successful biological validation. The exact values are registered in
+`runs/v2_p10_dpy27_internal_application_20260813/summary_endpoints.tsv`, and
+the terminal review is
+`alphagenome_custom/metadata/v2/audits/P10/review.json`.
+
 ## Frozen inputs and execution
 
 The complete contract is frozen in
@@ -96,7 +114,7 @@ as stable top-level provenance fields.
 
 ## Figure legend
 
-**Figure: Model B recovers the DPY-27 response pattern in held-out genomic
+**Figure: Internal evaluation of the DPY-27 response in held-out genomic
 blocks.** **a,** Predicted versus observed gene-level log1p contrasts for
 DPY-27 RNAi relative to vector RNAi after averaging the two condition signals
 across three seeds within each fold and gene. Chromosome-X genes are shown
@@ -110,6 +128,6 @@ bootstrap intervals. Only genes with complete unique-exon coverage are shown.
 Both RNA-seq tracks are independently total-signal normalized; the figure is an
 internal genomic-block validation, not an independent-condition or causal test.
 
-This methods document does not assert that P10 has run. Execution status and
-biological results are established only by the checksum-verified P10 execution
-record, terminal R10 review, and generated Source Data artifacts.
+Execution status and biological results are established by the
+checksum-verified P10 execution record, terminal R10 review, and generated
+Source Data artifacts. The terminal controller state is `P10 / COMPLETE`.

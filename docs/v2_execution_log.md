@@ -2,6 +2,22 @@
 
 Entries are append-only. Failed phases and corrected conclusions remain in the record.
 
+## 2026-08-14 - P9 Submission Evidence Result
+
+- Execution: P9 completed on HY-GPU physical GPUs 2/3 under `G4:p9_submission_evidence_matrix`, using commit `8063a06734833814f7ab17f8fee8bfa7286f2568`. The registered matrix contains 90 unique configuration-by-fold-by-seed records, with 59 new training jobs and 31 hash-verified reuses. Failures were zero.
+- Review: R9 passed all nine checks. It independently verified 990 raw paired contrasts, 495 raw factorial contrasts, 66 paired summaries, 33 factorial summaries, and 65,070 per-track rows. Fold-first, seed-within-fold bootstrap intervals use 10,000 replicates. The inference unit is five genomic folds; seeds are nested algorithmic repeats and tracks are descriptive outcomes.
+- Size-matched comparison: C had 1,265,122 trainable parameters and B had 1,276,228, a 0.87% difference. C-minus-B primary score was `-0.0920167` (95% CI `-0.0997615` to `-0.0849763`), gene-exon Pearson was `-0.0850454` (`-0.0966044` to `-0.0726610`), and 128-bp Pearson was `-0.0989880` (`-0.1065557` to `-0.0933849`).
+- Component attribution: no-LoRA-minus-B primary score was `-0.094392`; LoRA-only-minus-B was `-0.002812`; learned-1-bp-head-only-minus-B was `-0.001808` with a 95% CI spanning zero (`-0.004205` to `0.000707`). The factorial worm-embedding main effect was `+0.009800`, the LoRA main effect was `+0.101380`, and the worm-by-LoRA statistical interaction was `-0.013976`. The interaction is non-additivity in this model matrix, not a biological mechanism.
+- Preservation: `final_test_access=prohibited`, locked-test signal reads were zero, and the P6C lock/report hashes remained unchanged. Machine-readable evidence is in `p9_submission_evidence_execution.json`, the registered P9 TSVs, and `audits/P9/review.json`.
+
+## 2026-08-14 - P10 DPY-27 Internal Application Result and Recovery
+
+- First attempt: all 15 inference shards and aggregate tables completed, but the figure finalizer failed while serializing Pillow TIFF `IFDRational` DPI metadata to JSON. The failed spec, execution record, 15 shards, aggregate tables, and figures were preserved under timestamped `failed_ifdrational` metadata and run paths. This was a presentation-QA failure, not a model or statistical failure.
+- Repair: TIFF DPI values are normalized to finite Python floats, with a regression test that serializes the complete PNG/TIFF audit payload. The corrected plot implementation and spec were committed as `9db53d20ad59929c8ccf8a2d34228fcb931345eb`. The canonical run root was emptied by moving, not deleting, the failed attempt before the controller retry.
+- Clean execution: the controller reran all 15 checkpoint jobs from new shards on physical GPUs 2/3 under the same exact P10 scope. R10 passed all nine checks, all four figure formats and Source Data passed hash and QA checks, and the controller reached `P10 / COMPLETE` with zero failures.
+- Biological result: observed chromosome-X-minus-autosome contrast was `+0.003065` (95% fold-bootstrap CI `0.001980` to `0.004237`), while the predicted contrast was `-0.002740` (`-0.005352` to `-0.000369`). X-linked direction concordance was `0.6674` (`0.6120` to `0.7176`) and gene-level Spearman correlation was `0.0846` (`0.0707` to `0.0945`). Independent recomputation found no track mapping, sign, chromosome classification, or aggregation error. The prespecified chromosome-level DPY-27 endpoint therefore failed; the weak positive gene-level agreement is diagnostic only and is not a successful biological validation.
+- Preservation: the analysis used fold validation cores and conditions already present among the training targets. It did not use the final-test block. `final_test_access=prohibited`, locked-test signal reads were zero, and the P6C lock/report hashes remained unchanged. Machine-readable evidence is in `p10_dpy27_internal_application_execution.json`, `runs/v2_p10_dpy27_internal_application_20260813/`, and `audits/P10/review.json`.
+
 ## 2026-08-13 - P9/P10 Development-Only Registration
 
 - P9 contract: `p9_submission_evidence_spec.json` freezes six 5-fold x 3-seed component cells, 90 registered records, 31 exact reuses, and 59 new training jobs. The exact G4 scope is `p9_submission_evidence_matrix`; only physical GPUs 2/3 may be selected after live checks.

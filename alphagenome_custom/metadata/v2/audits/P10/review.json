@@ -1,0 +1,54 @@
+{
+  "checks": [
+    {
+      "check_id": "R10.01_required_outputs",
+      "evidence": "all frozen outputs present",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R10.02_frozen_contract",
+      "evidence": "input_errors=[] checkpoint_errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R10.03_preflight",
+      "evidence": "checkpoints=15 tracks=241",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R10.04_execution_matrix",
+      "evidence": "status=completed workers=15 gpus=[2, 3]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R10.05_restart_shards",
+      "evidence": "shards=15/15 errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R10.06_fold_primary_source_data",
+      "evidence": "runs=15 folds=5 summaries=4 artifact_errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R10.07_figure_qa",
+      "evidence": "qa=passed artifact_errors=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R10.08_final_test_preserved",
+      "evidence": "P6C lock and report hashes unchanged",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R10.09_controller_scope",
+      "evidence": "phase=P10 status=REVIEWING",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P10",
+  "review": "R10-dpy27-internal-application",
+  "reviewed_at": "2026-08-14T01:51:12+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}
