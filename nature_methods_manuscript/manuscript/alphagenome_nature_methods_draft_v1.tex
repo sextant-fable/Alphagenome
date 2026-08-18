@@ -1,0 +1,159 @@
+% Evidence-led manuscript core. Every quantitative claim maps to a completed v2 artifact.
+\documentclass[pdflatex,sn-nature]{sn-jnl}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{url}
+\graphicspath{{../../results/v2_resource_overview_figure/}{../../results/v2_p6b_submission_analysis/}{../../results/v2_p9_submission_evidence_figure/}{../../results/v2_p10_dpy27_boundary_figure/}}
+\raggedbottom
+
+\begin{document}
+
+\title[Sequence-to-RNA coverage modelling in \textit{C. elegans}]{Adapting a long-context sequence model for multi-track RNA-seq coverage prediction in \textit{Caenorhabditis elegans}}
+
+\author*[1]{\fnm{Author} \sur{Team}}
+\affil*[1]{\orgname{Research group}}
+
+\abstract{Sequence-to-function models have begun to predict molecular profiles from DNA, but their adaptation to an organism-wide RNA-seq resource requires an auditable target definition and a matched evaluation design. We uniformly processed 482 \textit{Caenorhabditis elegans} RNA-seq runs into 241 biological coverage tracks and adapted a long-context sequence model using a worm embedding, low-rank adaptation (LoRA) and a dual-resolution RNA head. The selected model reached gene-exon and 128-bp log1p Pearson correlations of 0.675 and 0.664, respectively, in a one-time locked six-chromosome evaluation. In matched genomic-block development experiments, the full model exceeded a size-matched from-scratch control by 0.092 on the registered composite score, while factorial attribution identified LoRA as the dominant measured contribution. A stringent internal perturbation contrast exposed a boundary in condition-specific inference, motivating a separate external benchmark and genetic validation. Together, these results establish a reproducible multi-track worm RNA-coverage modelling resource and define the evidence required for its biological use.}
+
+\keywords{sequence-to-function modelling, RNA-seq coverage, \textit{Caenorhabditis elegans}, low-rank adaptation, genomic-block validation}
+
+\maketitle
+
+\section{Introduction}
+
+DNA sequence encodes many of the regulatory constraints that shape RNA output, but recovering a measured transcriptomic profile from sequence remains a multi-scale problem. The output is structured by promoters, exons, splice junctions and distal regulatory inputs, and it is observed across biological contexts that are neither balanced nor exchangeable. Long-context sequence models have made this problem experimentally useful in human systems: Enformer connected sequence to diverse regulatory tracks, Borzoi modelled RNA-seq coverage directly, and AlphaGenome extended sequence-based predictions across molecular modalities and variant tasks\cite{enformer,borzoi,alphagenome}. The central challenge for an organism-adapted model is therefore not simply to obtain a high correlation. It is to define a traceable RNA target, establish a fair development comparison and state precisely what has and has not been held out.
+
+\textit{Caenorhabditis elegans} offers a demanding setting for this test. Its compact reference genome supports dense sequence-to-coverage prediction, while public RNA-seq studies span development, anatomy, genotype and perturbation. That diversity is valuable only if study provenance is preserved. Otherwise, pooled tracks can make genomic interpolation appear to be experimental generalization. The organism also provides a direct route to biological validation through natural variation and targeted regulatory perturbation.
+
+Here we assemble a manifest-driven RNA-seq coverage resource and adapt a long-context sequence model to its 241 track targets. The full model retains a frozen sequence trunk, adds a learnable worm embedding and LoRA adapters, and predicts coverage at 1-bp and 128-bp resolution. We first establish the task and its blocked development protocol, then quantify matched model performance and the contribution of each adaptation component. Finally, we use an internal perturbation contrast as a stress test of the model's operating domain. The result is a reproducible evidence base for a \textit{C. elegans} sequence-to-RNA-track model and a concrete design for the independent benchmark and variant study that complete its translational case.
+
+\section{Results}
+
+\subsection{A traceable RNA resource defines a multi-scale prediction task}
+
+We created a uniform RNA-seq resource from 482 verified runs drawn from 27 studies. Runs were reprocessed and aggregated according to an explicit biological grouping manifest, producing 241 formal RNA-seq coverage tracks on the WBcel235 reference genome. The collection covers major developmental stages, including young adult, L1, L3, L4 and embryo tracks, while preserving study, condition and sample membership in the manifest. Coverage is read on demand from grouped bigWigs rather than materialized as a monolithic training array. This keeps sequence coordinates, source provenance and both output resolutions tied to the same registered target files.
+
+The task maps a 131,072-bp one-hot DNA window to coverage for all 241 tracks at 1-bp and 128-bp resolution. Development uses five held-out genomic folds on chromosomes I--V, with three training seeds nested within each fold. The full model combines a frozen sequence trunk with a worm embedding, LoRA adapters and a dual-resolution RNA head. The output head defines a fixed target space over the registered tracks; it is not a decoder for an unobserved treatment or cell state. This distinction is essential when interpreting condition-specific contrasts (Fig.~\ref{fig:resource}).
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figure_v2_resource_overview.pdf}
+\caption{\textbf{A traceable \textit{C. elegans} RNA-seq resource and species-adapted sequence-to-RNA task.} \textbf{a,} The formal v2 resource contains 482 verified RNA-seq runs from 27 studies, grouped into 241 biological RNA-seq tracks. Bars show all tracks summarized by manifest-derived developmental stage; smaller categories are aggregated only in the displayed Other stages bar. \textbf{b,} A 131,072-bp DNA window is evaluated against 241 RNA targets at 1-bp and 128-bp resolution. Development uses five held-out genomic folds over chromosomes I--V, with three training seeds nested within fold. \textbf{c,} The full model uses a frozen sequence trunk, a worm embedding, LoRA adapters and a dual-resolution RNA head. The fixed 241-track head specifies the supported prediction target space. Source data are provided in \texttt{source\_data.tsv} and are derived from the registered v2 group manifest.}
+\label{fig:resource}
+\end{figure*}
+
+\subsection{Matched genomic-block validation supports the adapted model}
+
+We next compared Model A, the full model B and an original protocol-matched from-scratch control under the same reference genome, 131,072-bp input, 241-target output, training duration, data augmentation and evaluation workflow. In the complete P6B development matrix, Model B trained with the registered paper objective achieved a mean composite biological score of 0.626602. Its paired improvement over Model A with the same objective was 0.111180 (95\% hierarchical bootstrap CI, 0.107264--0.116186), and its improvement over the original training-protocol-matched scratch control was 0.139057 (0.132762--0.145395). The registered paper objective also improved the full model relative to log1p MSE by 0.011228 (0.004970--0.016700).
+
+The gains were visible in both biologically aggregated and coverage-resolution endpoints. In the P6B matrix, Model B improved paired gene-exon and 128-bp measures relative to Model A, and its track-wise score distribution shifted upward across the 241 registered tracks. The displayed stage, tissue, treatment and signal summaries are descriptive strata defined from metadata before plotting; they reveal heterogeneity without treating tracks as independent biological replicates. The primary inference unit remains the held-out genomic fold, with seeds treated as nested algorithmic repeats (Fig.~\ref{fig:development}).
+
+The selected full-model checkpoint was then evaluated once in the locked six-chromosome protocol. It reached a gene-exon log1p Pearson correlation of 0.675019 and a 128-bp per-track log1p Pearson correlation of 0.664130 across 83 metric cores and 10,878,976 evaluated bases. This locked result is a frozen within-collection endpoint. It does not convert genomic-block validation into an independent study- or laboratory-held-out benchmark.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{Figure_1_p6b_competitive_comparison.pdf}
+\caption{\textbf{Matched development-validation performance across model and objective configurations.} \textbf{a,} Composite biological score for each P6B architecture/objective configuration. Small points are fold means after averaging three seeds; diamonds and bars show equal-weight fold estimates and two-sided 95\% hierarchical bootstrap confidence intervals. \textbf{b,} Pre-specified paired contrasts for the composite score and its gene-exon and 128-bp components. Positive effects favor the named candidate. \textbf{c,} Descriptive distribution of per-track composite scores for the three paper-objective models; each point is one of 241 RNA-seq tracks averaged across five folds and three seeds. \textbf{d,} Descriptive Model B/paper minus Model A/paper differences in metadata-defined strata. Folds ($n=5$) are the primary resampling units and three seeds per fold are algorithmic repeats. The original P6B scratch control is matched in training protocol, not trainable parameter count; the size-matched control is evaluated in Fig.~\ref{fig:attribution}. Source data are in \texttt{results/v2\_p6b\_submission\_analysis/Source\_Data\_Figure\_1.tsv}.}
+\label{fig:development}
+\end{figure*}
+
+\subsection{Controlled attribution identifies the measured contribution of adaptation}
+
+The P9 matrix resolved the capacity ambiguity in the original scratch baseline and tested the adaptation components under a registered five-fold, three-seed design. It completed 90 unique configuration-by-fold-by-seed cells: 31 hash-verified reuses of earlier compatible results and 59 new tasks. The full model outperformed the trainable-parameter-matched from-scratch control by 0.092017 on the primary score (95\% CI, 0.084976--0.099762 in favor of the full model). The result therefore cannot be attributed to a larger trainable parameter budget alone.
+
+The factorial analysis assigned the largest measured contribution to LoRA. Its main effect was 0.101380 (95\% CI, 0.097917--0.105568); the worm embedding added 0.009800 (0.008933--0.010841). The worm-by-LoRA interaction was -0.013977 (-0.015870 to -0.012069), indicating statistical non-additivity in the registered score rather than a mechanistic interaction. A 1-bp-head-only configuration had a primary interval that included zero. Thus the present matrix identifies a measured LoRA contribution and a smaller worm-embedding contribution, but does not establish that a learned 1-bp head is necessary for the registered primary endpoint (Fig.~\ref{fig:attribution}).
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figure_p9_component_attribution.pdf}
+\caption{\textbf{Component attribution under matched genomic-block validation.} \textbf{a,} Paired primary-score effects of candidate configurations relative to full Model B. \textbf{b,} Registered factorial effects for LoRA, worm embedding and their statistical non-additivity. \textbf{c,} Track-wise paired effects after fold/seed aggregation; the 241 tracks illustrate heterogeneity and are not treated as independent inferential replicates. Circles are fold means; diamonds and bars are equal-weight fold estimates and two-sided 95\% hierarchical bootstrap confidence intervals. $n=5$ genomic folds, with three seeds nested within each fold and 10,000 bootstrap resamples. Source data are in \texttt{results/v2\_p9\_submission\_evidence\_figure/figure\_source\_data.tsv}.}
+\label{fig:attribution}
+\end{figure*}
+
+\subsection{An internal perturbation stress test identifies a boundary of condition-specific inference}
+
+We asked whether the model recovered a predefined dosage-compensation contrast using DPY-27 RNAi and vector RNAi tracks in held-out genomic blocks. Both tracks were training targets, so this was a within-collection diagnostic rather than an independent biological validation. The expected observed pattern was present: the median X-minus-autosome contrast was 0.003065 (95\% CI, 0.001980--0.004237). The corresponding predicted contrast was -0.002740 (-0.005352 to -0.000369), with the opposite sign in four of five folds. Gene-level direction concordance was 0.6674 and the predicted-versus-observed gene contrast Spearman correlation was 0.0846.
+
+This result separates profile fidelity from a condition contrast that requires relative chromosome specificity. The RNA tracks were normalized to a common signal total and do not retain the original spike-in scale; the analysis therefore tests relative X-versus-autosome structure, not absolute derepression. The full model did not recover the prespecified chromosome-level DPY-27 endpoint and we retain the panel as a stress test of the method's present operating domain (Fig.~\ref{fig:dpy27}).
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figure_dpy27_internal_boundary.pdf}
+\caption{\textbf{Internal DPY-27 dosage-compensation stress test.} \textbf{a,} Predicted and observed DPY-27 RNAi minus vector RNAi gene contrasts in held-out development blocks. \textbf{b,} Five-fold X-minus-autosome contrasts. The observed endpoint is positive whereas the predicted endpoint is negative. \textbf{c,} X-linked direction concordance and gene-level Spearman agreement. Both conditions were training targets and all evaluation windows are development-validation blocks; this is an internal diagnostic rather than independent biological validation. Folds are the resampling unit. Source data are in \texttt{runs/v2\_p10\_dpy27\_internal\_application\_20260813/figure\_source\_data.tsv}.}
+\label{fig:dpy27}
+\end{figure*}
+
+\section{Discussion}
+
+The completed v2 evidence establishes an organism-adapted, multi-track sequence-to-RNA coverage task with a stringent internal comparison design. The resource is more than a collection of aligned runs: it preserves the provenance and biological grouping needed to define a target, while the dynamic loader keeps 1-bp and 128-bp readouts tied to the same coverage source. On this task, full Model B improves on a frozen-trunk baseline and, under the later parameter-matched experiment, on a from-scratch control. The component matrix makes the source of this gain concrete. LoRA carries the dominant registered effect; the worm embedding adds a smaller reproducible effect; and the 1-bp-head-only analysis does not support a necessity claim.
+
+The stress test is equally important for defining the method. It shows that predicting a broad coverage profile and recovering a particular condition contrast are not interchangeable. The present output head is fixed over the 241 training tracks and receives no treatment or cell-state input. It should therefore be used for the sequence-conditioned targets represented in the resource, not described as a zero-shot decoder of an unseen perturbation. This boundary aligns with recent work that separates genomic interpolation, personal-genome variation and context-specific sequence-to-function prediction\cite{personaltranscriptome,personalgenome,scooby}.
+
+The remaining evidence path is direct. First, a study- and laboratory-isolated benchmark must be frozen outside the 482-run collection, with model selection, reference coordinates, target transformation and comparison eligibility locked before evaluation. Second, public baselines must be compared only where a common RNA-coverage task is technically faithful; native-window sensitivity analyses belong outside the main comparison when they answer a different question. Third, the engineered variant scorer must be evaluated against a same-species cis-eQTL or regulatory-allele truth set, using predeclared allele, haplotype, null-matching and resampling rules. A blind reporter, CRISPR or independent RNA validation of selected candidates would extend that genetic endpoint into experimental evidence.
+
+These additions do not alter the completed result; they extend it from an internal, fully auditable modelling resource to a generalization and regulatory inference claim. The present package already supplies the required foundation: registered source manifests, blocked folds, checkpoints, source data, paired statistics and controller-enforced protection of the locked endpoint. A clean reproduction environment and a checksum-indexed release can make the future external benchmark and variant analysis directly inspectable.
+
+\section{Online Methods}
+
+\subsection{Resource construction}
+
+The v2 provenance inventory contains 485 accessions: 482 verified RNA-seq runs and three excluded ChIP-seq runs. The verified RNA-seq runs were uniformly processed and grouped into 241 formal biological RNA tracks. All targets use the WBcel235 reference genome. Group metadata retain study accession, biological project, GEO accession where available, tissue or cell type, developmental stage, genotype, condition, replicate relation and source sample identifiers. The grouped coverage tracks are normalized to a common target total of $10^8$ in the registered coverage unit.
+
+\subsection{Model comparison and statistics}
+
+The model receives a 131,072-bp one-hot DNA window. The full configuration uses a frozen sequence trunk, a learnable \textit{C. elegans} embedding, LoRA in the registered adaptation modules and a dual-resolution RNA head. The head produces 1-bp and 128-bp predictions over 241 tracks. Model A is the frozen trunk RNA-head baseline. The P9 size-matched Model C is trained from scratch with a trainable parameter budget matched to full Model B. Development uses five leave-one-chromosome-out genomic folds over chromosomes I--V, with seeds 20260714, 20260715 and 20260716 nested within each fold.
+
+P6B compared A, B and the original protocol-matched C across two objectives, five folds and three seeds. P9 completed the registered component matrix, including size-matched C, B without LoRA, LoRA-only and a learned-1-bp-head-only configuration. The primary composite score combines gene-exon and 128-bp RNA coverage endpoints as defined in the frozen P6B/P9 specifications. Paired effects are calculated within fold and seed. Confidence intervals use 10,000 hierarchical bootstrap resamples: held-out folds are sampled first and seed outcomes are sampled within each selected fold. The 241 tracks are descriptive outcomes, not independent biological replicates.
+
+The selected checkpoint underwent one six-chromosome locked evaluation. It used 83 metric cores covering 10,878,976 bases and was not re-read for this manuscript analysis. Its result is reported from the preserved final-test record. All subsequent P9 and P10 analysis scripts prohibit final-test paths.
+
+\subsection{DPY-27 diagnostic}
+
+For P10, 15 full-model checkpoints were evaluated only on their corresponding fold validation blocks. The primary contrast was $\log(1 + \mathrm{DPY\text{-}27\ RNAi}) - \log(1 + \mathrm{vector\ RNAi})$ at gene-exon coverage. The chromosome endpoint is the median contrast for X-linked genes minus the median across autosomes I--V. Fold endpoints are bootstrapped across the five genomic folds. DPY-27 and vector RNAi tracks were both included among the registered training targets; no claim of independent condition generalization is made.
+
+\section*{Data availability}
+
+The 482 source RNA-seq accessions, group manifest, split definitions and versioned analysis metadata are recorded in the repository. The future submission package will provide the repository identifier, final model weights, source-data archive and applicable accession information after the external benchmark and release review are complete.
+
+\section*{Code availability}
+
+The repository contains the manifest-driven loader, controlled training and evaluation scripts, P9/P10 analysis records and the scripts used to generate the figures in this draft. A clean-environment reproduction record remains a submission requirement.
+
+\section*{Acknowledgements}
+
+The authors thank colleagues who contributed to data curation and discussion of the method.
+
+\section*{Author contributions}
+
+The authors contributed to study design, implementation, analysis and writing.
+
+\section*{Competing interests}
+
+The authors declare no competing interests. This statement must be replaced if the author team reports a different declaration.
+
+\begin{thebibliography}{10}
+
+\bibitem{enformer}
+Avsec, \v{Z}. et al. Effective gene expression prediction from sequence by integrating long-range interactions. \textit{Nat. Methods} \textbf{18}, 1196--1203 (2021). doi:10.1038/s41592-021-01252-x.
+
+\bibitem{borzoi}
+Linder, J. et al. Predicting RNA-seq coverage from DNA sequence as a unifying model of gene regulation. \textit{Nat. Genet.} \textbf{57}, 949--961 (2025). doi:10.1038/s41588-024-02053-6.
+
+\bibitem{alphagenome}
+Avsec, \v{Z}. et al. Advancing regulatory variant effect prediction with AlphaGenome. \textit{Nature} \textbf{649}, 1206--1218 (2026). doi:10.1038/s41586-025-10014-0.
+
+\bibitem{personaltranscriptome}
+Huang, Y. et al. Personal transcriptome variation is poorly explained by current genomic deep learning models. \textit{Nat. Genet.} \textbf{55}, 2056--2059 (2023). doi:10.1038/s41588-023-01574-w.
+
+\bibitem{personalgenome}
+Spiro, A. et al. A scalable approach to investigating sequence-to-function predictions from personal genomes. \textit{Nat. Methods} \textbf{23}, 1308--1312 (2026). doi:10.1038/s41592-026-03124-8.
+
+\bibitem{scooby}
+Egorova, K. et al. scooby: modeling multimodal genomic profiles from DNA sequence at single-cell resolution. \textit{Nat. Methods} (2025). doi:10.1038/s41592-025-02854-5.
+
+\end{thebibliography}
+
+\end{document}

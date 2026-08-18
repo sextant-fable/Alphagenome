@@ -1,17 +1,18 @@
 # Draft Staging Status
 
-Initial drafting is authorized by the owner on 2026-08-14. The working source
-is `alphagenome_nature_methods_draft_v0.tex`, using the official Springer Nature
-`sn-nature` template as its document-class skeleton. The manuscript is a
-coherent assumed-results scaffold: verified internal results are written as
-facts, while external benchmark and cis-eQTL fields remain explicit tokens
-listed in `DRAFT_ASSUMPTION_REGISTER_v0.md`.
+The earlier `alphagenome_nature_methods_draft_v0.tex` is retained as an
+internal historical scaffold only. It used empty figure layouts and assumed
+external benchmark/variant results, so it is not a readable or submission-facing
+manuscript.
 
-The readable PDF preview is
-`rendered/alphagenome_nature_methods_draft_v0.pdf`. Its prose uses fluent
-assumed-result wording; the assumption register remains the audit record for
-which sentences must be replaced when external artifacts arrive.
+`alphagenome_nature_methods_draft_v1.tex` is the current evidence-led core
+draft. It uses the official Springer Nature `sn-nature` class and embeds the
+real manifest-derived resource overview plus the audited P6B, P9 and P10
+figures. Every reported number has a completed internal v2 source artifact.
 
-This version is not submission-ready. Before submission, replace every external
-token from a frozen manifest and reviewed source-data package, then rerun the
-voice, terminology, statistics, citation, data-availability and figure audits.
+This is a manuscript core, not a submission-ready Nature Methods Article. The
+study/laboratory-isolated benchmark, public baseline comparison, real
+cis-eQTL/allelic-effect validation and clean-room reproduction record remain
+requirements before an Article can make the intended generalization and
+biological-utility claims. No external result is written as an assumption in
+v1.

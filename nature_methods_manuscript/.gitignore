@@ -5,6 +5,10 @@ template/vendor/
 manuscript/drafts/
 manuscript/rendered/
 
+# Local full-text and SI retrievals are auditable working copies, not source
+# material for the repository. Their checksums belong in the reading report.
+literature/full_text_*/
+
 # Local tool caches and editor artifacts.
 .cache/
 *.aux

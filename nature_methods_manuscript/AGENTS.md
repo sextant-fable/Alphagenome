@@ -10,20 +10,19 @@ results, or alter source data from this directory.
 
 The owner has authorized an initial manuscript draft. Prose may now be created
 under `manuscript/`, but this is an internal draft and not a submission-ready
-record. Keep concrete section plans in `plans/`, never in this file. Preserve
-the explicit external-result placeholders defined below until signed external
-artifacts are available.
+record. Keep concrete section plans in `plans/`, never in this file. The
+historical assumed-results scaffold is archived: a readable or compiled
+manuscript may contain only verified results and real figures.
 
 ## Evidence Contract
 
 - Treat the frozen external benchmark and independent biological application as
   planned manuscript inputs, not as verified repository results, until their
   signed manifests and source data are supplied.
-- Use the placeholders defined in
-  `plans/08_external_benchmark_placeholder_contract.md` verbatim. In the
-  owner-authorized assumed-results draft, placeholders may sit inside fluent
-  sentences, but they must remain visibly marked and must never be replaced by
-  guessed values or invented dataset names.
+- Use `plans/08_external_benchmark_placeholder_contract.md` only to plan the
+  missing external benchmark and biological application. Do not place its
+  placeholders, assumed effects, guessed dataset names or generic positive
+  substitute language in a compiled manuscript or figure legend.
 - Distinguish `external benchmark`, `internal genomic-block validation`, and
   `locked final evaluation`. They are not interchangeable.
 - Preserve the P10 DPY-27 result as a negative internal diagnostic. It cannot
@@ -105,10 +104,9 @@ finding manually.
 
 ## Draft and Release Gates
 
-1. Before drafting: complete the terminology ledger and preserve all required
-   external benchmark placeholders. The owner may authorize an assumed-results
-   scaffold before those fields are filled; that scaffold must be labeled in
-   `manuscript/DRAFT_ASSUMPTION_REGISTER_v0.md`.
+1. Before drafting: complete the terminology ledger and claim-evidence map.
+   Planning documents may identify the evidence needed for external claims, but
+   prose and figures must omit those claims until frozen artifacts exist.
 2. Before a figure is rendered: complete its figure contract and select the
    plotting backend.
 3. Before internal review: run the local voice audit, terminology audit,
