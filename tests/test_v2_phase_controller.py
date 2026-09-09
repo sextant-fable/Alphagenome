@@ -19,7 +19,9 @@ class V2PhaseControllerTest(unittest.TestCase):
         self.assertEqual(controller.next_phase("P7"), "P8")
         self.assertEqual(controller.next_phase("P8"), "P9")
         self.assertEqual(controller.next_phase("P9"), "P10")
-        self.assertIsNone(controller.next_phase("P10"))
+        self.assertEqual(controller.next_phase("P10"), "P11")
+        self.assertEqual(controller.next_phase("P11"), "P12")
+        self.assertIsNone(controller.next_phase("P12"))
 
     def test_p3a_requires_all_three_exact_scopes(self) -> None:
         state = controller.initial_state()
@@ -180,6 +182,52 @@ class V2PhaseControllerTest(unittest.TestCase):
             ["G4:p8_b_no_lora_fold1"],
         )
 
+    def test_p15_is_registered_as_an_i_to_v_only_training_contract(self) -> None:
+        self.assertIn("P15", controller.POST_COMPLETION_PHASES)
+        self.assertIn("scripts.run_v2_p15_iv_training_contract", controller.PHASE_COMMANDS["P15"])
+        controller.validate_approval_scope("G3", "p15_iv_training_interval_contract", "P15")
+        state = controller.initial_state()
+        state["current_phase"] = "P15"
+        self.assertEqual(
+            controller.missing_approvals(state, "P15"),
+            ["G3:p15_iv_training_interval_contract"],
+        )
+
+    def test_p16_is_registered_as_i_to_v_only_normalization(self) -> None:
+        self.assertIn("P16", controller.POST_COMPLETION_PHASES)
+        self.assertIn("scripts.run_v2_p16_iv_normalization", controller.PHASE_COMMANDS["P16"])
+        controller.validate_approval_scope("G3", "p16_iv_training_normalization", "P16")
+        state = controller.initial_state()
+        state["current_phase"] = "P16"
+        self.assertEqual(
+            controller.missing_approvals(state, "P16"),
+            ["G3:p16_iv_training_normalization"],
+        )
+
+    def test_p17_is_registered_as_scoped_i_to_v_gpu_matrix(self) -> None:
+        self.assertIn("P17", controller.POST_COMPLETION_PHASES)
+        self.assertIn("scripts.run_v2_p17_iv_controlled_matrix", controller.PHASE_COMMANDS["P17"])
+        controller.validate_approval_scope("G4", "p17_iv_controlled_ablation_and_basenji2", "P17")
+        state = controller.initial_state()
+        state["current_phase"] = "P17"
+        self.assertEqual(
+            controller.missing_approvals(state, "P17"),
+            ["G4:p17_iv_controlled_ablation_and_basenji2"],
+        )
+
+    def test_p18_is_registered_as_scoped_external_continuation(self) -> None:
+        self.assertIn("P18", controller.POST_COMPLETION_PHASES)
+        self.assertIn("scripts.run_v2_p18_external_continuation", controller.PHASE_COMMANDS["P18"])
+        controller.validate_approval_scope(
+            "G1", "p18_external_replacement_download_and_reprocessing", "P18"
+        )
+        state = controller.initial_state()
+        state["current_phase"] = "P18"
+        self.assertEqual(
+            controller.missing_approvals(state, "P18"),
+            ["G1:p18_external_replacement_download_and_reprocessing"],
+        )
+
     def test_p9_is_registered_as_scoped_submission_evidence(self) -> None:
         self.assertIn("scripts.run_v2_p9_submission_evidence", controller.PHASE_COMMANDS["P9"])
         controller.validate_approval_scope(
@@ -191,6 +239,15 @@ class V2PhaseControllerTest(unittest.TestCase):
             controller.missing_approvals(state, "P9"),
             ["G4:p9_submission_evidence_matrix"],
         )
+
+    def test_p18_external_data_sidecar_scope_is_bound_to_active_p17_period(self) -> None:
+        controller.validate_approval_scope(
+            "G1", "p18_external_rna_download_and_reprocessing", "P17"
+        )
+        with self.assertRaisesRegex(ValueError, "only in P17"):
+            controller.validate_approval_scope(
+                "G1", "p18_external_rna_download_and_reprocessing", "P16"
+            )
 
     def test_start_p9_requires_completed_p8_and_preserved_final_lock(self) -> None:
         state = controller.initial_state()

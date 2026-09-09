@@ -223,6 +223,24 @@ def derive_128bp_model_space_from_1bp(
     return scale_targets_model_space(prediction_128bp, track_means, 128)
 
 
+def derive_1bp_model_space_from_128bp(
+    prediction_128bp_model_space: torch.Tensor,
+    track_means: torch.Tensor | Sequence[float],
+) -> torch.Tensor:
+    """Uniformly distribute 128-bp coverage to 1-bp positions in model space.
+
+    This is a declared resolution-limited fallback used only for P16's
+    128-bp-only ablation and convolutional public baseline. It is not a learned
+    base-resolution prediction branch.
+    """
+
+    prediction_128bp = unscale_predictions_experimental_space(
+        prediction_128bp_model_space, track_means, 128
+    )
+    prediction_1bp = prediction_128bp.repeat_interleave(128, dim=-1) / 128.0
+    return scale_targets_model_space(prediction_1bp, track_means, 1)
+
+
 def reverse_complement_item(
     item: Mapping[str, Any],
     strand_pair_index: torch.Tensor | Sequence[int] | None = None,
@@ -366,6 +384,7 @@ class AlphaGenomeRnaModel(torch.nn.Module):
         encode_requires_grad: bool,
         head_resolutions: Sequence[int] = RESOLUTIONS,
         derive_128bp_from_1bp: bool = False,
+        derive_1bp_from_128bp: bool = False,
     ) -> None:
         super().__init__()
         self.base_model = base_model
@@ -378,8 +397,13 @@ class AlphaGenomeRnaModel(torch.nn.Module):
         self.encode_requires_grad = bool(encode_requires_grad)
         self.head_resolutions = tuple(int(value) for value in head_resolutions)
         self.derive_128bp_from_1bp = bool(derive_128bp_from_1bp)
+        self.derive_1bp_from_128bp = bool(derive_1bp_from_128bp)
         if self.derive_128bp_from_1bp and self.head_resolutions != (1,):
             raise ValueError("Derived 128-bp output requires a 1-bp-only learned head")
+        if self.derive_1bp_from_128bp and self.head_resolutions != (128,):
+            raise ValueError("Derived 1-bp output requires a 128-bp-only learned head")
+        if self.derive_128bp_from_1bp and self.derive_1bp_from_128bp:
+            raise ValueError("Only one resolution-derivation policy may be active")
 
     def train(self, mode: bool = True) -> "AlphaGenomeRnaModel":
         super().train(mode)
@@ -410,6 +434,10 @@ class AlphaGenomeRnaModel(torch.nn.Module):
         if self.derive_128bp_from_1bp:
             predictions[128] = derive_128bp_model_space_from_1bp(
                 predictions[1], self.track_means
+            )
+        if self.derive_1bp_from_128bp:
+            predictions[1] = derive_1bp_model_space_from_128bp(
+                predictions[128], self.track_means
             )
         return predictions
 
@@ -578,6 +606,59 @@ class SizeMatchedWormSequenceBaseline(WormSequenceBaseline):
     pass
 
 
+class Basenji2StyleRnaBaseline(torch.nn.Module):
+    """A 128-bp-only convolutional/dilated-residual public baseline.
+
+    The architecture preserves Basenji2's defining sequence of convolutional
+    pooling followed by dilated residual blocks, while using this repository's
+    dynamic 241-track target contract. It is independently trained from
+    scratch; it is not a native human or mouse Basenji checkpoint.
+    """
+
+    def __init__(
+        self,
+        n_tracks: int,
+        track_means: torch.Tensor | Sequence[float],
+        hidden_channels: int = 64,
+    ) -> None:
+        super().__init__()
+        if hidden_channels % 8:
+            raise ValueError("hidden_channels must be divisible by 8")
+        self.register_buffer(
+            "track_means",
+            torch.as_tensor(track_means, dtype=torch.float32).reshape(-1).clone(),
+        )
+        self.stem = torch.nn.Conv1d(4, hidden_channels, kernel_size=15, padding=7)
+        self.pool_tower = torch.nn.ModuleList(
+            [
+                torch.nn.Sequential(
+                    torch.nn.GroupNorm(8, hidden_channels),
+                    torch.nn.GELU(),
+                    torch.nn.Conv1d(hidden_channels, hidden_channels, kernel_size=5, padding=2),
+                    torch.nn.GELU(),
+                    torch.nn.MaxPool1d(kernel_size=2, stride=2),
+                )
+                for _ in range(7)
+            ]
+        )
+        self.dilated_blocks = torch.nn.Sequential(
+            *(ResidualBlock(hidden_channels, dilation) for dilation in (1, 2, 4, 8, 16))
+        )
+        self.head_128bp = torch.nn.Conv1d(hidden_channels, n_tracks, kernel_size=1)
+
+    def forward(self, dna: torch.Tensor) -> dict[int, torch.Tensor]:
+        if dna.shape[-1] % 128:
+            raise ValueError("Basenji2-style baseline requires a sequence length divisible by 128")
+        hidden = F.gelu(self.stem(dna))
+        for block in self.pool_tower:
+            hidden = block(hidden)
+        prediction_128bp = F.softplus(self.head_128bp(self.dilated_blocks(hidden)))
+        return {
+            128: prediction_128bp,
+            1: derive_1bp_model_space_from_128bp(prediction_128bp, self.track_means),
+        }
+
+
 @dataclass(frozen=True)
 class ModelSpec:
     model_id: str
@@ -612,10 +693,22 @@ MODEL_SPECS = (
         2,
         "worm_embeddings_and_lora_only",
     ),
+    ModelSpec(
+        "B_128bp_head_only",
+        "worm embedding plus LoRA with a learned 128bp head and deterministic 1bp expansion",
+        2,
+        "worm_embeddings_and_lora_only",
+    ),
     ModelSpec("C", "residual sequence baseline trained from scratch", None, "from_scratch"),
     ModelSpec(
         "C_size_matched",
         "parameter-matched residual sequence baseline trained from scratch",
+        None,
+        "from_scratch",
+    ),
+    ModelSpec(
+        "Basenji2_style",
+        "from-scratch 128bp convolutional/dilated-residual public baseline",
         None,
         "from_scratch",
     ),

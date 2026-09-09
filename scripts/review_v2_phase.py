@@ -110,6 +110,17 @@ def _p10_implementation_sha256(repo_root: Path | None = None) -> dict[str, str]:
     }
 
 
+def _p10_implementation_manifest_valid(manifest: object) -> bool:
+    if not isinstance(manifest, dict) or set(manifest) != set(P10_IMPLEMENTATION_PATHS):
+        return False
+    return all(
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdefABCDEF" for character in value)
+        for value in manifest.values()
+    )
+
+
 def _p10_execution_provenance_ok(execution: dict[str, Any]) -> bool:
     python_executable = Path(str(execution.get("python_executable", "")))
     return (
@@ -4867,6 +4878,17 @@ def review_p10() -> dict[str, Any]:
                 checkpoint_errors.append(f"{pair}:run")
         except Exception:
             checkpoint_errors.append(f"{row.get('seed')}:{row.get('fold')}:missing")
+    frozen_implementation = spec.get("implementation_sha256", {})
+    current_implementation = _p10_implementation_sha256()
+    implementation_drift = {
+        relative: {
+            "frozen": frozen_implementation.get(relative),
+            "current": current_implementation[relative],
+        }
+        for relative in P10_IMPLEMENTATION_PATHS
+        if not isinstance(frozen_implementation, dict)
+        or frozen_implementation.get(relative) != current_implementation[relative]
+    }
     static_contract_ok = (
         spec.get("schema_version") == 1
         and spec.get("phase") == "P10"
@@ -4885,13 +4907,12 @@ def review_p10() -> dict[str, Any]:
         and spec.get("figure_source_data_contract") == P10_SOURCE_DATA_CONTRACT
         and set(spec.get("implementation_sha256", {}))
         == set(P10_IMPLEMENTATION_PATHS)
-        and spec.get("implementation_sha256") == _p10_implementation_sha256()
+        and _p10_implementation_manifest_valid(frozen_implementation)
         and len(spec.get("checkpoint_matrix", [])) == 15
         and checkpoint_pairs == expected_pairs
         and not checkpoint_errors
     )
 
-    current_implementation = _p10_implementation_sha256()
     interval_audit = preflight.get("dataset", {}).get("intervals", {})
     preflight_ok = (
         preflight.get("status") == "passed"
@@ -4904,7 +4925,7 @@ def review_p10() -> dict[str, Any]:
         and preflight.get("final_test_access") == "prohibited"
         and preflight.get("locked_test_block_signal_reads") == 0
         and preflight.get("model_or_bigwig_reads") == 0
-        and preflight.get("implementation_sha256") == current_implementation
+        and preflight.get("implementation_sha256") == frozen_implementation
         and all(
             int(interval_audit.get(str(fold), interval_audit.get(fold, {})).get("subwindows", -1))
             == 83
@@ -4934,7 +4955,7 @@ def review_p10() -> dict[str, Any]:
         and execution.get("final_test_access") == "prohibited"
         and execution.get("locked_test_block_signal_reads") == 0
         and execution.get("preflight_model_or_bigwig_reads") == 0
-        and execution.get("implementation_sha256") == current_implementation
+        and execution.get("implementation_sha256") == frozen_implementation
         and execution.get("git_commit") == preflight.get("git_commit")
         and _p10_execution_provenance_ok(execution)
         and not execution.get("failures")
@@ -4998,7 +5019,7 @@ def review_p10() -> dict[str, Any]:
                 and audit.get("run_endpoint_sha256") == sha256(endpoint_path)
                 and audit.get("final_test_access") == "prohibited"
                 and audit.get("locked_test_block_signal_reads") == 0
-                and audit.get("implementation_sha256") == current_implementation
+                and audit.get("implementation_sha256") == frozen_implementation
                 and endpoint.get("seed") == seed
                 and endpoint.get("fold") == fold
                 and endpoint.get("checkpoint_sha256") == row["checkpoint_sha256"]
@@ -5217,7 +5238,7 @@ def review_p10() -> dict[str, Any]:
             check(
                 "R10.02_frozen_contract",
                 static_contract_ok and not input_errors,
-                f"input_errors={input_errors} checkpoint_errors={checkpoint_errors}",
+                f"input_errors={input_errors} checkpoint_errors={checkpoint_errors} implementation_drift={sorted(implementation_drift)}",
             ),
             check(
                 "R10.03_preflight",
@@ -5266,6 +5287,882 @@ def review_p10() -> dict[str, Any]:
         "review": "R10-dpy27-internal-application",
         "reviewed_at": utc_now(),
         "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
+        "frozen_implementation_sha256": frozen_implementation,
+        "current_implementation_sha256": current_implementation,
+        "implementation_drift": implementation_drift,
+        "checks": checks,
+    }
+
+
+def review_p11() -> dict[str, Any]:
+    """Review the CPU-only replicate-holdout data contract."""
+
+    root = REPO_ROOT / "alphagenome_custom/metadata/v2/replicate_holdout_v1"
+    required = {
+        "spec": root / "p11_replicate_holdout_spec.json",
+        "execution": root / "p11_replicate_holdout_execution.json",
+        "assignments": root / "holdout_assignments.tsv",
+        "roles": root / "member_roles.tsv",
+        "training_manifest": root / "training_track_manifest.tsv",
+        "heldout_manifest": root / "heldout_track_manifest.tsv",
+        "training_groups": root / "training_group_manifest.tsv",
+        "heldout_groups": root / "heldout_group_manifest.tsv",
+        "means": root / "track_nonzero_means.tsv",
+        "means_summary": root / "track_nonzero_means_summary.json",
+    }
+    missing = [str(path.relative_to(REPO_ROOT)) for path in required.values() if not path.is_file()]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P11",
+            "review": "R11-replicate-holdout-data",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": [check("R11.01_required_outputs", False, f"missing={missing}")],
+        }
+    assignments = list(csv.DictReader(required["assignments"].open(newline=""), delimiter="\t"))
+    roles = list(csv.DictReader(required["roles"].open(newline=""), delimiter="\t"))
+    training = list(csv.DictReader(required["training_manifest"].open(newline=""), delimiter="\t"))
+    heldout = list(csv.DictReader(required["heldout_manifest"].open(newline=""), delimiter="\t"))
+    execution = json.loads(required["execution"].read_text())
+    means_summary = json.loads(required["means_summary"].read_text())
+    counts = {role: sum(row.get("assignment_role") == role for row in assignments) for role in (
+        "primary_candidate", "primary_pending_qc", "supplementary_candidate", "training_only"
+    )}
+    checks = [
+        check("R11.01_required_outputs", True, "all P11 metadata and means outputs present"),
+        check("R11.02_assignment_counts", counts == {"primary_candidate": 57, "primary_pending_qc": 1, "supplementary_candidate": 22, "training_only": 161}, str(counts)),
+        check("R11.03_member_roles", len(roles) == 482 and len({row["run_accession"] for row in roles}) == 482, f"rows={len(roles)}"),
+        check("R11.04_manifest_order", len(training) == 241 and [row["group_id"] for row in training] == sorted(row["group_id"] for row in training), f"training_rows={len(training)}"),
+        check("R11.05_heldout_count", len(heldout) == 80, f"heldout_rows={len(heldout)}"),
+        check("R11.06_means", means_summary.get("tracks") == 241 and means_summary.get("locked_test_block_signal_reads") == 0, str(means_summary)),
+        check("R11.07_locked_test", execution.get("locked_test_access") == "prohibited" and execution.get("locked_test_signal_reads") == 0, str(execution.get("locked_test_signal_reads"))),
+    ]
+    status = "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL"
+    return {
+        "schema_version": 1,
+        "phase": "P11",
+        "review": "R11-replicate-holdout-data",
+        "reviewed_at": utc_now(),
+        "status": status,
+        "checks": checks,
+    }
+
+
+def review_p12() -> dict[str, Any]:
+    """Review P12 task completion and the two-layer validation guards."""
+
+    root = REPO_ROOT / "alphagenome_custom/metadata/v2/replicate_holdout_v1"
+    retry_spec = REPO_ROOT / "alphagenome_custom/metadata/v2/p12_replicate_holdout_retry_spec.json"
+    base_spec = REPO_ROOT / "alphagenome_custom/metadata/v2/p12_replicate_holdout_spec.json"
+    spec_path = retry_spec if retry_spec.is_file() else base_spec
+    required = {
+        "spec": spec_path,
+        "execution": root / "p12_replicate_holdout_execution.json",
+        "results": root / "p12_replicate_holdout_results.tsv",
+        "records": root / "p12_replicate_holdout_job_records.tsv",
+        "metrics": root / "p12_replicate_holdout_metrics.tsv",
+        "role_metrics": root / "p12_heldout_role_metrics.tsv",
+        "paired": root / "p12_replicate_holdout_paired_effects.tsv",
+        "raw_paired": root / "p12_replicate_holdout_raw_paired_effects.tsv",
+    }
+    missing = [str(path.relative_to(REPO_ROOT)) for path in required.values() if not path.is_file()]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P12",
+            "review": "R12-replicate-holdout-matrix",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": [check("R12.01_required_outputs", False, f"missing={missing}")],
+        }
+    spec = json.loads(required["spec"].read_text())
+    if spec.get("base_spec"):
+        base_path = REPO_ROOT / spec["base_spec"]
+        spec_payload = json.loads(base_path.read_text())
+        spec_payload.update({
+            "retry_id": spec.get("retry_id"),
+            "supersedes_spec": spec.get("supersedes_spec"),
+            "correction": spec.get("correction"),
+            "base_spec_sha256": spec.get("base_spec_sha256"),
+        })
+        spec = spec_payload
+    execution = json.loads(required["execution"].read_text())
+    records = list(csv.DictReader(required["records"].open(newline=""), delimiter="\t"))
+    results = list(csv.DictReader(required["results"].open(newline=""), delimiter="\t"))
+    metrics = list(csv.DictReader(required["metrics"].open(newline=""), delimiter="\t"))
+    role_metrics = list(csv.DictReader(required["role_metrics"].open(newline=""), delimiter="\t"))
+    checks = [
+        check("R12.01_required_outputs", True, "all P12 outputs present"),
+        check("R12.02_static_contract", spec.get("phase") == "P12" and spec.get("final_test_access") == "prohibited" and spec.get("matrix", {}).get("total_tasks") == 165, "phase/P12 task contract"),
+        check("R12.03_job_count", execution.get("status") == "completed" and execution.get("registered_tasks_completed") == 165 and len(records) == 165, f"execution={execution.get('registered_tasks_completed')} records={len(records)}"),
+        check("R12.04_metric_rows", len(metrics) == 165 * 2 * 11 and {row["scope"] for row in metrics} == {"internal", "heldout"}, f"metric_rows={len(metrics)}"),
+        check("R12.05_role_metrics", len(role_metrics) > 0 and {row["role"] for row in role_metrics} == {"primary", "supplementary"}, f"role_metric_rows={len(role_metrics)}"),
+        check("R12.06_paired_analysis", required["paired"].stat().st_size > 0 and required["raw_paired"].stat().st_size > 0, "paired effect tables present"),
+        check("R12.07_configuration_counts", len(results) == 13 and {int(row["jobs"]) for row in results} >= {5, 15}, f"summary_rows={len(results)}"),
+        check("R12.08_locked_test", execution.get("final_test_access") == "prohibited" and execution.get("locked_test_block_signal_reads") == 0, str(execution.get("locked_test_block_signal_reads"))),
+        check("R12.09_physical_gpus", set(execution.get("selected_physical_gpus", [])) <= {2, 3} and execution.get("selected_physical_gpus"), str(execution.get("selected_physical_gpus"))),
+    ]
+    status = "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL"
+    return {
+        "schema_version": 1,
+        "phase": "P12",
+        "review": "R12-replicate-holdout-matrix",
+        "reviewed_at": utc_now(),
+        "status": status,
+        "checks": checks,
+    }
+
+
+def review_p13() -> dict[str, Any]:
+    """Review the I--V-only replicate-agreement reference without loading signal."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    contract_dir = REPO_ROOT / "results/v2_p13_iv_interval_contract"
+    analysis_dir = REPO_ROOT / "results/v2_p13_replicate_agreement_iv"
+    paths = {
+        "execution": metadata_dir / "p13_submission_evidence_execution.json",
+        "contract": contract_dir / "p13_iv_interval_contract.json",
+        "analysis_audit": analysis_dir / "p13_replicate_agreement_audit.json",
+        "per_group": analysis_dir / "p13_replicate_agreement_per_group.tsv",
+        "by_fold": analysis_dir / "p13_replicate_agreement_by_fold.tsv",
+        "summary": analysis_dir / "p13_replicate_agreement_summary.tsv",
+    }
+    missing = [name for name, path in paths.items() if not path.is_file()]
+    checks = [check("R13.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P13",
+            "review": "R13 I--V replicate-agreement reference",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+
+    execution = json.loads(paths["execution"].read_text())
+    contract = json.loads(paths["contract"].read_text())
+    analysis_audit = json.loads(paths["analysis_audit"].read_text())
+    per_group = read_tsv(paths["per_group"])
+    by_fold = read_tsv(paths["by_fold"])
+    summary = read_tsv(paths["summary"])
+    contract_folds = contract.get("folds", [])
+    no_x = (
+        contract.get("allowed_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and len(contract_folds) == 5
+        and all(
+            set(fold.get("selected_chromosomes", [])) <= {"I", "II", "III", "IV", "V"}
+            and "X" in fold.get("excluded_chromosomes", [])
+            for fold in contract_folds
+        )
+    )
+    valid_group_rows = (
+        len(per_group) == 57 * 5
+        and {int(row["fold"]) for row in per_group} == {1, 2, 3, 4, 5}
+        and all(row["comparison"] == "training_aggregate_vs_heldout_biological_unit" for row in per_group)
+    )
+    valid_summary = len(by_fold) == 5 and len(summary) == 3 and {
+        row["metric"] for row in summary
+    } == {
+        "gene_exon_pearson_log1p",
+        "pearson_128bp_log1p",
+        "primary_biological_score",
+    }
+    execution_ok = (
+        execution.get("phase") == "P13"
+        and execution.get("status") == "completed"
+        and execution.get("controller_invocation") == "python -m scripts.v2_phase_controller run --phase P13"
+        and "no gpu" in execution.get("resource_contract", "").lower()
+    )
+    audit_ok = (
+        analysis_audit.get("folds") == [1, 2, 3, 4, 5]
+        and "No GPU was used." in analysis_audit.get("prohibited", [])
+        and "No locked final-test intervals or signals were opened." in analysis_audit.get("prohibited", [])
+    )
+    checks.extend(
+        [
+            check("R13.02_execution_contract", execution_ok, str(execution.get("resource_contract"))),
+            check("R13.03_i_to_v_boundary", no_x, f"folds={len(contract_folds)}"),
+            check("R13.04_group_coverage", valid_group_rows, f"per_group_rows={len(per_group)}"),
+            check("R13.05_summary_coverage", valid_summary, f"by_fold={len(by_fold)} summary={len(summary)}"),
+            check("R13.06_analysis_audit", audit_ok, str(analysis_audit.get("prohibited"))),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P13",
+        "review": "R13 I--V replicate-agreement reference",
+        "reviewed_at": utc_now(),
+        "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
+        "checks": checks,
+    }
+
+
+def review_p14() -> dict[str, Any]:
+    """Review P14's frozen I--V Model B reference without signal access."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    result_dir = REPO_ROOT / "results/v2_p14_iv_model_reference"
+    paths = {
+        "spec": metadata_dir / "p14_iv_frozen_model_reference_spec.json",
+        "execution": metadata_dir / "p14_iv_frozen_model_reference_execution.json",
+        "records": result_dir / "p14_iv_model_reference_records.tsv",
+        "by_fold": result_dir / "p14_iv_model_reference_by_fold.tsv",
+        "summary": result_dir / "p14_iv_model_reference_summary.tsv",
+        "paired": result_dir / "p14_iv_model_vs_replicate_reference_by_fold.tsv",
+    }
+    missing = [name for name, path in paths.items() if not path.is_file()]
+    checks = [check("R14.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1, "phase": "P14", "review": "R14 frozen Model B I--V reference",
+            "reviewed_at": utc_now(), "status": "FAIL", "checks": checks,
+        }
+    spec = json.loads(paths["spec"].read_text())
+    execution = json.loads(paths["execution"].read_text())
+    records = read_tsv(paths["records"])
+    by_fold = read_tsv(paths["by_fold"])
+    summary = read_tsv(paths["summary"])
+    paired = read_tsv(paths["paired"])
+    expected_ids = {
+        f"p14:iv_model_reference:B_paper:seed{seed}:fold{fold}"
+        for fold in range(1, 6) for seed in (20260714, 20260715, 20260716)
+    }
+    execution_ok = (
+        execution.get("phase") == "P14" and execution.get("status") == "completed"
+        and execution.get("registered_tasks") == 15 and execution.get("registered_tasks_completed") == 15
+        and execution.get("locked_test_block_signal_reads") == 0
+        and set(execution.get("selected_physical_gpus", [])) <= {2, 3}
+    )
+    record_ok = (
+        len(records) == 15 and {row["job_id"] for row in records} == expected_ids
+        and all(row["checkpoint_sha256"] for row in records)
+        and all(float(row["primary_biological_score"]) == float(row["primary_biological_score"]) for row in records)
+    )
+    summary_ok = (
+        len(by_fold) == 5 and {int(row["fold"]) for row in by_fold} == {1, 2, 3, 4, 5}
+        and len(summary) == 3 and {row["metric"] for row in summary}
+        == {"primary_biological_score", "gene_exon_pearson_log1p", "pearson_128bp_log1p"}
+        and len(paired) == 5
+    )
+    spec_ok = (
+        spec.get("phase") == "P14"
+        and spec.get("evaluation", {}).get("allowed_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and spec.get("evaluation", {}).get("final_test_access") == "prohibited"
+        and len(spec.get("jobs", [])) == 15
+    )
+    checks.extend(
+        [
+            check("R14.02_preregistered_i_to_v_contract", spec_ok, str(spec.get("evaluation", {}))),
+            check("R14.03_execution_contract", execution_ok, f"completed={execution.get('registered_tasks_completed')} gpus={execution.get('selected_physical_gpus')}"),
+            check("R14.04_checkpoint_record_coverage", record_ok, f"records={len(records)}"),
+            check("R14.05_fold_and_reference_summary", summary_ok, f"folds={len(by_fold)} summary={len(summary)} paired={len(paired)}"),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P14",
+        "review": "R14 frozen Model B I--V reference",
+        "reviewed_at": utc_now(),
+        "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
+        "checks": checks,
+    }
+
+
+def review_p15() -> dict[str, Any]:
+    """Review P15's metadata-only I--V training/validation contract."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    result_dir = REPO_ROOT / "results/v2_p15_iv_training_interval_contract"
+    execution_path = metadata_dir / "p15_iv_training_contract_execution.json"
+    contract_path = result_dir / "p15_iv_training_interval_contract.json"
+    interval_paths = [
+        result_dir / "intervals" / f"fold_{fold}" / role
+        for fold in range(1, 6)
+        for role in ("train.tsv", "valid.tsv")
+    ]
+    missing = [str(path.relative_to(REPO_ROOT)) for path in [execution_path, contract_path, *interval_paths] if not path.is_file()]
+    checks = [check("R15.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P15",
+            "review": "R15 I--V-only training interval contract",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    execution = json.loads(execution_path.read_text())
+    contract = json.loads(contract_path.read_text())
+    all_rows = [row for path in interval_paths for row in read_tsv(path)]
+    execution_ok = (
+        execution.get("phase") == "P15"
+        and execution.get("status") == "completed"
+        and execution.get("controller_invocation") == "python -m scripts.v2_phase_controller run --phase P15"
+        and "no gpu" in execution.get("resource_contract", "").lower()
+    )
+    contract_ok = (
+        contract.get("phase") == "P15"
+        and contract.get("allowed_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and len(contract.get("folds", [])) == 5
+    )
+    interval_ok = (
+        bool(all_rows)
+        and all(row["chromosome"] in {"I", "II", "III", "IV", "V"} for row in all_rows)
+        and all(row["role"] in {"train", "valid"} for row in all_rows)
+        and all(row["role"] != "test_locked" for row in all_rows)
+    )
+    source_x_excluded = all(
+        "X" in fold[role].get("source_chromosomes", [])
+        and fold[role].get("selected_chromosomes") != ["X"]
+        for fold in contract.get("folds", [])
+        for role in ("train", "valid")
+    )
+    checks.extend(
+        [
+            check("R15.02_execution_contract", execution_ok, str(execution.get("resource_contract"))),
+            check("R15.03_contract_structure", contract_ok, f"folds={len(contract.get('folds', []))}"),
+            check("R15.04_no_x_or_locked_rows", interval_ok, f"rows={len(all_rows)}"),
+            check("R15.05_source_x_exclusion", source_x_excluded, "source manifests contain X; output contract excludes it"),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P15",
+        "review": "R15 I--V-only training interval contract",
+        "reviewed_at": utc_now(),
+        "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
+        "checks": checks,
+    }
+
+
+def review_p16() -> dict[str, Any]:
+    """Review P16's strict I--V-only fold-normalization output."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    result_dir = REPO_ROOT / "results/v2_p16_iv_training_normalization"
+    paths = {
+        "spec": metadata_dir / "p16_iv_training_normalization_spec.json",
+        "execution": metadata_dir / "p16_iv_training_normalization_execution.json",
+        "means": result_dir / "track_nonzero_means.tsv",
+        "summary": result_dir / "track_nonzero_means_summary.json",
+    }
+    missing = [name for name, path in paths.items() if not path.is_file()]
+    checks = [check("R16.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P16",
+            "review": "R16 strict I--V training normalization",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    spec = json.loads(paths["spec"].read_text())
+    execution = json.loads(paths["execution"].read_text())
+    summary = json.loads(paths["summary"].read_text())
+    rows = read_tsv(paths["means"])
+    required_columns = {"group_id", *(f"fold_{fold}_train_nonzero_mean" for fold in range(1, 6))}
+    execution_ok = (
+        execution.get("phase") == "P16"
+        and execution.get("status") == "completed"
+        and execution.get("controller_invocation") == "python -m scripts.v2_phase_controller run --phase P16"
+        and "no gpu" in execution.get("resource_contract", "").lower()
+    )
+    contract_ok = (
+        spec.get("phase") == "P16"
+        and spec.get("allowed_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and summary.get("contract") == "strict_interval_root"
+        and summary.get("allowed_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and summary.get("locked_test_block_signal_reads") == 0
+    )
+    means_ok = (
+        len(rows) == 241
+        and bool(rows)
+        and required_columns.issubset(rows[0])
+        and "development_train_nonzero_mean" not in rows[0]
+        and all(float(row[column]) > 0 for row in rows for column in required_columns - {"group_id"})
+    )
+    checks.extend(
+        [
+            check("R16.02_execution_contract", execution_ok, str(execution.get("resource_contract"))),
+            check("R16.03_i_to_v_source_contract", contract_ok, str(summary.get("allowed_chromosomes"))),
+            check("R16.04_241_fold_means", means_ok, f"rows={len(rows)}"),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P16",
+        "review": "R16 strict I--V training normalization",
+        "reviewed_at": utc_now(),
+        "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
+        "checks": checks,
+    }
+
+
+def review_p17() -> dict[str, Any]:
+    """Review P17's strict I--V controlled ablation and baseline matrix."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    result_dir = REPO_ROOT / "results/v2_p17_iv_controlled_matrix"
+    paths = {
+        "spec": metadata_dir / "p17_iv_controlled_matrix_spec.json",
+        "execution": metadata_dir / "p17_iv_controlled_matrix_execution.json",
+        "records": result_dir / "p17_iv_controlled_records.tsv",
+        "by_fold": result_dir / "p17_iv_controlled_by_fold.tsv",
+        "paired": result_dir / "p17_iv_controlled_paired_effects.tsv",
+    }
+
+
+def review_p18() -> dict[str, Any]:
+    """Review P18 external-source transfer and I-V-only reprocessing."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    spec_path = metadata_dir / "p18_external_continuation_spec.json"
+    execution_path = metadata_dir / "p18_external_continuation_execution.json"
+    checks = [check("R18.01_required_outputs", spec_path.is_file() and execution_path.is_file(), "spec and execution")]
+    if not spec_path.is_file() or not execution_path.is_file():
+        return {
+            "schema_version": 1,
+            "phase": "P18",
+            "review": "R18 external RNA continuation",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    spec = json.loads(spec_path.read_text())
+    execution = json.loads(execution_path.read_text())
+    expected_runs = {"SRR18463404", "SRR18463405", "SRR18463406", "SRR3560831"}
+    output = spec.get("output", {})
+    coverage_dir = REPO_ROOT / output.get("coverage_dir", "")
+    summary_path = coverage_dir / "p18_reprocessing_summary.json"
+    audit_dir = coverage_dir / "sample_audits"
+    summary = json.loads(summary_path.read_text()) if summary_path.is_file() else {}
+    audits: list[dict[str, Any]] = []
+    if audit_dir.is_dir():
+        for run in sorted(expected_runs):
+            path = audit_dir / f"{run}.json"
+            if path.is_file():
+                audits.append(json.loads(path.read_text()))
+    static_ok = (
+        spec.get("phase") == "P18"
+        and spec.get("status") == "preregistered"
+        and spec.get("allowed_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and set(spec.get("expected_runs", [])) == expected_runs
+        and spec.get("represented_head") == "RNA_V2_G0054"
+        and spec.get("final_test_access") == "prohibited"
+    )
+    execution_ok = (
+        execution.get("phase") == "P18"
+        and execution.get("status") == "completed"
+        and set(execution.get("expected_runs", [])) == expected_runs
+        and execution.get("locked_test_block_signal_reads") == 0
+        and execution.get("model_inference") == "not performed"
+    )
+    coverage_ok = (
+        summary.get("completed_runs") == 4
+        and set(summary.get("completed_accessions", [])) == expected_runs
+        and len(audits) == 4
+        and all(item.get("coverage_chromosomes") == ["I", "II", "III", "IV", "V"] for item in audits)
+        and all((REPO_ROOT / item.get("output_path", "")).is_file() for item in audits)
+        and all(item.get("output_sha256") == sha256(REPO_ROOT / item["output_path"]) for item in audits)
+    )
+    checks.extend(
+        [
+            check("R18.02_static_continuation_contract", static_ok, f"runs={sorted(spec.get('expected_runs', []))}"),
+            check("R18.03_execution_boundary", execution_ok, f"inference={execution.get('model_inference')}, locked_reads={execution.get('locked_test_block_signal_reads')}"),
+            check("R18.04_complete_i_to_v_source_coverage", coverage_ok, f"audits={len(audits)}"),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P18",
+        "review": "R18 external RNA continuation",
+        "reviewed_at": utc_now(),
+        "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
+        "checks": checks,
+    }
+
+
+def review_p19() -> dict[str, Any]:
+    """Review external represented-head inference without reopening the lock."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    spec_path = metadata_dir / "p19_external_represented_head_scoring_spec.json"
+    execution_path = metadata_dir / "p19_external_represented_head_scoring_execution.json"
+    result_dir = REPO_ROOT / "results/v2_p19_external_scoring"
+    checks = [check("R19.01_required_outputs", spec_path.is_file() and execution_path.is_file(), "spec and execution")]
+    if not spec_path.is_file() or not execution_path.is_file():
+        return {"schema_version": 1, "phase": "P19", "review": "R19 external represented-head scoring", "reviewed_at": utc_now(), "status": "FAIL", "checks": checks}
+    spec = json.loads(spec_path.read_text())
+    execution = json.loads(execution_path.read_text())
+    jobs = spec.get("jobs", [])
+    records = execution.get("jobs", [])
+    result_path = result_dir / "p19_external_records.tsv"
+    source_path = result_dir / "p19_external_by_source.tsv"
+    expected_runs = {"SRR18463404", "SRR18463405", "SRR18463406", "SRR3560831"}
+    static_ok = (
+        spec.get("phase") == "P19"
+        and spec.get("status") == "preregistered"
+        and spec.get("allowed_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and spec.get("final_test_access") == "prohibited"
+        and spec.get("represented_head", {}).get("group_id") == "RNA_V2_G0054"
+        and len(jobs) == 60
+        and {job.get("run_accession") for job in jobs} == expected_runs
+        and all(job.get("model") == "B" and job.get("training_loss") == "paper" for job in jobs)
+    )
+    execution_ok = (
+        execution.get("phase") == "P19"
+        and execution.get("status") == "completed"
+        and execution.get("registered_tasks_completed") == 60
+        and len(records) == 60
+        and execution.get("locked_test_block_signal_reads") == 0
+        and execution.get("final_test_access") == "prohibited"
+        and execution.get("model_inference") == "external_represented_head_inference"
+        and not execution.get("failures")
+    )
+    hashes_ok = (
+        result_path.is_file()
+        and source_path.is_file()
+        and execution.get("records_sha256") == sha256(result_path)
+        and execution.get("by_source_sha256") == sha256(source_path)
+        and all((REPO_ROOT / row["result_path"]).is_file() and row.get("result_sha256") == sha256(REPO_ROOT / row["result_path"]) for row in records)
+    )
+    metrics_ok = all(
+        row.get("evaluated_chromosomes") == "I,II,III,IV,V"
+        and row.get("locked_test_block_signal_reads") is False
+        and all(math.isfinite(float(row[key])) for key in ("primary_biological_score", "gene_exon_pearson_log1p", "pearson_128bp_log1p"))
+        for row in records
+    ) if records else False
+    source_ok = all(
+        (REPO_ROOT / source["coverage_path"]).is_file()
+        and source.get("coverage_sha256") == sha256(REPO_ROOT / source["coverage_path"])
+        and source.get("represented_group_id") == "RNA_V2_G0054"
+        for source in spec.get("source", {}).get("source_records", [])
+    ) and len(spec.get("source", {}).get("source_records", [])) == 4
+    checks.extend([
+        check("R19.02_static_inference_contract", static_ok, f"jobs={len(jobs)}, runs={sorted({job.get('run_accession') for job in jobs})}"),
+        check("R19.03_execution_boundary", execution_ok, f"completed={execution.get('registered_tasks_completed')}, locked_reads={execution.get('locked_test_block_signal_reads')}"),
+        check("R19.04_output_hashes", hashes_ok, f"records={len(records)}"),
+        check("R19.05_metrics_and_i_to_v_only", metrics_ok, f"records={len(records)}"),
+        check("R19.06_external_source_hashes", source_ok, f"sources={len(spec.get('source', {}).get('source_records', []))}"),
+    ])
+    return {"schema_version": 1, "phase": "P19", "review": "R19 external represented-head scoring", "reviewed_at": utc_now(), "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL", "checks": checks}
+
+
+def review_p20() -> dict[str, Any]:
+    """Review checksum-verified public eQTL source acquisition."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    spec_path = metadata_dir / "p20_eqtl_public_source_download_spec.json"
+    output_dir = REPO_ROOT / "shared/external_eqtl/p20_sources_v1"
+    manifest_path = output_dir / "p20_source_manifest.json"
+    checks = [check("R20.01_required_outputs", spec_path.is_file() and manifest_path.is_file(), "spec and source manifest")]
+    if not spec_path.is_file() or not manifest_path.is_file():
+        return {"schema_version": 1, "phase": "P20", "review": "R20 public eQTL source acquisition", "reviewed_at": utc_now(), "status": "FAIL", "checks": checks}
+    spec = json.loads(spec_path.read_text())
+    manifest = json.loads(manifest_path.read_text())
+    records = manifest.get("source_records", [])
+    required_keys = {"expression_counts", "eqtl_truth_archive", "cendr_isotype_vcf"}
+    records_by_key = {row.get("key"): row for row in records}
+    files_ok = (
+        set(records_by_key) == required_keys
+        and all(
+            (REPO_ROOT / row.get("path", "")).is_file()
+            and int(row.get("bytes", 0)) == (REPO_ROOT / row["path"]).stat().st_size
+            and row.get("sha256") == sha256(REPO_ROOT / row["path"])
+            for row in records
+        )
+    )
+    static_ok = (
+        spec.get("contract") == "p20_eqtl_public_source_download_v1"
+        and spec.get("allowed_downstream_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and manifest.get("source_status") == "DOWNLOADED_PENDING_COHORT_SOURCE_EQUIVALENCE_AND_COORDINATE_AUDIT"
+        and manifest.get("spec_sha256") == sha256(spec_path)
+    )
+    boundary_ok = (
+        "independent eQTL validation" in manifest.get("prohibited_claims", [])
+        and "regulatory-allele validation" in manifest.get("prohibited_claims", [])
+        and "unseen-condition prediction" in manifest.get("prohibited_claims", [])
+    )
+    checks.extend([
+        check("R20.02_source_inventory", set(records_by_key) == required_keys, f"keys={sorted(records_by_key)}"),
+        check("R20.03_source_hashes", files_ok, f"files={len(records)}"),
+        check("R20.04_static_boundary", static_ok, manifest.get("source_status")),
+        check("R20.05_claim_boundary", boundary_ok, "independent/eQTL/regulatory claims remain blocked"),
+    ])
+    return {"schema_version": 1, "phase": "P20", "review": "R20 public eQTL source acquisition", "reviewed_at": utc_now(), "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL", "checks": checks}
+
+
+def review_p21() -> dict[str, Any]:
+    """Review external public-candidate variant scoring on I--V only."""
+
+    metadata_dir = REPO_ROOT / "alphagenome_custom/metadata/v2"
+    execution_path = metadata_dir / "p21_eqtl_variant_scoring_execution.json"
+    variant_manifest_path = REPO_ROOT / "results/v2_p20_eqtl_variant_set/p20_eqtl_variant_set_manifest.json"
+    checks = [check("R21.01_required_outputs", execution_path.is_file() and variant_manifest_path.is_file(), "execution and P20 variant manifest")]
+    if not execution_path.is_file() or not variant_manifest_path.is_file():
+        return {"schema_version": 1, "phase": "P21", "review": "R21 external eQTL candidate variant scoring", "reviewed_at": utc_now(), "status": "FAIL", "checks": checks}
+
+    execution = json.loads(execution_path.read_text())
+    variant_manifest = json.loads(variant_manifest_path.read_text())
+    jobs = execution.get("jobs", [])
+    expected_keys = {
+        (fold, seed)
+        for fold in range(1, 6)
+        for seed in (20260714, 20260715, 20260716)
+    }
+    observed_keys = {(int(row.get("fold", 0)), int(row.get("seed", 0))) for row in jobs}
+    records_ok = (
+        len(jobs) == 15
+        and observed_keys == expected_keys
+        and all(int(row.get("physical_gpu", 0)) in {2, 3} for row in jobs)
+        and all(row.get("status") == "completed" for row in jobs)
+        and all(row.get("audit_path") for row in jobs)
+    )
+    audit_records: list[dict[str, Any]] = []
+    audit_ok = True
+    for job in jobs:
+        audit_path = repository_file(job.get("audit_path"))
+        if not audit_path.is_file():
+            audit_ok = False
+            continue
+        audit = json.loads(audit_path.read_text())
+        audit_records.append(audit)
+        if not (
+            audit.get("status") == "completed"
+            and int(audit.get("variant_count", 0)) > 0
+            and audit.get("final_test_access") == "prohibited"
+            and int(audit.get("locked_test_block_signal_reads", -1)) == 0
+            and int(audit.get("model_loads", 0)) == 1
+        ):
+            audit_ok = False
+    hash_ok = bool(audit_records) and all(
+        job.get("audit_sha256") == sha256(repository_file(job["audit_path"]))
+        for job in jobs
+        if job.get("audit_path") and repository_file(job["audit_path"]).is_file()
+    )
+    candidate_count = int(variant_manifest.get("candidate_count", variant_manifest.get("unique_candidate_positions", variant_manifest.get("candidate_rows", 0))))
+    chromosome_contract_ok = variant_manifest.get("allowed_downstream_chromosomes") == ["I", "II", "III", "IV", "V"] or "I--V" in str(variant_manifest.get("scope", ""))
+    manifest_ok = (
+        variant_manifest.get("status") == "PASS"
+        and chromosome_contract_ok
+        and candidate_count > 0
+        and variant_manifest.get("selected_vcf_sha256") == sha256(REPO_ROOT / variant_manifest.get("selected_vcf", ""))
+    )
+    execution_ok = (
+        execution.get("phase") == "P21"
+        and execution.get("status") == "completed"
+        and execution.get("registered_tasks") == 15
+        and execution.get("registered_tasks_completed") == 15
+        and execution.get("final_test_access") == "prohibited"
+        and execution.get("locked_test_block_signal_reads") == 0
+    )
+    checks.extend([
+        check("R21.02_variant_manifest_pass", manifest_ok, f"candidates={candidate_count}"),
+        check("R21.03_execution_contract", execution_ok, f"completed={execution.get('registered_tasks_completed')}"),
+        check("R21.04_complete_iv_gpu_records", records_ok, f"jobs={len(jobs)} gpus={sorted({row.get('physical_gpu') for row in jobs})}"),
+        check("R21.05_scoring_audits", audit_ok, f"audits={len(audit_records)}"),
+        check("R21.06_audit_hashes", hash_ok, f"hashed_audits={len(audit_records)}"),
+    ])
+    return {"schema_version": 1, "phase": "P21", "review": "R21 external eQTL candidate variant scoring", "reviewed_at": utc_now(), "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL", "checks": checks}
+
+
+def review_p22() -> dict[str, Any]:
+    """Review public dosage-expression association against P21 effects."""
+
+    output_dir = REPO_ROOT / "results/v2_p22_eqtl_effect_association"
+    manifest_path = output_dir / "p22_eqtl_effect_association_manifest.json"
+    summary_path = output_dir / "eqtl_variant_effects.tsv"
+    model_path = output_dir / "eqtl_variant_effects_by_model.tsv"
+    checks = [check("R22.01_required_outputs", all(path.is_file() for path in (manifest_path, summary_path, model_path)), "manifest and effect tables")]
+    if not all(path.is_file() for path in (manifest_path, summary_path, model_path)):
+        return {"schema_version": 1, "phase": "P22", "review": "R22 public eQTL effect association", "reviewed_at": utc_now(), "status": "FAIL", "checks": checks}
+    manifest = json.loads(manifest_path.read_text())
+    summary = read_tsv(summary_path)
+    by_model = read_tsv(model_path)
+    hashes_ok = (
+        manifest.get("counts_sha256") == sha256(REPO_ROOT / "shared/external_eqtl/p20_sources_v1/GSE186719_Celegans_208strains_609samples_rawCounts.tsv.gz")
+        and manifest.get("vcf_sha256") == sha256(REPO_ROOT / "results/v2_p20_eqtl_variant_set/published_eqtl_candidates_iv.vcf")
+        and manifest.get("candidate_annotations_sha256") == sha256(REPO_ROOT / "results/v2_p20_eqtl_variant_set/published_eqtl_candidate_annotations.tsv")
+    )
+    status_ok = manifest.get("status") == "PASS" and int(manifest.get("analyzable_count", 0)) >= 20
+    rows_ok = len(summary) == int(manifest.get("summary_count", -1)) and len(by_model) >= int(manifest.get("analyzable_count", 0)) * 15
+    boundary_ok = "causal regulatory mechanism" in manifest.get("prohibited_claims", []) and "unseen-condition prediction" in manifest.get("prohibited_claims", [])
+    checks.extend([
+        check("R22.02_effect_association_status", status_ok, f"analyzable={manifest.get('analyzable_count')}"),
+        check("R22.03_effect_table_counts", rows_ok, f"summary={len(summary)} by_model={len(by_model)}"),
+        check("R22.04_input_hashes", hashes_ok, "P20 public-source hashes"),
+        check("R22.05_claim_boundary", boundary_ok, "causal/unseen-condition claims remain blocked"),
+    ])
+    return {"schema_version": 1, "phase": "P22", "review": "R22 public eQTL effect association", "reviewed_at": utc_now(), "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL", "checks": checks}
+
+
+def review_p23() -> dict[str, Any]:
+    """Review the I-V-only LoRA sensitivity pilot."""
+
+    execution_path = REPO_ROOT / "alphagenome_custom/metadata/v2/p23_lora_sensitivity_execution.json"
+    result_path = REPO_ROOT / "results/v2_p23_lora_sensitivity_pilot/p23_lora_sensitivity_pilot.tsv"
+    spec_path = REPO_ROOT / "alphagenome_custom/metadata/v2/p23_lora_sensitivity_spec.json"
+    checks = [
+        check("R23.01_required_outputs", all(path.is_file() for path in (execution_path, result_path, spec_path)), "spec, execution and pilot table")
+    ]
+    if not all(path.is_file() for path in (execution_path, result_path, spec_path)):
+        return {"schema_version": 1, "phase": "P23", "review": "R23 LoRA sensitivity pilot", "reviewed_at": utc_now(), "status": "FAIL", "checks": checks}
+    execution = json.loads(execution_path.read_text())
+    spec = json.loads(spec_path.read_text())
+    rows = read_tsv(result_path)
+    expected = {row["id"] for row in spec.get("pilot_configurations", [])}
+    observed = {row.get("configuration") for row in rows}
+    scope_ok = (
+        execution.get("phase") == "P23"
+        and execution.get("status") == "completed"
+        and execution.get("registered_tasks") == len(expected)
+        and execution.get("registered_tasks_completed") == len(expected)
+        and execution.get("final_test_access") == "prohibited"
+        and execution.get("locked_test_block_signal_reads") == 0
+        and set(execution.get("selected_physical_gpus", [])) <= {2, 3}
+    )
+    rows_ok = (
+        len(rows) == len(expected)
+        and observed == expected
+        and all(row.get("evaluated_chromosomes") == "I,II,III,IV,V" for row in rows)
+        and all(row.get("locked_test_block_signal_reads") == "False" for row in rows)
+    )
+    finite_ok = all(
+        all(str(row.get(field, "")).lower() not in {"", "nan", "none"} for field in ("primary_biological_score", "gene_exon_coverage_pearson_log1p", "per_track_pearson_128bp_log1p"))
+        for row in rows
+    )
+    checks.extend([
+        check("R23.02_static_scope", spec.get("allowed_chromosomes") == ["I", "II", "III", "IV", "V"] and spec.get("final_test_access") == "prohibited", "I-V-only pilot contract"),
+        check("R23.03_execution_contract", scope_ok, f"completed={execution.get('registered_tasks_completed')} gpus={execution.get('selected_physical_gpus')}"),
+        check("R23.04_complete_pilot_rows", rows_ok, f"rows={len(rows)} configurations={sorted(observed)}"),
+        check("R23.05_finite_metrics", finite_ok, "pilot metrics are finite"),
+    ])
+    return {"schema_version": 1, "phase": "P23", "review": "R23 LoRA sensitivity pilot", "reviewed_at": utc_now(), "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL", "checks": checks}
+
+
+def review_p24() -> dict[str, Any]:
+    """Review official Borzoi source feasibility without claiming an adapter."""
+
+    execution_path = REPO_ROOT / "alphagenome_custom/metadata/v2/p24_borzoi_adapter_execution.json"
+    spec_path = REPO_ROOT / "alphagenome_custom/metadata/v2/p24_borzoi_adapter_spec.json"
+    checks = [check("R24.01_required_outputs", execution_path.is_file() and spec_path.is_file(), "Borzoi spec and audit execution")]
+    if not execution_path.is_file() or not spec_path.is_file():
+        return {"schema_version": 1, "phase": "P24", "review": "R24 Borzoi feasibility audit", "reviewed_at": utc_now(), "status": "FAIL", "checks": checks}
+    execution = json.loads(execution_path.read_text())
+    source_checks = execution.get("checks", {})
+    source_ok = all(bool(source_checks.get(name, {}).get("pass")) for name in ("official_commit", "license_sha256", "required_source_metadata"))
+    boundary_ok = execution.get("adapter_status") == "not_yet_run" and execution.get("final_test_access") == "prohibited" and execution.get("locked_test_block_signal_reads") == 0
+    checks.extend([
+        check("R24.02_official_source", source_ok, f"vendor_commit={execution.get('vendor_commit')} license={execution.get('license')}"),
+        check("R24.03_adapter_boundary", boundary_ok, "audit is not presented as a completed C. elegans adapter"),
+        check("R24.04_native_checkpoint_ineligibility", source_checks.get("native_checkpoint_fairness", {}).get("pass") is False, "native human/mouse heads are excluded from the primary comparison"),
+    ])
+    return {"schema_version": 1, "phase": "P24", "review": "R24 Borzoi feasibility audit", "reviewed_at": utc_now(), "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL", "checks": checks}
+
+
+def review_p25() -> dict[str, Any]:
+    """Review the bounded Borzoi adapter pilot without upgrading its endpoint."""
+
+    execution_path = REPO_ROOT / "alphagenome_custom/metadata/v2/p25_borzoi_adapter_pilot_execution.json"
+    spec_path = REPO_ROOT / "alphagenome_custom/metadata/v2/p25_borzoi_adapter_pilot_spec.json"
+    checks = [check("R25.01_required_outputs", execution_path.is_file() and spec_path.is_file(), "Borzoi pilot execution and spec")]
+    if not execution_path.is_file() or not spec_path.is_file():
+        return {"schema_version": 1, "phase": "P25", "review": "R25 Borzoi adapter pilot", "reviewed_at": utc_now(), "status": "FAIL", "checks": checks}
+    execution = json.loads(execution_path.read_text())
+    spec = json.loads(spec_path.read_text())
+    output_ok = execution.get("status") == "completed_pilot" and execution.get("adapter_status") == "pilot_completed"
+    boundary_ok = (
+        execution.get("chromosome_x_reads") == 0
+        and execution.get("locked_test_block_signal_reads") == 0
+        and execution.get("native_checkpoint_head_used") is False
+        and execution.get("native_trunk_weights_used") is True
+        and execution.get("one_bp_result") == "not_available"
+    )
+    shape_ok = execution.get("trainable_parameter_count", 0) > 0 and execution.get("validation_intervals", 0) > 0
+    contract_ok = (
+        spec.get("input", {}).get("allowed_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and spec.get("target", {}).get("n_tracks") == 241
+        and spec.get("target", {}).get("reported_resolution_bp") == 128
+    )
+    checks.extend([
+        check("R25.02_pilot_output", output_ok, f"status={execution.get('status')} adapter_status={execution.get('adapter_status')}"),
+        check("R25.03_task_boundary", boundary_ok, "native heads, X and locked-test reads excluded; 1-bp not claimed"),
+        check("R25.04_output_shape_and_validation", shape_ok, f"trainable_parameters={execution.get('trainable_parameter_count')} validation_intervals={execution.get('validation_intervals')}"),
+        check("R25.05_static_contract", contract_ok, "I-V, 241 heads, 128-bp reported endpoint"),
+    ])
+    return {"schema_version": 1, "phase": "P25", "review": "R25 Borzoi adapter pilot", "reviewed_at": utc_now(), "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL", "checks": checks}
+    missing = [name for name, path in paths.items() if not path.is_file()]
+    checks = [check("R17.01_required_outputs", not missing, f"missing={missing}")]
+    if missing:
+        return {
+            "schema_version": 1,
+            "phase": "P17",
+            "review": "R17 strict I--V controlled matrix",
+            "reviewed_at": utc_now(),
+            "status": "FAIL",
+            "checks": checks,
+        }
+    spec = json.loads(paths["spec"].read_text())
+    execution = json.loads(paths["execution"].read_text())
+    records = read_tsv(paths["records"])
+    by_fold = read_tsv(paths["by_fold"])
+    paired = read_tsv(paths["paired"])
+    expected_configurations = {"B_iv_dual", "B_128bp_only", "Basenji2_style"}
+    expected_keys = {
+        (configuration, str(fold), str(seed))
+        for configuration in expected_configurations
+        for fold in range(1, 6)
+        for seed in (20260714, 20260715, 20260716)
+    }
+    observed_keys = {
+        (row.get("configuration", ""), row.get("fold", ""), row.get("seed", ""))
+        for row in records
+    }
+    static_ok = (
+        spec.get("phase") == "P17"
+        and spec.get("status") == "preregistered"
+        and spec.get("allowed_chromosomes") == ["I", "II", "III", "IV", "V"]
+        and spec.get("matrix", {}).get("total_jobs") == 45
+        and {row.get("id") for row in spec.get("matrix", {}).get("configurations", [])}
+        == expected_configurations
+    )
+    execution_ok = (
+        execution.get("phase") == "P17"
+        and execution.get("status") == "completed"
+        and execution.get("registered_tasks") == 45
+        and execution.get("registered_tasks_completed") == 45
+        and execution.get("final_test_access") == "prohibited"
+        and execution.get("locked_test_block_signal_reads") == 0
+        and set(execution.get("selected_physical_gpus", [])) <= {2, 3}
+    )
+    records_ok = (
+        len(records) == 45
+        and observed_keys == expected_keys
+        and all(row.get("evaluated_chromosomes") == "I,II,III,IV,V" for row in records)
+        and all(row.get("locked_test_block_signal_reads") == "False" for row in records)
+    )
+    summaries_ok = (
+        len(by_fold) == 15
+        and {(row.get("configuration", ""), row.get("fold", "")) for row in by_fold}
+        == {(configuration, str(fold)) for configuration in expected_configurations for fold in range(1, 6)}
+        and len(paired) == 10
+    )
+    checks.extend(
+        [
+            check("R17.02_static_contract", static_ok, f"configs={sorted(expected_configurations)}"),
+            check("R17.03_execution_contract", execution_ok, f"completed={execution.get('registered_tasks_completed')}"),
+            check("R17.04_complete_i_to_v_records", records_ok, f"records={len(records)}"),
+            check("R17.05_fold_and_paired_summaries", summaries_ok, f"by_fold={len(by_fold)} paired={len(paired)}"),
+        ]
+    )
+    return {
+        "schema_version": 1,
+        "phase": "P17",
+        "review": "R17 strict I--V controlled matrix",
+        "reviewed_at": utc_now(),
+        "status": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
         "checks": checks,
     }
 
@@ -5312,6 +6209,21 @@ def parse_args() -> argparse.Namespace:
             "P8",
             "P9",
             "P10",
+            "P11",
+            "P12",
+            "P13",
+            "P14",
+            "P15",
+            "P16",
+            "P17",
+            "P18",
+            "P19",
+            "P20",
+            "P21",
+            "P22",
+            "P23",
+            "P24",
+            "P25",
         ],
     )
     return parser.parse_args()
@@ -5345,8 +6257,40 @@ def main() -> None:
         report = review_p8()
     elif args.phase == "P9":
         report = review_p9()
-    else:
+    elif args.phase == "P10":
         report = review_p10()
+    elif args.phase == "P11":
+        report = review_p11()
+    elif args.phase == "P12":
+        report = review_p12()
+    elif args.phase == "P13":
+        report = review_p13()
+    elif args.phase == "P14":
+        report = review_p14()
+    elif args.phase == "P15":
+        report = review_p15()
+    elif args.phase == "P16":
+        report = review_p16()
+    elif args.phase == "P17":
+        report = review_p17()
+    elif args.phase == "P18":
+        report = review_p18()
+    elif args.phase == "P19":
+        report = review_p19()
+    elif args.phase == "P20":
+        report = review_p20()
+    elif args.phase == "P21":
+        report = review_p21()
+    elif args.phase == "P22":
+        report = review_p22()
+    elif args.phase == "P23":
+        report = review_p23()
+    elif args.phase == "P24":
+        report = review_p24()
+    elif args.phase == "P25":
+        report = review_p25()
+    else:
+        raise AssertionError(f"Unhandled phase: {args.phase}")
     assert report is not None
     write_report(report)
     print(json.dumps(report, indent=2, sort_keys=True))

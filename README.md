@@ -106,26 +106,28 @@ source .venv/bin/activate
 python -m pip install -r requirements-torch.txt
 ```
 
-The v2 workflow requires Python 3.12 or newer and a separate environment. Do
-not activate a virtual environment on top of a Conda environment, and do not
-use Python 3.11: it can resolve an older `alphagenome-pytorch` API without the
-`heads`, `losses`, and LoRA modules required by v2.
+The verified v2 runtime is a separate Conda environment with Python `3.12.13`,
+NumPy `2.4.4`, PyBigWig `0.3.25`, PyTorch `2.11.0+cu128`, Triton `3.6.0`, and
+`alphagenome-pytorch` `0.3.1`. Do not activate a virtual environment on top of
+the Conda environment.
 
 ```bash
-conda create -n alphagenome-v2 python=3.12 -y
-conda activate alphagenome-v2
-python -m pip install --upgrade pip
+conda create -n alphagenome python=3.12.13 -y
+conda activate alphagenome
+python -m pip install --upgrade pip==26.1.1
 python -m pip install -r requirements.txt
 python -m scripts.check_v2_environment
 python -m pytest -q
 ```
 
-Install a CUDA-appropriate PyTorch build before the v2 requirements on a GPU
-host. The full v2 workflow also relies on prepared local assets such as
-bigWigs, WBcel235 FASTA/GTF files, AlphaGenome weights, and bioinformatics
-tools. Do not regenerate or download those assets merely to make a checkout
-look complete. Confirm the required inputs for the intended phase in the
-execution plan and its audit records first.
+The historical runtime used CUDA `12.8` and a driver reporting CUDA `13.2`.
+A host whose driver only supports CUDA `12.0` cannot execute this environment
+on GPU, though CPU-only unit-test collection may still run. The full v2
+workflow also relies on prepared local assets such as bigWigs, WBcel235
+FASTA/GTF files, AlphaGenome weights, and bioinformatics tools. Do not
+regenerate or download those assets merely to make a checkout look complete.
+Confirm the required inputs for the intended phase in the execution plan and
+its audit records first.
 
 Useful read-only checks:
 

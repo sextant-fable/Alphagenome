@@ -32,7 +32,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         choices=(
-            "A", "B", "B_no_lora", "B_lora_only", "B_1bp_head_only",
+            "A", "B", "B_no_lora", "B_lora_only", "B_1bp_head_only", "B_128bp_head_only",
+            "Basenji2_style",
             "C", "C_size_matched", "D",
         ),
         required=True,
@@ -43,12 +44,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sequence-length", type=int, default=131072)
     parser.add_argument("--hidden-channels", type=int, default=64)
     parser.add_argument("--mean-column")
+    parser.add_argument("--means-path")
+    parser.add_argument("--track-manifest")
+    parser.add_argument("--group-manifest")
+    parser.add_argument("--valid-intervals-path")
+    parser.add_argument(
+        "--prediction-track-indices",
+        help="Optional TSV with original 241-head track_index values for a subset manifest.",
+    )
     parser.add_argument(
         "--frozen-base-checkpoint",
         help="Required for model D; the exact D_base checkpoint used in training.",
     )
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--lora-rank", type=int, default=8)
+    parser.add_argument("--lora-alpha", type=int, default=16)
+    parser.add_argument(
+        "--lora-target-set",
+        choices=sorted(train_v2_model.LORA_TARGET_MODULE_SETS),
+        default="final_block",
+    )
     parser.add_argument("--final-test", action="store_true")
     parser.add_argument("--final-test-execution-id")
     return parser.parse_args()
@@ -65,6 +81,20 @@ def sha256(path: Path) -> str:
 def read_tsv(path: Path) -> list[dict[str, str]]:
     with path.open(newline="") as handle:
         return list(csv.DictReader(handle, delimiter="\t"))
+
+
+def read_prediction_track_indices(path: Path | None, n_model_tracks: int) -> list[int]:
+    if path is None:
+        return list(range(n_model_tracks))
+    rows = read_tsv(path)
+    if not rows or "track_index" not in rows[0]:
+        raise ValueError("prediction-track-indices must contain a track_index column")
+    indices = [int(row["track_index"]) for row in rows]
+    if len(set(indices)) != len(indices):
+        raise ValueError("prediction-track-indices contains duplicate track_index values")
+    if any(index < 0 or index >= n_model_tracks for index in indices):
+        raise ValueError("prediction-track-indices contains an out-of-range head")
+    return indices
 
 
 def atomic_json(path: Path, payload: dict[str, object]) -> None:
@@ -256,8 +286,18 @@ def main() -> None:
             "--final-test and --final-test-execution-id must be provided together"
         )
 
-    means_path = METADATA_DIR / "track_nonzero_means_v2.tsv"
+    means_path = REPO_ROOT / (
+        args.means_path
+        if args.means_path is not None
+        else "alphagenome_custom/metadata/v2/track_nonzero_means_v2.tsv"
+    )
     means_rows = read_tsv(means_path)
+    prediction_indices = read_prediction_track_indices(
+        REPO_ROOT / args.prediction_track_indices
+        if args.prediction_track_indices is not None
+        else None,
+        len(means_rows),
+    )
     default_mean_column = (
         "development_train_nonzero_mean"
         if args.final_test
@@ -268,15 +308,30 @@ def main() -> None:
         raise ValueError("final test requires development_train_nonzero_mean")
     if mean_column not in means_rows[0]:
         raise ValueError(f"Unknown mean column: {mean_column}")
-    fold_means = torch.tensor(
+    model_fold_means = torch.tensor(
         [float(row[mean_column]) for row in means_rows],
         dtype=torch.float32,
         device=device,
     )
-    intervals_path = (
-        REPO_ROOT / "alphagenome_custom/intervals/v2/test_locked.tsv"
-        if args.final_test
-        else REPO_ROOT / f"alphagenome_custom/intervals/v2/fold_{args.fold}/valid.tsv"
+    eval_fold_means = model_fold_means[prediction_indices]
+    intervals_path = REPO_ROOT / (
+        args.valid_intervals_path
+        if args.valid_intervals_path is not None
+        else (
+            "alphagenome_custom/intervals/v2/test_locked.tsv"
+            if args.final_test
+            else f"alphagenome_custom/intervals/v2/fold_{args.fold}/valid.tsv"
+        )
+    )
+    track_manifest = REPO_ROOT / (
+        args.track_manifest
+        if args.track_manifest is not None
+        else "alphagenome_custom/metadata/v2/p3_group_outputs.tsv"
+    )
+    group_manifest = REPO_ROOT / (
+        args.group_manifest
+        if args.group_manifest is not None
+        else "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv"
     )
     frozen_base_checkpoint = (
         REPO_ROOT / args.frozen_base_checkpoint
@@ -291,10 +346,15 @@ def main() -> None:
         raise ValueError("--frozen-base-checkpoint is valid only for model D")
     model = train_v2_model.build_model(
         args.model,
-        fold_means.detach().cpu(),
+        model_fold_means.detach().cpu(),
         device,
         args.hidden_channels,
         frozen_base_checkpoint,
+        lora_rank=args.lora_rank,
+        lora_alpha=args.lora_alpha,
+        lora_target_modules=train_v2_model.LORA_TARGET_MODULE_SETS[
+            args.lora_target_set
+        ],
     )
     checkpoint_path = REPO_ROOT / args.checkpoint
     checkpoint = load_checkpoint(
@@ -316,6 +376,9 @@ def main() -> None:
     checkpoint_sha = sha256(checkpoint_path)
     dataset = V2BigWigDataset(
         intervals_path,
+        track_manifest_path=track_manifest,
+        group_manifest_path=group_manifest,
+        track_indices=list(range(len(prediction_indices))),
         max_io_workers=16,
         final_test_checkpoint_sha256=checkpoint_sha if args.final_test else None,
         final_test_execution_id=(
@@ -325,8 +388,12 @@ def main() -> None:
     subwindows, eligible_bases = core_subwindows(
         dataset.intervals, args.sequence_length
     )
-    n_tracks = len(means_rows)
-    group_ids = [row["group_id"] for row in means_rows]
+    n_tracks = len(prediction_indices)
+    if len(dataset.track_rows) != n_tracks:
+        raise ValueError(
+            "prediction-track-indices length must match selected track manifest rows"
+        )
+    group_ids = [row["group_id"] for row in dataset.track_rows]
     chromosomes = {row["chromosome"] for row in dataset.intervals}
     genes, genes_by_chromosome = full_metrics.load_gene_exons(
         dataset.gtf_path, chromosomes
@@ -381,10 +448,14 @@ def main() -> None:
             gene_mask = item["gene_mask"].unsqueeze(0).to(device)
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
                 predictions = model(dna)
+                predictions = {
+                    resolution: value[:, prediction_indices, ...]
+                    for resolution, value in predictions.items()
+                }
                 paper_loss, paper_metrics = components.dual_resolution_paper_loss(
                     predictions,
                     targets,
-                    track_means=fold_means,
+                    track_means=eval_fold_means,
                     track_mask=track_mask,
                     track_strand=track_strand,
                     gene_mask=gene_mask,
@@ -392,7 +463,7 @@ def main() -> None:
                 log_loss, log_metrics = components.log1p_mse_loss(
                     predictions,
                     targets,
-                    track_means=fold_means,
+                    track_means=eval_fold_means,
                     track_mask=track_mask,
                 )
             current = {
@@ -408,10 +479,10 @@ def main() -> None:
                 metric_sums[key] = metric_sums.get(key, 0.0) + numeric
 
             prediction_128 = components.unscale_predictions_experimental_space(
-                predictions[128].float(), fold_means, 128
+                predictions[128].float(), eval_fold_means, 128
             )
             prediction_1 = components.unscale_predictions_experimental_space(
-                predictions[1].float(), fold_means, 1
+                predictions[1].float(), eval_fold_means, 1
             )
             raw_prediction_1 = prediction_1.clamp_min(0)[0].float().cpu().numpy()
             raw_target_1 = targets[1].clamp_min(0)[0].float().cpu().numpy()
@@ -559,7 +630,7 @@ def main() -> None:
         "max_per_track_pearson_128bp": float(finite_pearson.max()),
         "per_track_pearson_128bp": {
             row["group_id"]: float(value) if math.isfinite(value) else None
-            for row, value in zip(means_rows, per_track_pearson, strict=True)
+            for row, value in zip(dataset.track_rows, per_track_pearson, strict=True)
         },
         "full_metrics": full_metric_record,
         "intervals_sha256": sha256(intervals_path),

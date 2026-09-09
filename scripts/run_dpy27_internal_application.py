@@ -121,7 +121,17 @@ def repo_path(relative: str) -> Path:
     return REPO_ROOT / path
 
 
-def _validate_static_contract(spec: Mapping[str, Any]) -> None:
+def _is_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdefABCDEF" for character in value)
+    )
+
+
+def _validate_static_contract(
+    spec: Mapping[str, Any], *, require_current_implementation: bool = True
+) -> None:
     model = spec.get("model_contract", {})
     statistics = spec.get("statistics", {})
     figure_source = spec.get("figure_source_data_contract", {})
@@ -203,9 +213,12 @@ def _validate_static_contract(spec: Mapping[str, Any]) -> None:
             raise RuntimeError(f"P10 data input cannot name final-test content: {key}")
     registered_implementation = spec.get("implementation_sha256", {})
     if (
-        set(registered_implementation) != set(IMPLEMENTATION_PATHS)
-        or registered_implementation != implementation_sha256()
+        not isinstance(registered_implementation, Mapping)
+        or set(registered_implementation) != set(IMPLEMENTATION_PATHS)
+        or not all(_is_sha256(value) for value in registered_implementation.values())
     ):
+        raise RuntimeError("P10 frozen implementation manifest is invalid")
+    if require_current_implementation and registered_implementation != implementation_sha256():
         raise RuntimeError("P10 frozen implementation hash mismatch")
 
 
@@ -356,17 +369,38 @@ def preflight_contract(
     spec_path: str | Path = SPEC_PATH,
     *,
     enforce_controller: bool = True,
+    require_current_implementation: bool | None = None,
 ) -> dict[str, Any]:
-    """Validate the complete frozen P10 scope without model or BigWig reads."""
+    """Validate the frozen P10 scope without model or BigWig reads.
+
+    Controller-enforced preflight is an execution guard and therefore requires
+    the current implementation to match the frozen manifest.  Offline
+    preflight is a historical read-back of the completed P10 record; it keeps
+    the recorded implementation hashes and reports any later code drift.
+    """
 
     spec_path = Path(spec_path)
     spec = read_json(spec_path)
-    _validate_static_contract(spec)
+    if require_current_implementation is None:
+        require_current_implementation = enforce_controller
+    _validate_static_contract(
+        spec, require_current_implementation=require_current_implementation
+    )
     if enforce_controller:
         _validate_controller_state()
     locked_hashes = _validate_locked_inputs(spec)
     matrix = _validate_checkpoint_matrix(spec)
     dataset = _validate_tracks_and_intervals(spec)
+    frozen_implementation = dict(spec["implementation_sha256"])
+    current_implementation = implementation_sha256()
+    implementation_drift = {
+        relative: {
+            "frozen": frozen_implementation[relative],
+            "current": current_implementation[relative],
+        }
+        for relative in IMPLEMENTATION_PATHS
+        if frozen_implementation[relative] != current_implementation[relative]
+    }
     return {
         "schema_version": 1,
         "analysis_contract": ANALYSIS_CONTRACT,
@@ -384,7 +418,17 @@ def preflight_contract(
         "locked_test_block_signal_reads": 0,
         "model_or_bigwig_reads": 0,
         "git_commit": git_commit(),
-        "implementation_sha256": implementation_sha256(),
+        "implementation_hash_mode": (
+            "current" if require_current_implementation else "historical"
+        ),
+        "implementation_sha256": (
+            current_implementation
+            if require_current_implementation
+            else frozen_implementation
+        ),
+        "frozen_implementation_sha256": frozen_implementation,
+        "current_implementation_sha256": current_implementation,
+        "implementation_drift": implementation_drift,
     }
 
 
@@ -649,7 +693,7 @@ def run_one_checkpoint(
 
 def _run_worker(args: argparse.Namespace) -> None:
     spec = read_json(SPEC_PATH)
-    _validate_static_contract(spec)
+    _validate_static_contract(spec, require_current_implementation=True)
     matrix = {
         (int(row["seed"]), int(row["fold"])): row for row in spec["checkpoint_matrix"]
     }
@@ -993,7 +1037,11 @@ def _render_figure_and_complete(
 def _run_controller_entry() -> None:
     started = time.monotonic()
     spec = read_json(SPEC_PATH)
-    preflight = preflight_contract(SPEC_PATH, enforce_controller=True)
+    preflight = preflight_contract(
+        SPEC_PATH,
+        enforce_controller=True,
+        require_current_implementation=True,
+    )
     spec_sha256 = preflight["spec_sha256"]
     outputs = spec["output_paths"]
     preflight_path = repo_path(outputs["preflight_audit"])

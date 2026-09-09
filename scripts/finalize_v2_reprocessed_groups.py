@@ -433,10 +433,13 @@ def aggregate_group(
     group: dict[str, Any],
     members: list[dict[str, Any]],
     expected_chromosomes: dict[str, int],
+    output_dir: Path | None = None,
 ) -> dict[str, Any]:
+    if output_dir is None:
+        output_dir = GROUPED_DIR
     group_id = group["group_id"]
-    output_path = GROUPED_DIR / f"{group_id}.bw"
-    audit_path = GROUPED_DIR / "audits" / f"{group_id}.json"
+    output_path = output_dir / f"{group_id}.bw"
+    audit_path = output_dir / "audits" / f"{group_id}.json"
     source_signature = [
         {
             "run_accession": row["run_accession"],
@@ -464,7 +467,7 @@ def aggregate_group(
             )
             return audit
 
-    GROUPED_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     audit_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = output_path.with_suffix(".bw.tmp")
     temporary.unlink(missing_ok=True)

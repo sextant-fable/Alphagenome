@@ -1,12 +1,14 @@
-# Full Python dependency set for the audited v2 workflow.
+# Historical v2 runtime recorded in
+# alphagenome_custom/metadata/v2/environment/p3_after.json.
 #
-# Requires Python 3.12 or newer. Do not install this into Python 3.11: pip can
-# resolve an older alphagenome-pytorch API that lacks the heads, losses, and
-# finetuning modules used by v2.
-#
-# On a GPU host, install the CUDA-appropriate PyTorch build before this file.
-# Do not hard-code a CUDA wheel here because it must match the target host.
-numpy>=1.26,<3
-torch>=2.2,<3
-alphagenome-pytorch[finetuning]==0.3.1
+# Create the Conda environment with Python 3.12.13 before installing this file.
+# This reproduces the verified CUDA 12.8 software stack, which requires an
+# NVIDIA driver compatible with CUDA 12.8 or newer for GPU execution.
+--extra-index-url https://download.pytorch.org/whl/cu128
+numpy==2.4.4
+pyBigWig==0.3.25
+torch==2.11.0+cu128
+triton==3.6.0
+alphagenome-pytorch==0.3.1
+matplotlib==3.10.8
 pytest>=8,<10

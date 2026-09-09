@@ -14,6 +14,7 @@ from scripts.run_dpy27_internal_application import (
     CONTROLLER_INVOCATION,
     REGISTERED_PHASE_COMMAND,
     _figure_source_rows,
+    _validate_static_contract,
     execution_provenance,
     implementation_sha256,
     preflight_contract,
@@ -228,16 +229,28 @@ class Dpy27InternalApplicationTests(unittest.TestCase):
             )
         )
 
-    def test_r10_implementation_hash_matches_runner_contract(self) -> None:
+    def test_r10_implementation_hash_preserves_historical_contract(self) -> None:
         spec = json.loads(
             Path(
                 "alphagenome_custom/metadata/v2/p10_dpy27_internal_application_spec.json"
             ).read_text()
         )
+        frozen = spec["implementation_sha256"]
+        current = implementation_sha256()
         self.assertEqual(
-            review_v2_phase._p10_implementation_sha256(), implementation_sha256()
+            review_v2_phase._p10_implementation_sha256(), current
         )
-        self.assertEqual(spec["implementation_sha256"], implementation_sha256())
+        self.assertEqual(set(frozen), set(current))
+        self.assertNotEqual(frozen, current)
+        changed = {path for path in current if current[path] != frozen[path]}
+        self.assertTrue(
+            {
+                "scripts/train_v2_model.py",
+                "scripts/v2_training_components.py",
+            }.issubset(changed)
+        )
+        with self.assertRaisesRegex(RuntimeError, "frozen implementation hash mismatch"):
+            _validate_static_contract(spec)
 
     def test_real_p10_preflight_checks_15_runs_without_model_or_bigwig_reads(self) -> None:
         spec = json.loads(
@@ -259,6 +272,16 @@ class Dpy27InternalApplicationTests(unittest.TestCase):
         self.assertEqual(result["checkpoint_count"], 15)
         self.assertEqual(result["dataset"]["track_count"], 241)
         self.assertEqual(result["model_or_bigwig_reads"], 0)
+        self.assertEqual(result["implementation_hash_mode"], "historical")
+        self.assertEqual(result["implementation_sha256"], spec["implementation_sha256"])
+        current = implementation_sha256()
+        self.assertEqual(result["current_implementation_sha256"], current)
+        changed = {
+            path
+            for path in current
+            if current[path] != spec["implementation_sha256"][path]
+        }
+        self.assertEqual(set(result["implementation_drift"]), changed)
         self.assertEqual(
             [result["dataset"]["intervals"][fold]["subwindows"] for fold in range(1, 6)],
             [83] * 5,

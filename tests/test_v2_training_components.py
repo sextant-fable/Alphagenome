@@ -459,6 +459,56 @@ class V2TrainingComponentsTest(unittest.TestCase):
         self.assertTrue(trainable)
         self.assertTrue(all(parameter.grad is not None for parameter in trainable))
 
+    def test_128bp_head_derives_1bp_model_space_by_uniform_distribution(self) -> None:
+        torch.manual_seed(11)
+        means = torch.tensor([2.0, 4.0])
+        experimental = torch.rand(1, 2, 2) * 20
+        model_128bp = components.scale_targets_model_space(experimental, means, 128)
+        derived = components.derive_1bp_model_space_from_128bp(model_128bp, means)
+        observed = components.unscale_predictions_experimental_space(derived, means, 1)
+        expected = experimental.repeat_interleave(128, dim=-1) / 128.0
+        torch.testing.assert_close(observed, expected, rtol=1e-5, atol=1e-5)
+
+    def test_128bp_only_alphagenome_head_requests_only_128bp_embeddings(self) -> None:
+        class FakeBase(torch.nn.Module):
+            def encode(self, dna, organism, resolutions, channels_last):
+                self.observed_resolutions = tuple(resolutions)
+                return {
+                    "embeddings_128bp": torch.ones(
+                        dna.shape[0], 3072, dna.shape[1] // 128
+                    ),
+                }
+
+        base = FakeBase()
+        model = components.AlphaGenomeRnaModel(
+            base,
+            n_tracks=3,
+            track_means=torch.ones(3),
+            base_organism_index=2,
+            encode_requires_grad=False,
+            head_resolutions=(128,),
+            derive_1bp_from_128bp=True,
+        )
+        outputs = model(torch.ones(1, 4, 256))
+        self.assertEqual(base.observed_resolutions, (128,))
+        self.assertEqual(outputs[128].shape, (1, 3, 2))
+        self.assertEqual(outputs[1].shape, (1, 3, 256))
+
+    def test_basenji2_style_baseline_is_128bp_native_and_backward_finite(self) -> None:
+        torch.manual_seed(13)
+        model = components.Basenji2StyleRnaBaseline(
+            n_tracks=5, track_means=torch.ones(5), hidden_channels=16
+        )
+        outputs = model(torch.rand(1, 4, 256))
+        self.assertEqual(outputs[128].shape, (1, 5, 2))
+        self.assertEqual(outputs[1].shape, (1, 5, 256))
+        loss = outputs[128].mean() + outputs[1].mean()
+        loss.backward()
+        self.assertTrue(all(torch.isfinite(parameter.grad).all() for parameter in model.parameters()))
+        metadata = train_v2_model.adaptation_metadata("Basenji2_style")
+        self.assertEqual(metadata["learned_head_resolutions"], [128])
+        self.assertEqual(metadata["derived_output_resolutions"], [1])
+
     def test_random_shift_is_seeded_bounded_and_epoch_dependent(self) -> None:
         class FakeDataset(torch.utils.data.Dataset):
             intervals = [

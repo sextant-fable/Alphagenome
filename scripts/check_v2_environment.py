@@ -9,8 +9,14 @@ import sys
 from typing import Iterable
 
 
-MINIMUM_PYTHON = (3, 12)
-EXPECTED_ALPHAGENOME_VERSION = "0.3.1"
+EXPECTED_PYTHON = (3, 12, 13)
+EXPECTED_DISTRIBUTIONS = {
+    "alphagenome-pytorch": "0.3.1",
+    "numpy": "2.4.4",
+    "pyBigWig": "0.3.25",
+    "torch": "2.11.0+cu128",
+    "triton": "3.6.0",
+}
 
 
 def module_version(distribution: str) -> str | None:
@@ -35,31 +41,33 @@ def main() -> int:
     errors: list[str] = []
     print(f"python: {sys.executable}")
     print(f"python_version: {sys.version.split()[0]}")
-    if sys.version_info < MINIMUM_PYTHON:
+    if sys.version_info[:3] != EXPECTED_PYTHON:
         errors.append(
-            "v2 requires Python 3.12+; create a new environment instead of "
-            "installing into Python 3.11"
+            "historical v2 runtime requires Python "
+            f"{'.'.join(map(str, EXPECTED_PYTHON))}"
         )
 
-    packages = {
-        "alphagenome-pytorch": "alphagenome-pytorch",
-        "numpy": "numpy",
-        "pyBigWig": "pyBigWig",
-        "pytest": "pytest",
-        "torch": "torch",
-    }
-    for label, distribution in packages.items():
+    for distribution, expected_version in EXPECTED_DISTRIBUTIONS.items():
         version = module_version(distribution)
-        print(f"{label}: {version or 'NOT INSTALLED'}")
+        print(f"{distribution}: {version or 'NOT INSTALLED'}")
         if version is None:
             errors.append(f"missing distribution: {distribution}")
+        elif version != expected_version:
+            errors.append(
+                f"{distribution} must be {expected_version}, found {version}"
+            )
 
-    alpha_version = module_version("alphagenome-pytorch")
-    if alpha_version and alpha_version != EXPECTED_ALPHAGENOME_VERSION:
-        errors.append(
-            "alphagenome-pytorch must be "
-            f"{EXPECTED_ALPHAGENOME_VERSION}, found {alpha_version}"
-        )
+    pytest_version = module_version("pytest")
+    print(f"pytest: {pytest_version or 'NOT INSTALLED'}")
+    if pytest_version is None:
+        errors.append("missing distribution: pytest")
+
+    try:
+        alpha_module = importlib.import_module("alphagenome_pytorch")
+    except Exception as error:
+        errors.append(f"cannot import alphagenome_pytorch: {error}")
+    else:
+        print(f"alphagenome_pytorch_path: {alpha_module.__file__}")
 
     errors.extend(
         require_import(
