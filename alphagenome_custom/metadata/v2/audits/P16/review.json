@@ -1,0 +1,29 @@
+{
+  "checks": [
+    {
+      "check_id": "R16.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R16.02_execution_contract",
+      "evidence": "CPU-only I-V training-aggregate BigWig means; no GPU, DNA, checkpoint, external source, chromosome-X or locked-test access",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R16.03_i_to_v_source_contract",
+      "evidence": "['I', 'II', 'III', 'IV', 'V']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R16.04_241_fold_means",
+      "evidence": "rows=241",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P16",
+  "review": "R16 strict I--V training normalization",
+  "reviewed_at": "2026-08-22T18:46:58+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

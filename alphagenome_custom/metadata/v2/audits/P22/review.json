@@ -1,0 +1,34 @@
+{
+  "checks": [
+    {
+      "check_id": "R22.01_required_outputs",
+      "evidence": "manifest and effect tables",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R22.02_effect_association_status",
+      "evidence": "analyzable=50",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R22.03_effect_table_counts",
+      "evidence": "summary=51 by_model=750",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R22.04_input_hashes",
+      "evidence": "P20 public-source hashes",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R22.05_claim_boundary",
+      "evidence": "causal/unseen-condition claims remain blocked",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P22",
+  "review": "R22 public eQTL effect association",
+  "reviewed_at": "2026-08-23T07:15:31+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

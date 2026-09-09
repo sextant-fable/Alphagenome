@@ -1,0 +1,29 @@
+{
+  "checks": [
+    {
+      "check_id": "R24.01_required_outputs",
+      "evidence": "Borzoi spec and audit execution",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R24.02_official_source",
+      "evidence": "vendor_commit=5c9358222b5026abb733ed5fb84f3f6c77239b37 license=Apache-2.0",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R24.03_adapter_boundary",
+      "evidence": "audit is not presented as a completed C. elegans adapter",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R24.04_native_checkpoint_ineligibility",
+      "evidence": "native human/mouse heads are excluded from the primary comparison",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P24",
+  "review": "R24 Borzoi feasibility audit",
+  "reviewed_at": "2026-08-23T10:02:57+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

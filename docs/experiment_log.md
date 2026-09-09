@@ -34,6 +34,171 @@ Do not delete failed runs. Append corrections or follow-up notes instead.
 
 ## Runs
 
+## 2026-08-23 - P22/ED6 Manuscript Evidence Integration
+
+- Run type: analysis and figure generation.
+- Purpose: render the independent public dosage-expression association figure and expand existing P13 calibration-ratio and metadata strata into Extended Data 6 without new training or locked-test access.
+- Command: `scripts/plot_v2_p22_eqtl_figure.py`, `scripts/plot_v2_p13_calibration_strata.py`, and the Nature-figure validator/PDF text audit under the `alphagenome` environment.
+- Input data: P22 `eqtl_variant_effects.tsv`; P13 `p13_b_paper_primary_group_descriptives.tsv`.
+- Output path: `results/v2_p22_manuscript_figure_20260823T0710Z/`, `results/v2_ed6_calibration_strata/`, and copied ED6/ED8 artifacts under `nature_methods_manuscript/extended_data/`.
+- Result summary: Fig. 6 reports 50 analyzable candidates, observed/model Pearson `-0.007`, Spearman `0.062`, and mean checkpoint sign concordance `0.545`. ED6 covers all 57 primary groups and descriptive study/stage/tissue/condition strata.
+- Verification: both figure scripts passed 20/20 static validator checks; PDF text audits found minimum text sizes of 6.0 pt (Fig. 6) and 6.2 pt (ED6), with no warnings.
+- Claim status: verified local evidence integration; P22 is not causal regulatory validation and ED6 is not population-level calibration.
+
+## 2026-08-23 - P21 Public eQTL Candidate Variant Scoring
+
+- Run type: registered inference-only external regulatory-candidate analysis.
+- Purpose: score 51 checksum-verified I--V candidate alleles from the public wild-strain eQTL source with all 15 frozen P17 `B_iv_dual` checkpoints.
+- Controller and approval scope: P21 under `G4:p21_eqtl_variant_scoring`; no training, chromosome-X signal, or locked-test access.
+- Command: `python -m scripts.v2_phase_controller run --phase P21` under the validated `alphagenome` environment, supervised in detached tmux.
+- Input contract: passing `results/v2_p20_eqtl_variant_set/p20_eqtl_variant_set_manifest.json`, WBcel235 REF audit with 0 mismatches, P17 checkpoint hashes, and the existing v2 variant scorer.
+- Output path: ignored per-fold scoring outputs under `results/v2_p21_eqtl_variant_scoring/`, execution/review metadata under `alphagenome_custom/metadata/v2/`.
+- Registered matrix: 15 jobs (folds I--V, seeds `20260714`, `20260715`, `20260716`), alternating physical GPUs 2 and 3.
+- Result summary: all 15 scoring jobs completed with 51 candidates each; R21 passed with zero chromosome-X or locked-test reads. This is candidate-allele scoring and does not by itself establish causal regulatory validation or unseen-condition prediction.
+- Verification: `alphagenome_custom/metadata/v2/audits/P21/review.json` (R21 PASS); execution record reports 15/15 completed jobs on physical GPUs 2 and 3.
+- Claim status: verified execution; biological interpretation remains descriptive and boundary-limited.
+
+## 2026-08-23 - P22 Public eQTL Effect Association (Completed)
+
+- Run type: registered CPU-only public biological application analysis.
+- Purpose: associate CeNDR genotype dosage with strain-level expression and compare the observed signed effect with frozen represented-head model allele effects.
+- Controller and approval scope: P22 under `G3:p22_eqtl_effect_association`, automatically launched by the detached P22 supervisor after P21/R21 pass.
+- Analysis contract: sample-level log1p(CPM), mean within strain; `Supplementary Data 4` `finemapping_gene` mapped to WBcel235 GTF gene names; Model B target head `RNA_V2_G0054`, 1-bp gene-body delta.
+- Output path: `results/v2_p22_eqtl_effect_association/` and `results/v2_p22_manuscript_figure_20260823T0710Z/`.
+- Result summary: 51 candidates were registered and 50 were analyzable. Observed dosage-expression slope versus model gene-body delta gave Pearson `-0.007` and Spearman `0.062`; mean 15-checkpoint sign concordance was `0.545`.
+- Verification: `alphagenome_custom/metadata/v2/audits/P22/review.json` (R22 PASS); figure validator and PDF text audit passed for `figure_p22_eqtl_effects.{pdf,svg,tiff,png}`.
+- Claim status: verified public-cohort association stress test; not causal mechanism, unseen-condition decoding, or population-level laboratory inference.
+
+## 2026-08-23 - P20 Public eQTL Source Acquisition
+
+- Run type: registered external-source download and audit.
+- Purpose: acquire the independent wild-strain expression matrix, published eQTL truth archive and CeNDR 2020-08-15 isotype VCF for a later I--V regulatory-allele analysis.
+- Controller and approval scope: P20 under `G1:p20_eqtl_public_source_download_and_audit`; no model inference, chromosome-X signal read or locked-test access.
+- Command: `python -m scripts.v2_phase_controller run --phase P20` under the validated `alphagenome` environment, supervised in detached tmux.
+- Input contract: immutable `alphagenome_custom/metadata/v2/p20_eqtl_public_source_download_spec.json`, the existing direct-collision screen for 609 cohort runs, and public URLs recorded in that specification.
+- Output path: `shared/external_eqtl/p20_sources_v1/`, with source hashes and provenance in `p20_source_manifest.json`; the source files are intentionally ignored large assets.
+- Current status: the GEO counts matrix, Supplementary Data 4 archive and 5.3-GB CeNDR VCF completed with source hashes; R20 passed. The downstream variant set passed reference-coordinate audit with 51 selected I--V records and zero REF mismatches.
+- Verification: `alphagenome_custom/metadata/v2/audits/P20/review.json` and `results/v2_p20_eqtl_variant_set/p20_eqtl_variant_set_manifest.json`.
+- Claim status: verified source acquisition and candidate preparation; this alone does not establish independent eQTL or regulatory-allele validation.
+
+## 2026-08-23 - P18 External I-V Reprocessing Operational Retry
+
+- Run type: preprocessing retry under the unchanged P18 source and chromosome contract.
+- Purpose: resume the four-source I-V-only reprocessing after the first attempt completed all checksum-verified transfers and STAR alignment for `SRR18463404`, then failed before coverage generation because the coordinate-sorted STAR BAM had not been indexed before region-restricted `samtools view`.
+- Git commit: `3233144d5c02f9355bd9bc6b64a3ac9769629ac1` with an uncommitted, reviewable one-command runner correction.
+- Branch and host: `setup/agent-maintenance` on HY-GPU (`hy8`), non-Slurm.
+- Controller and approval scope: reopen only P18 under the existing `G1:p18_external_replacement_download_and_reprocessing` scope. The immutable transport manifest, four expected runs, represented head `RNA_V2_G0054`, chromosomes I--V, and prohibition on model inference, chromosome X and locked-test access remain unchanged.
+- Correction: run `samtools index` on `star_Aligned.sortedByCoord.out.bam` before extracting regions `I II III IV V`. The failed attempt and controller log remain at `logs/v2_p18_external_continuation_20260823T031131Z/`.
+- Reuse boundary: all four per-source download audits and verified FASTQs are reused; no source is redownloaded. The partially aligned sample workspace was removed by the existing failure cleanup and will be recomputed.
+- Output path: unchanged `alphagenome_custom/tracks/rna_seq_v2_external_p18_continuation/`, with temporary work under `shared/source_reads/v2/p18_external_continuation_iv_work/`.
+- Verification before retry: replacement FASTQ size `2,215,401,424` bytes and MD5 `0bded8546b4f764a9cf3b3b595bbf405`; completed download summary records four of four sources.
+- Claim status: operational correction only; no external coverage or model-performance result exists until all four tracks pass P18 review.
+
+## 2026-08-23 - P18 External RNA Source Transfer Preregistration
+
+- Run type: registered external-source download sidecar.
+- Purpose: checksum-verify and stage four metadata-cleared public RNA-seq FASTQ sources for a later represented-context cross-study evaluation. The selected sources are one N2/L4 run mapped to `RNA_V2_G0055` and three N2/day-1-adult runs mapped, with a broad-stage qualification, to `RNA_V2_G0054`.
+- Controller and approval scope: the serial controller remains in P17. The independently audited P18 source-transfer sidecar requires `G1:p18_external_rna_download_and_reprocessing`, recorded only during the active P17 period so it cannot be confused with the GPU model matrix.
+- Input data: P18 transport manifest `results/v2_p18_external_source_transport_20260822T185343Z/p18_external_source_transport.tsv`, whose four runs passed direct run/experiment/BioSample/study/BioProject and FASTQ-MD5 collision screens against the local 482-run ledger. The source-equivalence attestation is provenance-only; post-reprocessing hash comparison remains required.
+- Command: `python -m scripts.run_v2_p18_external_rna_download --transport-manifest results/v2_p18_external_source_transport_20260822T185343Z/p18_external_source_transport.tsv --work-dir shared/source_reads/v2/p18_external_fastqs --audit-dir results/v2_p18_external_download`, supervised by `scripts/supervise_v2_p18_external_download_tmux.sh`.
+- Resource contract: CPU/network transfer only; four single-end FASTQs totaling `6,807,350,548` bytes; checksum-validated resume; no GPU allocation, model/checkpoint access, bigWig/coverage read, chromosome-X read or locked-test access.
+- Output path: ignored resumable FASTQs under `shared/source_reads/v2/p18_external_fastqs/`, per-run download audits under `results/v2_p18_external_download/`, and detached logs under `logs/v2_p18_external_download_<UTC timestamp>/`.
+- Stop conditions: controller scope mismatch; any manifest hash or source identity mismatch; unexpected accession/host/layout; incorrect size or MD5; less than 25 GiB free disk; or any attempted expansion beyond the frozen four runs.
+- Claim status: preregistered transfer; no external RNA signal, coverage evaluation or model-performance result exists at registration time.
+
+## 2026-08-23 - P18 External I-V-Only Reprocessing Preregistration
+
+- Run type: registered CPU-only reprocessing sidecar, waiting on the checksum-verified P18 transfer.
+- Purpose: create four source-level, uniformly processed WBcel235 coverage tracks for later comparison with the represented fixed heads, without creating or reading chromosome-X coverage.
+- Command: `python -m scripts.run_v2_p18_external_iv_reprocessing --transport-manifest results/v2_p18_external_source_transport_20260822T185343Z/p18_external_source_transport.tsv --download-audit-dir results/v2_p18_external_download --fastq-root shared/source_reads/v2/p18_external_fastqs --work-dir shared/source_reads/v2/p18_external_iv_work --output-dir alphagenome_custom/tracks/rna_seq_v2_external_p18 --threads 8`, supervised by `scripts/supervise_v2_p18_external_reprocessing_tmux.sh`.
+- Input contract: the exact four-run P18 transport manifest, completed checksum-verified download audit per run, the pre-existing WBcel235 STAR index, and an active `G1:p18_external_rna_download_and_reprocessing` approval. The runner fails closed on a missing source, changed manifest hash, altered run set, unavailable tool, or unavailable approval.
+- Processing contract: STAR alignment followed by primary unique, spliced, unstranded coverage restricted to chromosomes I--V; the intermediate BAM is explicitly restricted to `I II III IV V`; per-source I--V coverage is normalized to `1e8`; temporary alignment work is removed after a source audit is written.
+- Resource and boundary: CPU only, at most 8 threads, no GPU, model, checkpoint, native v2 coverage read, chromosome-X coverage emission/read, or locked-test access. I--V-only normalization is a stated compatibility limitation and no score will be compared until a frozen evaluation specification accounts for it.
+- Output path: ignored source-level tracks and audits under `alphagenome_custom/tracks/rna_seq_v2_external_p18/`; temporary work under `shared/source_reads/v2/p18_external_iv_work/`; persistent reprocessing logs under `logs/v2_p18_external_reprocessing_<UTC timestamp>/`.
+- Claim status: preregistered; waiting for completed download, with no external coverage or model-performance result at registration time.
+
+## 2026-08-23 - P14 Frozen Model B I-V Reference Preregistration
+
+- Run type: registered inference-only evaluation.
+- Purpose: evaluate the 15 hash-verified completed P12 `B_paper` checkpoints on the immutable P13 I-V-only held-out biological-unit interval contract, so model-to-held-out and training-aggregate-to-held-out agreement use the same targets, cores and primary score.
+- Git commit: recorded by the P14 execution record at completion; the worktree is intentionally not committed while manuscript assets are under active revision.
+- Branch and host: `setup/agent-maintenance` on HY-GPU (`hy8`), non-Slurm.
+- Controller and approval scope: P14 requires `G4:p14_iv_frozen_model_reference`. The user authorized the continuing background manuscript-completion workflow on 2026-08-23; this scope permits only frozen-checkpoint inference on physical GPUs 2 and 3.
+- Registered commands: `python -m scripts.prepare_v2_p14_iv_model_reference`; `python -m scripts.v2_phase_controller start-p14-iv-model-reference`; `python -m scripts.v2_phase_controller approve --gate G4 --scope p14_iv_frozen_model_reference`; then `python -m scripts.v2_phase_controller run --phase P14` through `scripts/supervise_v2_p14_iv_model_reference_tmux.sh`.
+- Input data: 15 P12 `B_paper` checkpoint paths and SHA-256 digests, P11 held-out track/group manifests, P13's derived fold-1 through fold-5 I-V-only interval manifests, and P13 R13 pass record. P14's immutable spec binds every input hash.
+- Output path: ignored evaluation JSON and summaries under `results/v2_p14_iv_model_reference/`; durable controller logs under `logs/v2_p14_iv_model_reference_<UTC timestamp>/`; execution/review metadata under `alphagenome_custom/metadata/v2/`.
+- Resource and test boundary: maximum one inference process per GPU 2/3, no training, no model selection, no external RNA download, no chromosome-X row, and no `test_locked` row or signal. P14 is within-collection only and cannot establish external, unseen-condition or regulatory-variant generalization.
+- Stop conditions: any checkpoint/interval hash mismatch, non-I-V interval row, unavailable GPU 2/3, missing or incomplete evaluator output, failed review, or locked-test read. Preserve failed output and do not substitute a different checkpoint.
+- Claim status: preregistered; no P14 result exists at registration time.
+
+## 2026-08-23 - P14 Frozen Model B I-V Reference Completion
+
+- Run type: registered inference-only evaluation.
+- Result summary: all 15 preregistered P12 `B_paper` checkpoints completed frozen inference on the P13 I-V-only held-out cores. The equal-weight primary-score mean was `0.6244769861`; the matched training-aggregate-to-held-out-unit reference was `0.9667128273`. Paired fold differences ranged from `-0.3602442` to `-0.3184659`.
+- Verification: controller P14 completed at `2026-08-22T18:12:18+00:00`; R14 passed all five checks, including 15/15 record coverage, I-V-only intervals, zero locked-test reads and physical GPUs 2/3 only. Source artifacts are `results/v2_p14_iv_model_reference/` and `alphagenome_custom/metadata/v2/audits/P14/review.json`.
+- Failures or warnings: this is a within-collection reference. The original P12 training interval manifests contain chromosome-X windows, so the result does not establish training-time chromosome-X exclusion, external validation, an absolute performance ceiling or unseen-condition generalization.
+- Next actions: construct an I-V-only train/validation contract before any new ablation or public-baseline training; keep the external RNA and eQTL lanes blocked until metadata collision and fixed-head mapping audits pass.
+- Claim status: verified within the registered I-V inference contract.
+
+## 2026-08-23 - P16 Strict I-V Training Normalization Completion
+
+- Run type: registered CPU-only normalization analysis.
+- Purpose: recompute 241 fold-specific training target means using only P15's I-V training blocks before any new ablation or public-baseline training.
+- Git commit and host: `3233144d5c02f9355bd9bc6b64a3ac9769629ac1` on HY-GPU (`hy8`), non-Slurm.
+- Controller and approval scope: P16 with `G3:p16_iv_training_normalization`.
+- Command: `python -m scripts.v2_phase_controller run --phase P16`, supervised by `scripts/supervise_v2_p16_iv_normalization_tmux.sh`.
+- Input data: hash-bound P15 I-V train manifests and the P11 training aggregate manifest; no model, checkpoint, external source or GPU was opened.
+- Output path: ignored means and summary under `results/v2_p16_iv_training_normalization/`, plus immutable execution/review records under `alphagenome_custom/metadata/v2/`.
+- Result summary: 241 train-only fold means were generated for all five folds.
+- Verification: R16 passed all four checks at `2026-08-22T18:46:58+00:00`, including strict I-V source rows and zero locked-test signal reads.
+- Failures or warnings: the means are a normalization contract, not an external benchmark or model result.
+- Next actions: freeze and run the minimal P17 45-job I-V-only controlled matrix on physical GPUs 2/3.
+- Claim status: verified normalization contract.
+
+## 2026-08-23 - P17 Strict I-V Controlled Matrix Preregistration
+
+- Run type: registered GPU training and held-out evaluation.
+- Purpose: retrain a full dual-resolution Model B control, a 128-bp-only Model B, and a Basenji2-style from-scratch public-architecture baseline under exactly the same P15/P16 I-V-only data contract.
+- Git commit and host: `3233144d5c02f9355bd9bc6b64a3ac9769629ac1` on HY-GPU (`hy8`), non-Slurm.
+- Controller and approval scope: P17 requires `G4:p17_iv_controlled_ablation_and_basenji2`; physical GPUs 2/3 only, maximum one job per GPU.
+- Registered commands: `python -m scripts.prepare_v2_p17_iv_controlled_matrix`; `python -m scripts.v2_phase_controller start-p17-iv-controlled-matrix`; `python -m scripts.v2_phase_controller approve --gate G4 --scope p17_iv_controlled_ablation_and_basenji2`; then `python -m scripts.v2_phase_controller run --phase P17` through `scripts/supervise_v2_p17_iv_controlled_matrix_tmux.sh`.
+- Input data: hash-bound P15 I-V train/valid interval manifests, P16 fold means, P11 training aggregates, and P11 held-out evaluation manifests. The immutable P17 specification enumerates 45 jobs: 3 configurations x 5 folds x 3 seeds.
+- Output path: ignored checkpoints and logs under `runs/v2_p17_iv_controlled_matrix/` and `logs/v2_p17_iv_controlled_matrix*/`; source metrics under `results/v2_p17_iv_controlled_matrix/`; durable controller records under `alphagenome_custom/metadata/v2/`.
+- Resource and claim boundary: no chromosome-X row, no locked-test read, no external source, no hyperparameter search, and no native human/mouse Basenji checkpoint comparison. The Basenji2-style model is a fair task-matched from-scratch architecture baseline. The 128-bp-only model derives 1-bp values only for common-metric compatibility and cannot establish 1-bp utility.
+- Stop conditions: any frozen-input hash mismatch, a non-I-V interval row, GPU outside 2/3, incomplete checkpoint/evaluation output, locked-test read, or failed R17 review stops the matrix while preserving the execution record.
+- Claim status: preregistered; no P17 result exists at registration time.
+
+## 2026-08-23 - P13 I-V Replicate-Agreement and P14 Metadata Gate Registration
+
+- Run type: registered read-only analysis plus public metadata-only provenance screen.
+- Purpose: create an I-V-only replicate-agreement reference without reading chromosome X or the locked test block, while independently collecting public accession/checksum metadata for candidate external RNA/eQTL sources.
+- Git commit: recorded by the P13 execution record at run completion.
+- Branch and host: `setup/agent-maintenance` on HY-GPU (`hy8`), non-Slurm.
+- Controller and approval scope: P13 requires `G3:p13_iv_replicate_agreement`; P14 candidate collection is metadata-only and is not an accepted external benchmark or raw-data download.
+- Commands: `python -m scripts.v2_phase_controller run --phase P13`; `python -m scripts.collect_v2_p14_candidate_metadata`; and `python -m scripts.audit_v2_p14_external_collision`, run by `scripts/supervise_submission_completion_tmux.sh` in detached tmux.
+- Input data: P11 training and held-out aggregate manifests; P12-era development validation manifests after a new fail-closed I-V filter; public ENA metadata for `PRJNA231838`, `PRJNA903192`, `PRJNA420450` and `PRJNA669810`.
+- Output path: ignored timestamped paths under `results/v2_p13_iv_interval_contract/`, `results/v2_p13_replicate_agreement_iv/` and `results/v2_p14_*`; detached logs under `logs/submission_completion_<UTC timestamp>/`.
+- Resource contract: P13 is CPU-only with at most four BigWig I/O workers. Metadata collection uses network metadata only. No GPU job, FASTQ/BAM/coverage download, external signal processing, checkpoint selection, or raw-data modification is permitted in this task.
+- Test boundary: explicit prohibition on chromosome X and `test_locked` rows before any BigWig handle is opened. P13 is a measurement-reliability reference, not external validation or a model-performance upper bound.
+- Stop conditions: any X/test row in the derived contract; failed P13 review; a candidate collision or incomplete source-equivalence record; or unavailable fixed-head mapping. Any such event stops the relevant lane without starting external raw-data processing.
+- Claim status: preregistered; no result at registration time.
+
+## 2026-08-22 - P13 Replicate-Agreement Analysis Stopped for Chromosome-X Boundary Violation
+
+- Run type: failed read-only analysis.
+- Purpose: calculate a training-aggregate versus held-out-biological-unit agreement reference from the completed P11/P12 labels, without model inference or retraining.
+- Git commit: `3233144`.
+- Branch and host: `setup/agent-maintenance` on HY-GPU (`hy8`), non-Slurm; CPU only.
+- Controller and approval scope: no controller phase or new gate. This was a manuscript-facing P13 audit attempt, not a formal v2 experiment.
+- Command: `/home/zelinli6/miniconda3/envs/alphagenome/bin/python -m scripts.analyze_v2_p13_replicate_agreement` in tmux session `alphagenome-p13-replicate-agreement`.
+- Input data: P11 training and held-out aggregate BigWig manifests and P12 fold-validation interval manifests.
+- Output path: attempted ignored output directory `results/v2_p13_replicate_agreement/`; no result files were produced. The execution log is retained at `logs/p13_replicate_agreement_20260822.log`.
+- Result summary: the job was terminated after a live audit found that `fold_1/valid.tsv` includes 15 chromosome-X development-core subwindows. It had completed the fold-1 X subwindows and had progressed through non-X fold-2 subwindows before termination.
+- Verification: `fold_1/valid.tsv` through `fold_5/valid.tsv` each contain 15 chromosome-X rows. `tmux kill-session -t alphagenome-p13-replicate-agreement` stopped the process; no P13 replicate-agreement TSV or JSON output exists.
+- Failures or warnings: although no `test_locked` row was opened, the analysis read chromosome-X signals without a new explicit authorization. This violates the project chromosome-X boundary. Its partial execution must not be used for figures, statistics or manuscript claims.
+- Next actions: add a pre-open fail-closed interval guard for both chromosome X and `test_locked`, then reassess whether a non-X read-only agreement calculation is scientifically comparable to the completed P12 estimand before any rerun.
+- Claim status: failed boundary check; no biological or model result.
+
 ## 2026-07-30 - P8 B-noLoRA Fold-1 Ablation Result
 
 - Run type: exploratory training and development validation.
@@ -2774,3 +2939,74 @@ sbatch scripts/slurm_smoke_torch.sh
 - Failures or warnings: Pending
 - Next actions: Submit only after explicit user approval; inspect Slurm logs and record tensor shapes, device, loss lines, and any errors.
 - Claim status: unverified
+# 2026-08-23 - P18 External RNA Replacement Continuation Preregistration
+
+- Run type: external-source transfer and uniform RNA-seq reprocessing; no model training or inference.
+- Purpose: replace the excluded `SRR2005820` L4 source, whose completed download did not match ENA's published MD5, with the separately attested `SRR3560831` N2 young-adult RNA-seq source. Preserve the original failed transfer evidence without using it as an input.
+- Controller and approval scope: P18 with `G1:p18_external_replacement_download_and_reprocessing`; this scope is distinct from the completed P17 GPU matrix.
+- Inputs: three prior verified P18 adult source FASTQs (`SRR18463404`, `SRR18463405`, `SRR18463406`) and one metadata-screened, source-equivalence-attested replacement (`SRR3560831`). The immutable continuation transport manifest is recorded in `alphagenome_custom/metadata/v2/p18_external_continuation_spec.json`.
+- Processing contract: fresh MD5 verification before source reuse; download only the replacement FASTQ; align and generate unstranded, primary-unique, spliced WBcel235 coverage for chromosomes I--V only; normalize each source to total I--V coverage of `1e8`.
+- Resource policy: CPU-only, eight threads, persistent tmux supervision. No model checkpoint, chromosome-X signal, locked-test signal, model selection, model inference, or external performance score is allowed in this phase.
+- Output path: ignored source and coverage artifacts under `shared/source_reads/v2/p18_external_continuation_*` and `alphagenome_custom/tracks/rna_seq_v2_external_p18_continuation/`; immutable execution/review records are written under `alphagenome_custom/metadata/v2/` and `alphagenome_custom/metadata/v2/audits/P18/`.
+- Claim status: preregistered. Completion of this phase establishes only verified external source coverage for a represented broad young-adult target context; a separate frozen scoring contract is required before any external RNA performance claim.
+# P19 external represented-head scoring (authorized 2026-08-23)
+
+- Date: 2026-08-23
+- Purpose: Score four checksum-verified P18 external RNA measurements against the represented `RNA_V2_G0054` output head using the frozen P17 `B_iv_dual` checkpoints.
+- Controller phase: P19; approval scope: `G4:p19_external_represented_head_scoring`.
+- Scope: 60 inference-only jobs, five I-V validation folds, three seeds and four sources; no training, chromosome-X signal or locked-test signal.
+- Inputs: `alphagenome_custom/metadata/v2/p19_external_represented_head_scoring_spec.json`, P17 Model B checkpoints, P16 I-V means, P15 I-V validation intervals and P18 external BigWigs.
+- Output: `results/v2_p19_external_scoring/` and `alphagenome_custom/metadata/v2/p19_external_represented_head_scoring_execution.json`.
+- Claim boundary: represented target identity external measurement benchmark only; not unseen-target, unseen-condition or population-level laboratory generalization until R19 passes.
+- Execution: completed 60/60 jobs on physical GPUs 2/3; R19 PASS at 2026-08-23T06:01:18+00:00. Source-level summary is descriptive and does not support unseen-condition decoding.
+
+## P19 operational correction
+
+- The first launch failed before scientific inference because the controller was invoked with base Python lacking NumPy; its logs and execution record are retained as a failed environment attempt.
+- The retry uses `/home/zelinli6/miniconda3/envs/alphagenome/bin/python` and the identical immutable P19 specification.
+
+# 2026-08-23 - P23 LoRA Sensitivity Pilot
+
+- Run type: registered GPU training/evaluation pilot.
+- Purpose: test rank and target-location sensitivity of the full C. elegans embedding + LoRA model before registering the larger I-V matrix.
+- Controller and approval scope: P23 with `G4:p23_lora_sensitivity`.
+- Host: `hy8`; physical GPUs 2/3 only; one job per GPU policy; chromosome X and locked-test access prohibited.
+- Configurations: `B_rank4_final_block`, `B_rank16_final_block`, and `B_rank8_previous_block`, fold 1, seed `20260714`, paper loss, 2,000 steps, 131,072-bp contexts.
+- Inputs: P15 I-V train/valid interval contract, P16 I-V fold means, existing v2 training/group manifests.
+- Output paths: `runs/v2_p23_lora_sensitivity_pilot/`, `logs/v2_p23_lora_sensitivity_pilot/`, `alphagenome_custom/metadata/v2/p23_lora_sensitivity_execution.json`.
+- Persistent command: `tmux` session `alphagenome-p23-lora`; controller log `logs/v2_p23_controller.log`.
+- Claim status: completed descriptive pilot; this tests local configuration robustness, not a biological mechanism or full hyperparameter robustness.
+
+# 2026-08-24 - P23 Extended Data 5 visualization and manuscript integration
+
+- Run type: figure generation and manuscript update; no new model training.
+- Purpose: visualize all completed P23 rank/location records with the matched P17 fold-1/seed-20260714 reference and integrate the result into the evidence-led manuscript.
+- Backend: Python/matplotlib in the `alphagenome` environment; figure source preflight passed 20/20 checks and the exported PDF text audit found no glyph below 5 pt.
+- Inputs: `results/v2_p23_lora_sensitivity_pilot/p23_lora_sensitivity_pilot.tsv`, P17 controlled records and R23 PASS review.
+- Outputs: `results/v2_p23_manuscript_figure_20260824T003000Z/` and `nature_methods_manuscript/extended_data/ED5_lora_sensitivity/`.
+- Manuscript updates: Results, Discussion, Online Methods, claim-evidence map, Extended Data index, Supplementary Table index and manuscript status.
+- Claim status: completed descriptive single-fold/seed sensitivity context; not a full fold-by-seed matrix.
+
+# 2026-08-24 - P25 Borzoi adapter pilot failure record
+
+- Run type: registered GPU adapter pilot; no valid scientific result produced.
+- Purpose: task-faithful C. elegans adapter feasibility after the P24 source audit.
+- Result: stopped during official trunk weight restoration because the constructed model expected 65 layers while the checkpoint contained 66 saved layers.
+- Claim status: no Borzoi performance result; native human/mouse checkpoint values remain ineligible for direct ranking.
+
+# 2026-08-23 - Official Borzoi Source and Weight Acquisition
+
+- Run type: public source acquisition and model-provenance audit.
+- Purpose: obtain the official Calico Borzoi source and one human checkpoint for conditional task-faithful adapter feasibility.
+- Source: `https://github.com/calico/borzoi`, commit `5c9358222b5026abb733ed5fb84f3f6c77239b37`; source license Apache-2.0.
+- Vendor path: `/home/zelinli6/vendor/borzoi`; model path: `/home/zelinli6/vendor/borzoi_weights/model0_best.h5`.
+- Weight transport: persistent `tmux` session `alphagenome-borzoi-weight`, resumable curl download, expected content length 744,112,468 bytes and ETag `ef83ad59b43765413f73767d87a717df`.
+- Claim boundary: native human/mouse Borzoi is not a direct comparison to the WBcel235 241-head task; a separate C. elegans adapter and I-V-only benchmark are required.
+## 2026-08-23 P25 Borzoi adapter pilot registration
+
+- Purpose: run a bounded, task-faithful C. elegans adapter pilot from the official Borzoi trunk after the P24 source audit.
+- Scope: controller P25, G4:p25_borzoi_adapter_pilot, physical GPU 3, WBcel235, 131,072-bp windows, chromosomes I-V only.
+- Native checkpoint policy: load `/home/zelinli6/vendor/borzoi_weights/model0_best.h5` trunk weights only; native human/mouse output heads are excluded.
+- Target policy: new 241-head C. elegans softplus adapter; native 32-bp output summed to 128-bp bins. No 1-bp claim.
+- Status: preregistered; execution waits for P23/R23 and P24/R24 controller completion.
+- Outputs: `alphagenome_custom/metadata/v2/p25_borzoi_adapter_pilot_execution.json`, `runs/v2_p25_borzoi_adapter_pilot/`, `logs/v2_p25_borzoi_adapter_pilot/`.

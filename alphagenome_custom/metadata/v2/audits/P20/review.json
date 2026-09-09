@@ -1,0 +1,34 @@
+{
+  "checks": [
+    {
+      "check_id": "R20.01_required_outputs",
+      "evidence": "spec and source manifest",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R20.02_source_inventory",
+      "evidence": "keys=['cendr_isotype_vcf', 'eqtl_truth_archive', 'expression_counts']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R20.03_source_hashes",
+      "evidence": "files=3",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R20.04_static_boundary",
+      "evidence": "DOWNLOADED_PENDING_COHORT_SOURCE_EQUIVALENCE_AND_COORDINATE_AUDIT",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R20.05_claim_boundary",
+      "evidence": "independent/eQTL/regulatory claims remain blocked",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P20",
+  "review": "R20 public eQTL source acquisition",
+  "reviewed_at": "2026-08-23T07:15:30+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

@@ -1,0 +1,242 @@
+group_id	source_n_biological_units	assignment_role	selected_unit_id	selection_reason	group_qc_decision	group_qc_flagged_pairs	source_declared_n_biological_units
+RNA_V2_G0001	3	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0002	4	primary_candidate	4	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0003	4	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0004	4	primary_candidate	4	minimum_sha256_ranked_unit	candidate_keep	0	7
+RNA_V2_G0005	4	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0006	4	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0007	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	6
+RNA_V2_G0008	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	6
+RNA_V2_G0009	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	6
+RNA_V2_G0010	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0011	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0012	3	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0013	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep_pending_manual_qc_review	2	4
+RNA_V2_G0014	2	supplementary_candidate	2	minimum_sha256_ranked_unit	candidate_keep_pending_manual_qc_review	4	4
+RNA_V2_G0015	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0016	2	supplementary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0017	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0018	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0019	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0020	2	supplementary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0021	2	supplementary_candidate	4	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0022	2	supplementary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0023	2	supplementary_candidate	4	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0024	2	supplementary_candidate	4	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0025	2	supplementary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0026	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0027	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0028	4	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0029	4	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0030	3	primary_candidate	1	duplicate_source_equivalence_class_forced	candidate_keep	0	3
+RNA_V2_G0031	3	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0032	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0033	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0034	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0035	3	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0036	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0037	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep_pending_manual_qc_review	4	4
+RNA_V2_G0038	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0039	2	supplementary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0040	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0041	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0042	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0043	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0044	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0045	2	supplementary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0046	2	supplementary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	2
+RNA_V2_G0047	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0048	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0049	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0050	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0051	4	primary_candidate	alg-1(AEDH); alg-2(AEDH) mixed embryos experiment 1rep3	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0052	4	primary_candidate	wild type mixed embryos experiment 1rep4	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0053	4	primary_candidate	alg-1(AEDH); alg-2(AEDH) young adult experiment 1rep1	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0054	4	primary_candidate	wild type young adult experiment 1rep1	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0055	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0056	3	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0057	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0058	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0059	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0060	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0061	4	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0062	4	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0063	4	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0064	4	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0065	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	12
+RNA_V2_G0066	3	primary_pending_qc	3	minimum_sha256_ranked_unit	candidate_keep_pending_manual_qc_review	1	9
+RNA_V2_G0067	1	training_only		singleton_no_replicate_holdout	candidate_keep	0	3
+RNA_V2_G0068	2	supplementary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	6
+RNA_V2_G0069	1	training_only		singleton_no_replicate_holdout	candidate_keep	0	3
+RNA_V2_G0070	1	training_only		singleton_no_replicate_holdout	candidate_keep	0	3
+RNA_V2_G0071	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0072	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0073	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0074	3	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0075	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0076	3	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0077	3	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0078	3	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0079	4	primary_candidate	3	minimum_sha256_ranked_unit	candidate_keep	0	4
+RNA_V2_G0080	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0081	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0082	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0083	3	primary_candidate	1	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0084	3	primary_candidate	2	minimum_sha256_ranked_unit	candidate_keep	0	3
+RNA_V2_G0085	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0086	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0087	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0088	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0089	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0090	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0091	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0092	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0093	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0094	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0095	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0096	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0097	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0098	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0099	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0100	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0101	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0102	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0103	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0104	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0105	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0106	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0107	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0108	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0109	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0110	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0111	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0112	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0113	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0114	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0115	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0116	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0117	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0118	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0119	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0120	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0121	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0122	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0123	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0124	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0125	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0126	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0127	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0128	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0129	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0130	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0131	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0132	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0133	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0134	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0135	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0136	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0137	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0138	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0139	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0140	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0141	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0142	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0143	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0144	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0145	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0146	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0147	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0148	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0149	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0150	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0151	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0152	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0153	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0154	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0155	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0156	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0157	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0158	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0159	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0160	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0161	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0162	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0163	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0164	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0165	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0166	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0167	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0168	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0169	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0170	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0171	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0172	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0173	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0174	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0175	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0176	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0177	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0178	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0179	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0180	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0181	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0182	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0183	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0184	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0185	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0186	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0187	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0188	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0189	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0190	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0191	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0192	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0193	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0194	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0195	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0196	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0197	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0198	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0199	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0200	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0201	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0202	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0203	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0204	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0205	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0206	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0207	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0208	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0209	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0210	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0211	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0212	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0213	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0214	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0215	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0216	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0217	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0218	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0219	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0220	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0221	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0222	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0223	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0224	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0225	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0226	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0227	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0228	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0229	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0230	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0231	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0232	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0233	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0234	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0235	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0236	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0237	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0238	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0239	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0240	1	training_only		singleton_no_replicate_holdout	missing		1
+RNA_V2_G0241	3	primary_candidate	1	duplicate_source_equivalence_class_forced	candidate_keep	0	3

@@ -2,9 +2,9 @@
   "approvals": {
     "G1_large_source_download_or_realignment": {
       "approved": true,
-      "note": "User directed full RNA-seq processing rather than a pilot-only endpoint; process all 482 verified RNA-seq runs with streaming cleanup in the existing alphagenome environment.",
-      "scope": "p3_full_rna_streaming_482",
-      "updated_at": "2026-07-13T16:35:12+00:00"
+      "note": "User authorized continued public eQTL source acquisition and later audit/scoring on 2026-08-23; download only the frozen GEO counts, published eQTL archive and CeNDR release, with no model inference, chromosome-X signal read or locked-test access.",
+      "scope": "p20_eqtl_public_source_download_and_audit",
+      "updated_at": "2026-08-23T06:14:21+00:00"
     },
     "G2_v2_manifest_scientific_review": {
       "approved": true,
@@ -14,15 +14,15 @@
     },
     "G3_dataset_or_cache_generation": {
       "approved": true,
-      "note": "User explicitly requires chromosomes I, II, III, IV, V, and X in every train, validation, and final-test partition; authorize manifest-driven six-chromosome block split generation without monolithic NPZ or final-test signal access.",
-      "scope": "p4_six_chromosome_block_split",
-      "updated_at": "2026-07-21T11:49:21+00:00"
+      "note": "User authorized the public dosage-expression association analysis after R21; preserve no X or locked-test access.",
+      "scope": "p22_eqtl_effect_association",
+      "updated_at": "2026-08-23T06:57:29+00:00"
     },
     "G4_gpu_experiments": {
       "approved": true,
-      "note": "Operational retry within the already authorized 15-checkpoint P10 scope after archiving the failed TIFF-QA-only attempt; physical GPUs 2 and 3; fold validation blocks only; final-test access prohibited.",
-      "scope": "p10_dpy27_internal_application",
-      "updated_at": "2026-08-14T01:47:31+00:00"
+      "note": "User-authorized task-faithful Borzoi C. elegans adapter pilot; physical GPU 3; I-V only; no native human/mouse head leaderboard, X or locked-test access.",
+      "scope": "p25_borzoi_adapter_pilot",
+      "updated_at": "2026-08-23T10:02:57+00:00"
     },
     "G5_final_test": {
       "approved": true,
@@ -31,7 +31,7 @@
       "updated_at": "2026-07-23T04:49:53+00:00"
     }
   },
-  "current_phase": "P10",
+  "current_phase": "P25",
   "history": [
     {
       "detail": "Phase command started.",
@@ -1076,10 +1076,658 @@
       "phase": "P10",
       "status": "PASS",
       "timestamp": "2026-08-14T01:51:12+00:00"
+    },
+    {
+      "detail": "User requested a fresh biological-replicate holdout data layer; CPU-only generation and no locked-test access.",
+      "phase": "P11",
+      "status": "PENDING",
+      "timestamp": "2026-08-18T17:59:41+00:00"
+    },
+    {
+      "detail": "scope=p11_replicate_holdout_data; Approved replicate-holdout label generation from the audited member ledger; no locked-test access.",
+      "phase": "P11",
+      "status": "G3_APPROVED",
+      "timestamp": "2026-08-18T17:59:48+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P11",
+      "status": "RUNNING",
+      "timestamp": "2026-08-18T17:59:56+00:00"
+    },
+    {
+      "detail": "Interrupted slow serial means scan before output generation; rerun the same locked P11 contract with the validated parallel CPU means implementation.",
+      "phase": "P11",
+      "status": "REOPENED",
+      "timestamp": "2026-08-18T18:03:34+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P11",
+      "status": "RUNNING",
+      "timestamp": "2026-08-18T18:03:43+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P11",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-18T18:15:43+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P11",
+      "status": "PASS",
+      "timestamp": "2026-08-18T18:15:43+00:00"
+    },
+    {
+      "detail": "Advanced automatically after P11 PASS.",
+      "phase": "P12",
+      "status": "PENDING",
+      "timestamp": "2026-08-18T18:15:43+00:00"
+    },
+    {
+      "detail": "scope=p12_replicate_holdout_matrix; Approved the fresh 165-job replicate-holdout matrix on physical GPUs 2 and 3; all checkpoints are new, validation is fold-only, and final-test access is prohibited.",
+      "phase": "P12",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-18T18:16:24+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P12",
+      "status": "RUNNING",
+      "timestamp": "2026-08-18T18:16:33+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P12",
+      "status": "FAIL",
+      "timestamp": "2026-08-18T18:42:51+00:00"
+    },
+    {
+      "detail": "P12-R1 retry after preserving first heldout serialization failure; evaluator per-track manifest alignment corrected.",
+      "phase": "P12",
+      "status": "REOPENED",
+      "timestamp": "2026-08-18T18:47:01+00:00"
+    },
+    {
+      "detail": "scope=p12_replicate_holdout_matrix; Approved P12-R1 retry after evaluator per-track serialization correction; same fresh 165-job scope, physical GPUs 2 and 3, final-test prohibited.",
+      "phase": "P12",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-18T18:47:01+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P12",
+      "status": "RUNNING",
+      "timestamp": "2026-08-18T18:47:08+00:00"
+    },
+    {
+      "detail": "Resume P12-R1 after external GPU driver interruption; 81 completed records passed output hash validation and 84 incomplete jobs will continue under the same retry spec.",
+      "phase": "P12",
+      "status": "REOPENED",
+      "timestamp": "2026-08-20T10:23:48+00:00"
+    },
+    {
+      "detail": "scope=p12_replicate_holdout_matrix; Approved continuation of P12-R1 after external GPU driver interruption; reuse only 81 hash-validated completed records, run 84 remaining jobs on physical GPUs 2 and 3, final-test prohibited.",
+      "phase": "P12",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-20T10:23:48+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P12",
+      "status": "RUNNING",
+      "timestamp": "2026-08-20T10:23:58+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P12",
+      "status": "FAIL",
+      "timestamp": "2026-08-20T10:23:58+00:00"
+    },
+    {
+      "detail": "GPU visibility diagnosed as Codex sandbox /dev isolation; host-side NVIDIA devices verified and P12-R1 continuation will run outside sandbox using 81 validated records.",
+      "phase": "P12",
+      "status": "REOPENED",
+      "timestamp": "2026-08-20T14:17:36+00:00"
+    },
+    {
+      "detail": "scope=p12_replicate_holdout_matrix; Approved P12-R1 continuation outside the Codex GPU-isolating sandbox; host nvidia-smi verified four idle A100s, reuse 81 validated records, run 84 remaining jobs on physical GPUs 2 and 3, final-test prohibited.",
+      "phase": "P12",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-20T14:17:36+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P12",
+      "status": "RUNNING",
+      "timestamp": "2026-08-20T14:35:54+00:00"
+    },
+    {
+      "detail": "Detached tmux continuation after the prior P12 runner exited; reuse only hash-validated completed records.",
+      "phase": "P12",
+      "status": "REOPENED",
+      "timestamp": "2026-08-20T18:41:13+00:00"
+    },
+    {
+      "detail": "scope=p12_replicate_holdout_matrix; Approved detached tmux continuation of P12-R1; reuse hash-validated completed records, physical GPUs 2 and 3, final-test prohibited.",
+      "phase": "P12",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-20T18:41:13+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P12",
+      "status": "RUNNING",
+      "timestamp": "2026-08-20T18:41:13+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P12",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-21T09:24:59+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P12",
+      "status": "PASS",
+      "timestamp": "2026-08-21T09:24:59+00:00"
+    },
+    {
+      "detail": "User requested I--V-only replicate agreement for manuscript completion; chromosome X, locked-test access, GPU use and model selection are prohibited.",
+      "phase": "P13",
+      "status": "PENDING",
+      "timestamp": "2026-08-22T17:48:04+00:00"
+    },
+    {
+      "detail": "scope=p13_iv_replicate_agreement; User authorized the I-V-only P13 replicate-agreement reference and background manuscript-completion workflow on 2026-08-23; chromosome X and locked test remain prohibited.",
+      "phase": "P13",
+      "status": "G3_APPROVED",
+      "timestamp": "2026-08-22T17:48:04+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P13",
+      "status": "RUNNING",
+      "timestamp": "2026-08-22T17:48:11+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P13",
+      "status": "FAIL",
+      "timestamp": "2026-08-22T17:49:36+00:00"
+    },
+    {
+      "detail": "P13 I-V metric computation completed, but the registered runner failed while rendering a relative output path after all outputs were written. Resume solely to create the execution record and run R13; do not reread BigWigs or recompute metrics.",
+      "phase": "P13",
+      "status": "REOPENED",
+      "timestamp": "2026-08-22T17:51:32+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P13",
+      "status": "RUNNING",
+      "timestamp": "2026-08-22T17:51:33+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P13",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-22T17:51:33+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P13",
+      "status": "PASS",
+      "timestamp": "2026-08-22T17:51:33+00:00"
+    },
+    {
+      "detail": "User authorized frozen P12 Model B inference on the P13 I--V-only held-out contract; GPU 2/3 only, no training, chromosome-X or locked-test access.",
+      "phase": "P14",
+      "status": "PENDING",
+      "timestamp": "2026-08-22T18:01:27+00:00"
+    },
+    {
+      "detail": "scope=p14_iv_frozen_model_reference; User authorized the continuing background manuscript-completion workflow on 2026-08-23: frozen P12 Model B inference on P13 I-V-only held-out cores, physical GPUs 2/3 only, no training, chromosome X or locked-test access.",
+      "phase": "P14",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-22T18:01:58+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P14",
+      "status": "RUNNING",
+      "timestamp": "2026-08-22T18:02:06+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P14",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-22T18:12:18+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P14",
+      "status": "PASS",
+      "timestamp": "2026-08-22T18:12:18+00:00"
+    },
+    {
+      "detail": "User authorized an I--V-only train/validation contract before new ablations or public-baseline training; no signal, checkpoint or GPU access.",
+      "phase": "P15",
+      "status": "PENDING",
+      "timestamp": "2026-08-22T18:28:06+00:00"
+    },
+    {
+      "detail": "scope=p15_iv_training_interval_contract; User authorized the continuing background manuscript-completion workflow on 2026-08-23; create only I-V train/validation interval contracts before any new ablation or public-baseline training, with chromosome X and locked test prohibited.",
+      "phase": "P15",
+      "status": "G3_APPROVED",
+      "timestamp": "2026-08-22T18:28:06+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P15",
+      "status": "RUNNING",
+      "timestamp": "2026-08-22T18:28:06+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P15",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-22T18:28:06+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P15",
+      "status": "PASS",
+      "timestamp": "2026-08-22T18:28:06+00:00"
+    },
+    {
+      "detail": "User authorized strict I--V fold-normalization means before new ablations or public-baseline training; CPU-only with chromosome X and locked test prohibited.",
+      "phase": "P16",
+      "status": "PENDING",
+      "timestamp": "2026-08-22T18:36:51+00:00"
+    },
+    {
+      "detail": "scope=p16_iv_training_normalization; User authorized the continuing background manuscript-completion workflow on 2026-08-23; recompute strict I-V-only fold normalization from training aggregates before P17 ablation or public-baseline training, with chromosome X and locked test prohibited.",
+      "phase": "P16",
+      "status": "G3_APPROVED",
+      "timestamp": "2026-08-22T18:36:51+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P16",
+      "status": "RUNNING",
+      "timestamp": "2026-08-22T18:36:52+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P16",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-22T18:46:58+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P16",
+      "status": "PASS",
+      "timestamp": "2026-08-22T18:46:58+00:00"
+    },
+    {
+      "detail": "User authorized a minimal 45-job strict I--V controlled matrix: retrained full Model B, 128-bp-only Model B and a Basenji2-style from-scratch public-architecture baseline; GPU 2/3 only with chromosome-X and locked-test access prohibited.",
+      "phase": "P17",
+      "status": "PENDING",
+      "timestamp": "2026-08-22T18:48:07+00:00"
+    },
+    {
+      "detail": "scope=p17_iv_controlled_ablation_and_basenji2; User authorized the continuing background manuscript-completion workflow on 2026-08-23; run only the preregistered 45-job strict I-V B, B-128bp-only and Basenji2-style matrix on physical GPUs 2/3, with chromosome X and locked test prohibited.",
+      "phase": "P17",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-22T18:48:14+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P17",
+      "status": "RUNNING",
+      "timestamp": "2026-08-22T18:48:20+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P17",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-23T02:39:31+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P17",
+      "status": "PASS",
+      "timestamp": "2026-08-23T02:39:31+00:00"
+    },
+    {
+      "detail": "User directed continuation after P17: checksum-verified replacement external RNA transfer and I-V-only reprocessing; model inference, chromosome X and locked test remain prohibited.",
+      "phase": "P18",
+      "status": "PENDING",
+      "timestamp": "2026-08-23T03:10:59+00:00"
+    },
+    {
+      "detail": "scope=p18_external_replacement_download_and_reprocessing; User directed continued background external RNA work on 2026-08-23; download only the preregistered replacement source and uniformly reprocess the frozen four-source P18 continuation on chromosomes I-V, with model inference, chromosome X and locked test prohibited.",
+      "phase": "P18",
+      "status": "G1_APPROVED",
+      "timestamp": "2026-08-23T03:11:25+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P18",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T03:11:31+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P18",
+      "status": "FAIL",
+      "timestamp": "2026-08-23T04:01:05+00:00"
+    },
+    {
+      "detail": "Operational retry after preserving the failed controller log and four checksum-verified FASTQs: add the missing samtools index step before region-restricted I-V BAM extraction; source set, manifest hashes, represented head, normalization, chromosome-X prohibition and no-model-inference boundary remain unchanged.",
+      "phase": "P18",
+      "status": "REOPENED",
+      "timestamp": "2026-08-23T05:22:57+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P18",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T05:22:57+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P18",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-23T05:39:12+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P18",
+      "status": "PASS",
+      "timestamp": "2026-08-23T05:39:12+00:00"
+    },
+    {
+      "detail": "User authorized external represented-head inference on checksum-verified P18 RNA tracks using frozen P17 Model B I--V checkpoints; no training, chromosome-X or locked-test signal access is allowed.",
+      "phase": "P19",
+      "status": "PENDING",
+      "timestamp": "2026-08-23T05:49:02+00:00"
+    },
+    {
+      "detail": "scope=p19_external_represented_head_scoring; User explicitly authorized full external represented-head model inference after P18/R18; inference-only, I-V-only, no X or locked-test reads.",
+      "phase": "P19",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-23T05:49:02+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P19",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T05:49:19+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P19",
+      "status": "FAIL",
+      "timestamp": "2026-08-23T05:49:20+00:00"
+    },
+    {
+      "detail": "Operational retry: the first P19 launch used base Python without scientific dependencies; preserve the failed logs and restart the identical preregistered 60-job inference contract under the validated alphagenome environment.",
+      "phase": "P19",
+      "status": "REOPENED",
+      "timestamp": "2026-08-23T05:50:01+00:00"
+    },
+    {
+      "detail": "scope=p19_external_represented_head_scoring; Operational retry within the same user-authorized P19 inference scope using the validated alphagenome environment; no training, X or locked-test reads.",
+      "phase": "P19",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-23T05:50:01+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P19",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T05:50:08+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P19",
+      "status": "FAIL",
+      "timestamp": "2026-08-23T05:50:09+00:00"
+    },
+    {
+      "detail": "Preserve the failed base-Python execution artifact and retry the identical P19 contract with the validated alphagenome environment after removing only the canonical failed execution filename.",
+      "phase": "P19",
+      "status": "REOPENED",
+      "timestamp": "2026-08-23T05:50:42+00:00"
+    },
+    {
+      "detail": "scope=p19_external_represented_head_scoring; Retry same P19 scope under validated alphagenome environment; scientific task set unchanged.",
+      "phase": "P19",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-23T05:50:42+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P19",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T05:50:42+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P19",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-23T06:01:17+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P19",
+      "status": "PASS",
+      "timestamp": "2026-08-23T06:01:18+00:00"
+    },
+    {
+      "detail": "User authorized public eQTL source acquisition: download the prespecified GEO expression matrix, published eQTL truth archive and CeNDR release; no model inference, chromosome-X or locked-test access is allowed.",
+      "phase": "P20",
+      "status": "PENDING",
+      "timestamp": "2026-08-23T06:14:21+00:00"
+    },
+    {
+      "detail": "scope=p20_eqtl_public_source_download_and_audit; User authorized continued public eQTL source acquisition and later audit/scoring on 2026-08-23; download only the frozen GEO counts, published eQTL archive and CeNDR release, with no model inference, chromosome-X signal read or locked-test access.",
+      "phase": "P20",
+      "status": "G1_APPROVED",
+      "timestamp": "2026-08-23T06:14:21+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P20",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T06:14:27+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P20",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-23T06:22:17+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P20",
+      "status": "PASS",
+      "timestamp": "2026-08-23T06:22:30+00:00"
+    },
+    {
+      "detail": "User authorized external I--V eQTL candidate scoring with the frozen P17 Model B checkpoint matrix; no training, chromosome-X signal or locked-test access is allowed.",
+      "phase": "P21",
+      "status": "PENDING",
+      "timestamp": "2026-08-23T06:31:39+00:00"
+    },
+    {
+      "detail": "scope=p21_eqtl_variant_scoring; User authorized frozen P17 Model B variant scoring on the audited public eQTL candidate set; I-V only, no X or locked-test reads.",
+      "phase": "P21",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-23T06:31:39+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P21",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T06:31:57+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P21",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-23T06:55:20+00:00"
+    },
+    {
+      "detail": "Phase review exited with code 1.",
+      "phase": "P21",
+      "status": "FAIL",
+      "timestamp": "2026-08-23T06:55:21+00:00"
+    },
+    {
+      "detail": "R21 review-only correction: use the existing P20 variant manifest candidate fields and I--V scope; do not rerun immutable 15-job scoring.",
+      "phase": "P21",
+      "status": "REOPENED",
+      "timestamp": "2026-08-23T06:57:02+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P21",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T06:57:02+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P21",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-23T06:57:02+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P21",
+      "status": "PASS",
+      "timestamp": "2026-08-23T06:57:02+00:00"
+    },
+    {
+      "detail": "User authorized public wild-strain dosage-expression association analysis against frozen P21 represented-head variant effects; no X or locked-test access.",
+      "phase": "P22",
+      "status": "PENDING",
+      "timestamp": "2026-08-23T06:57:29+00:00"
+    },
+    {
+      "detail": "scope=p22_eqtl_effect_association; User authorized the public dosage-expression association analysis after R21; preserve no X or locked-test access.",
+      "phase": "P22",
+      "status": "G3_APPROVED",
+      "timestamp": "2026-08-23T06:57:29+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P22",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T06:57:29+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P22",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-23T06:58:42+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P22",
+      "status": "PASS",
+      "timestamp": "2026-08-23T06:58:42+00:00"
+    },
+    {
+      "detail": "User authorized I-V-only LoRA rank/location sensitivity; physical GPUs 2/3 only, chromosome X and locked-test access prohibited.",
+      "phase": "P23",
+      "status": "PENDING",
+      "timestamp": "2026-08-23T08:42:20+00:00"
+    },
+    {
+      "detail": "scope=p23_lora_sensitivity; User authorized I-V-only LoRA rank/location sensitivity pilot and subsequent registered matrix; use physical GPUs 2/3 only, preserve chromosome-X and locked-test embargo.",
+      "phase": "P23",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-23T08:42:21+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P23",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T08:42:45+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P23",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-23T10:02:32+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P23",
+      "status": "PASS",
+      "timestamp": "2026-08-23T10:02:33+00:00"
+    },
+    {
+      "detail": "User authorized the official Borzoi feasibility audit and conditional I-V-only adapter; no native human/mouse checkpoint leaderboard, chromosome X or locked-test access.",
+      "phase": "P24",
+      "status": "PENDING",
+      "timestamp": "2026-08-23T10:02:56+00:00"
+    },
+    {
+      "detail": "scope=p24_borzoi_adapter; User-authorized official Borzoi source feasibility audit; native human/mouse heads excluded; physical GPUs 2/3 only; no X or locked-test access.",
+      "phase": "P24",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-23T10:02:57+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P24",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T10:02:57+00:00"
+    },
+    {
+      "detail": "Phase review started.",
+      "phase": "P24",
+      "status": "REVIEWING",
+      "timestamp": "2026-08-23T10:02:57+00:00"
+    },
+    {
+      "detail": "All phase review checks passed.",
+      "phase": "P24",
+      "status": "PASS",
+      "timestamp": "2026-08-23T10:02:57+00:00"
+    },
+    {
+      "detail": "User authorized the I-V-only task-faithful Borzoi C. elegans adapter pilot; native human/mouse heads, chromosome X and locked-test access remain prohibited.",
+      "phase": "P25",
+      "status": "PENDING",
+      "timestamp": "2026-08-23T10:02:57+00:00"
+    },
+    {
+      "detail": "scope=p25_borzoi_adapter_pilot; User-authorized task-faithful Borzoi C. elegans adapter pilot; physical GPU 3; I-V only; no native human/mouse head leaderboard, X or locked-test access.",
+      "phase": "P25",
+      "status": "G4_APPROVED",
+      "timestamp": "2026-08-23T10:02:57+00:00"
+    },
+    {
+      "detail": "Phase command started.",
+      "phase": "P25",
+      "status": "RUNNING",
+      "timestamp": "2026-08-23T10:02:58+00:00"
+    },
+    {
+      "detail": "Phase command exited with code 1.",
+      "phase": "P25",
+      "status": "FAIL",
+      "timestamp": "2026-08-23T10:03:03+00:00"
     }
   ],
   "schema_version": 2,
-  "status": "COMPLETE",
-  "updated_at": "2026-08-14T01:51:12+00:00",
+  "status": "FAIL",
+  "updated_at": "2026-08-23T10:03:03+00:00",
   "workflow": "c_elegans_rna_seq_v2"
 }

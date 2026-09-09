@@ -1,0 +1,54 @@
+{
+  "checks": [
+    {
+      "check_id": "R12.01_required_outputs",
+      "evidence": "all P12 outputs present",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R12.02_static_contract",
+      "evidence": "phase/P12 task contract",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R12.03_job_count",
+      "evidence": "execution=165 records=165",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R12.04_metric_rows",
+      "evidence": "metric_rows=3630",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R12.05_role_metrics",
+      "evidence": "role_metric_rows=79200",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R12.06_paired_analysis",
+      "evidence": "paired effect tables present",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R12.07_configuration_counts",
+      "evidence": "summary_rows=13",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R12.08_locked_test",
+      "evidence": "0",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R12.09_physical_gpus",
+      "evidence": "[2, 3]",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P12",
+  "review": "R12-replicate-holdout-matrix",
+  "reviewed_at": "2026-08-21T09:24:59+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

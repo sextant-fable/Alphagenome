@@ -1,0 +1,19 @@
+{
+  "contract": "replicate_holdout_v1",
+  "development_block_count": 30,
+  "fold_mean_policy": "nonzero_mean_on_replicate_holdout_training_labels_and_registered_train_blocks_only",
+  "fold_train_block_counts": {
+    "1": 24,
+    "2": 24,
+    "3": 24,
+    "4": 24,
+    "5": 24
+  },
+  "interval_dir": "alphagenome_custom/intervals/v2",
+  "locked_test_block_signal_reads": 0,
+  "output_sha256": "db0fb21ffacdd8e73780c79e867057a3d40a636ddbffa6ea64c4c188805a4180",
+  "schema_version": 1,
+  "track_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/training_track_manifest.tsv",
+  "track_manifest_sha256": "52605d07d1f52615fb82382f54fb892932ff48a6f42023a1ee452c5ed8a1d1a4",
+  "tracks": 241
+}

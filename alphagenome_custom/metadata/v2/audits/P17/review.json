@@ -1,0 +1,34 @@
+{
+  "checks": [
+    {
+      "check_id": "R17.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R17.02_static_contract",
+      "evidence": "configs=['B_128bp_only', 'B_iv_dual', 'Basenji2_style']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R17.03_execution_contract",
+      "evidence": "completed=45",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R17.04_complete_i_to_v_records",
+      "evidence": "records=45",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R17.05_fold_and_paired_summaries",
+      "evidence": "by_fold=15 paired=10",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P17",
+  "review": "R17 strict I--V controlled matrix",
+  "reviewed_at": "2026-08-23T02:39:31+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

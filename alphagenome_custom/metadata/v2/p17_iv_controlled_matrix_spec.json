@@ -1,0 +1,206 @@
+{
+  "allowed_chromosomes": [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V"
+  ],
+  "claim_boundary": [
+    "This is within-collection biological-unit holdout evaluation, not an external, study-isolated, laboratory-isolated or unseen-condition benchmark.",
+    "No chromosome-X or locked-test signal may be read.",
+    "The Basenji2-style configuration is a task-matched from-scratch public-architecture baseline, not a native Basenji human/mouse checkpoint comparison.",
+    "The 128-bp-only configuration derives 1-bp values by uniform expansion solely to retain a common metric interface; it does not demonstrate base-resolution utility."
+  ],
+  "created_at": "2026-08-22T18:48:00+00:00",
+  "evaluation": {
+    "group_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_group_manifest.tsv",
+    "metric": "frozen primary score = 0.5 * gene-exon Pearson(log1p) + 0.5 * 128-bp Pearson(log1p)",
+    "prediction_track_indices": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_indices.tsv",
+    "track_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_manifest.tsv"
+  },
+  "final_test_access": "prohibited",
+  "gpu_policy": {
+    "allowed_physical_indices": [
+      2,
+      3
+    ],
+    "maximum_concurrent_jobs_per_gpu": 1,
+    "minimum_free_mib": 70000
+  },
+  "matrix": {
+    "configurations": [
+      {
+        "gene_weight": 0.1,
+        "id": "B_iv_dual",
+        "interpretation": "Strict I--V retrained full Model B control.",
+        "loss": "paper",
+        "loss_128bp_weight": 1.0,
+        "loss_1bp_weight": 1.0,
+        "model": "B"
+      },
+      {
+        "gene_weight": 0.0,
+        "id": "B_128bp_only",
+        "interpretation": "128-bp-only Model B; derived 1-bp output is metric compatibility only.",
+        "loss": "paper",
+        "loss_128bp_weight": 1.0,
+        "loss_1bp_weight": 0.0,
+        "model": "B_128bp_head_only"
+      },
+      {
+        "gene_weight": 0.0,
+        "id": "Basenji2_style",
+        "implementation_reference": "Calico Basenji repository commit 06ce5d387e20b47184d05433b3983163c5f923cd; architectural reference only.",
+        "interpretation": "Task-matched from-scratch public-architecture baseline.",
+        "loss": "paper",
+        "loss_128bp_weight": 1.0,
+        "loss_1bp_weight": 0.0,
+        "model": "Basenji2_style"
+      }
+    ],
+    "folds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "seeds": [
+      20260714,
+      20260715,
+      20260716
+    ],
+    "total_jobs": 45
+  },
+  "phase": "P17",
+  "purpose": "Minimal fair I--V-only controlled matrix for dual-resolution utility and a public Basenji2-style architecture baseline.",
+  "schema_version": 1,
+  "source": {
+    "heldout_group_manifest": {
+      "path": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_group_manifest.tsv",
+      "sha256": "3105b3af99115206611127abe0a500336f183a642ce808b6a0ed98ae83954ad7"
+    },
+    "heldout_track_indices": {
+      "path": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_indices.tsv",
+      "sha256": "d6efec5788ad204e54eb54dcad65055bdb76e8d3122ff2e28746f3f8c8abc01f"
+    },
+    "heldout_track_manifest": {
+      "path": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_manifest.tsv",
+      "sha256": "c5e73d6a96c1f4f2dffd5f960701fdd03a61f9762dae30d2fcbeb12096b423d3"
+    },
+    "intervals": [
+      {
+        "fold": 1,
+        "path": "results/v2_p15_iv_training_interval_contract/intervals/fold_1/train.tsv",
+        "role": "train",
+        "sha256": "1fdf85fdf1927c6c8c9f636630bc850fabc242ff464b07dec1a4228e67233ad2"
+      },
+      {
+        "fold": 1,
+        "path": "results/v2_p15_iv_training_interval_contract/intervals/fold_1/valid.tsv",
+        "role": "valid",
+        "sha256": "0fc5b0dafbb07a714b34755d55161efec91839285b3d27d63ce6e6ed5cce6036"
+      },
+      {
+        "fold": 2,
+        "path": "results/v2_p15_iv_training_interval_contract/intervals/fold_2/train.tsv",
+        "role": "train",
+        "sha256": "722aa7a8be578c92da7709ab9c751e6d8ef26ee76b202d89a633566e00f331b6"
+      },
+      {
+        "fold": 2,
+        "path": "results/v2_p15_iv_training_interval_contract/intervals/fold_2/valid.tsv",
+        "role": "valid",
+        "sha256": "44a8db2316db9142bbab9b6085b16b86fcec8033d5b289dae8710997e36faf77"
+      },
+      {
+        "fold": 3,
+        "path": "results/v2_p15_iv_training_interval_contract/intervals/fold_3/train.tsv",
+        "role": "train",
+        "sha256": "6fe305effecba0186d2cfdbf67390d5e83a9effb2c504abc9bb11164b70f3b49"
+      },
+      {
+        "fold": 3,
+        "path": "results/v2_p15_iv_training_interval_contract/intervals/fold_3/valid.tsv",
+        "role": "valid",
+        "sha256": "01a69afcf6134282fb945ea2362d126e305a8ee0a4832cc925ad4429b3529e66"
+      },
+      {
+        "fold": 4,
+        "path": "results/v2_p15_iv_training_interval_contract/intervals/fold_4/train.tsv",
+        "role": "train",
+        "sha256": "99494cd5a127b4e38ee26505181f7238712bf94a11eb853ee462b0d504cd0af5"
+      },
+      {
+        "fold": 4,
+        "path": "results/v2_p15_iv_training_interval_contract/intervals/fold_4/valid.tsv",
+        "role": "valid",
+        "sha256": "1103262f7a7ce544002d69d7f180b072a616263ad1b4d8489b300d93e39bb87e"
+      },
+      {
+        "fold": 5,
+        "path": "results/v2_p15_iv_training_interval_contract/intervals/fold_5/train.tsv",
+        "role": "train",
+        "sha256": "54e339cfc0b646842ac0b81bc56ee6acc24c6e7338e8f410b069b26f1449359c"
+      },
+      {
+        "fold": 5,
+        "path": "results/v2_p15_iv_training_interval_contract/intervals/fold_5/valid.tsv",
+        "role": "valid",
+        "sha256": "b4e59e58e583243860df44c8a23d2850c82c12e7f1649bc579f1262dbe0752b6"
+      }
+    ],
+    "p15_contract": {
+      "path": "results/v2_p15_iv_training_interval_contract/p15_iv_training_interval_contract.json",
+      "sha256": "029539142b60329121072dd40a4298f5b2e5d8c42bb921da3e1e6798f49b9aed"
+    },
+    "p15_execution": {
+      "path": "alphagenome_custom/metadata/v2/p15_iv_training_contract_execution.json",
+      "sha256": "504f1c6d52d221cd236537d9efb950fa5f3c28c4b04b9a9ae37e3c8d02cce6de"
+    },
+    "p15_review": {
+      "path": "alphagenome_custom/metadata/v2/audits/P15/review.json",
+      "sha256": "7d03567076e5393f4681362996861510cd6d4573f0207d830ba315f665030a61"
+    },
+    "p16_execution": {
+      "path": "alphagenome_custom/metadata/v2/p16_iv_training_normalization_execution.json",
+      "sha256": "d79eccad469bac53d0b3fdadcc27845b36637be94784ae7cd57c3ec825103d05"
+    },
+    "p16_means": {
+      "path": "results/v2_p16_iv_training_normalization/track_nonzero_means.tsv",
+      "sha256": "79e1ccd433005e9fb557741eb3990a61c9bfada984abe516d4d5a0cf8278741e"
+    },
+    "p16_review": {
+      "path": "alphagenome_custom/metadata/v2/audits/P16/review.json",
+      "sha256": "beefdd576221eeb9101f67589e8ccf0a93bf941f73e10ed43d7b1dd3c29a34d1"
+    },
+    "p16_spec": {
+      "path": "alphagenome_custom/metadata/v2/p16_iv_training_normalization_spec.json",
+      "sha256": "cd49d20c9f2929950d79ba13254b1647051cbb47e96debc6fa7eac7cbb3e7507"
+    },
+    "p16_summary": {
+      "path": "results/v2_p16_iv_training_normalization/track_nonzero_means_summary.json",
+      "sha256": "e55a06ec2aaed630d8936a89e67da6a2944160a13163921efea6119bc0f5e2e2"
+    },
+    "training_group_manifest": {
+      "path": "alphagenome_custom/metadata/v2/replicate_holdout_v1/training_group_manifest.tsv",
+      "sha256": "7e26ad6846f37d51b65daf772a253f46a597db1c09369e9d0727e04f321f03f0"
+    },
+    "training_track_manifest": {
+      "path": "alphagenome_custom/metadata/v2/replicate_holdout_v1/training_track_manifest.tsv",
+      "sha256": "52605d07d1f52615fb82382f54fb892932ff48a6f42023a1ee452c5ed8a1d1a4"
+    }
+  },
+  "status": "preregistered",
+  "training": {
+    "hidden_channels": 64,
+    "learning_rate": 0.0001,
+    "max_shift_bp": 1024,
+    "max_steps": 2000,
+    "means_path": "results/v2_p16_iv_training_normalization/track_nonzero_means.tsv",
+    "reverse_complement_probability": 0.5,
+    "sequence_length": 131072,
+    "weight_decay": 0.0001
+  }
+}

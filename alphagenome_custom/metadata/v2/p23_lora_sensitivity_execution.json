@@ -1,0 +1,155 @@
+{
+  "allowed_chromosomes": [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V"
+  ],
+  "completed_at": "2026-08-23T10:02:32Z",
+  "controller_invocation": "python -m scripts.v2_phase_controller run --phase P23",
+  "failures": [],
+  "final_test_access": "prohibited",
+  "gpu_wait_snapshots": [
+    {
+      "commands": [
+        [
+          "nvidia-smi",
+          "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+          "--format=csv,noheader,nounits"
+        ],
+        [
+          "nvidia-smi",
+          "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+          "--format=csv,noheader,nounits"
+        ]
+      ],
+      "gpus": [
+        {
+          "index": 0,
+          "memory_free_mib": 1007,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 80147,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+        },
+        {
+          "index": 1,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+        },
+        {
+          "index": 2,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+        },
+        {
+          "index": 3,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+        }
+      ],
+      "observed_at": "2026-08-23T08:42:45+00:00",
+      "processes": [
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 2103240,
+          "process_name": "VLLM::EngineCore",
+          "used_memory_mib": 70588
+        },
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 769215,
+          "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+          "used_memory_mib": 9544
+        }
+      ]
+    }
+  ],
+  "hostname": "hy8",
+  "jobs": [
+    {
+      "checkpoint_path": "runs/v2_p23_lora_sensitivity_pilot/B_rank4_final_block/seed_20260714/fold_1/checkpoint.pt",
+      "checkpoint_sha256": "95c6ce9bb751f378c49a75899751c2b10b50f5ed3483054311d5dd0e29c2ed1c",
+      "configuration": "B_rank4_final_block",
+      "elapsed_seconds": 1609.150717318058,
+      "evaluated_chromosomes": "I,II,III,IV,V",
+      "evaluation_path": "results/v2_p23_lora_sensitivity_pilot/evaluations/B_rank4_final_block/seed_20260714/fold_1.json",
+      "evaluation_sha256": "c932d927ac2ad866f64dadc31fc1f46d4c16f8e7644ac73812d8ecd3fffba81c",
+      "fold": 1,
+      "gene_exon_coverage_pearson_log1p": 0.5822639432480511,
+      "locked_test_block_signal_reads": false,
+      "per_track_pearson_128bp_log1p": 0.6476008295377131,
+      "physical_gpu": 2,
+      "primary_biological_score": 0.6149323863928822,
+      "run_sha256": "3e0deff10af871e26786f6ca8d764b9d141e350de69c4f5e76f06f77133f0225",
+      "seed": 20260714,
+      "trainable_parameters": 1203268
+    },
+    {
+      "checkpoint_path": "runs/v2_p23_lora_sensitivity_pilot/B_rank16_final_block/seed_20260714/fold_1/checkpoint.pt",
+      "checkpoint_sha256": "2b1f3fc4888789aaebde51f5943543b3f3bf72ef87101ca9429b7ec742006885",
+      "configuration": "B_rank16_final_block",
+      "elapsed_seconds": 1595.554995527491,
+      "evaluated_chromosomes": "I,II,III,IV,V",
+      "evaluation_path": "results/v2_p23_lora_sensitivity_pilot/evaluations/B_rank16_final_block/seed_20260714/fold_1.json",
+      "evaluation_sha256": "b2b543337c7ff5491a2ce35adfd5c94f119d44597838b5f62de681b3fd8ed039",
+      "fold": 1,
+      "gene_exon_coverage_pearson_log1p": 0.5875125150535768,
+      "locked_test_block_signal_reads": false,
+      "per_track_pearson_128bp_log1p": 0.6501299680091515,
+      "physical_gpu": 3,
+      "primary_biological_score": 0.6188212415313641,
+      "run_sha256": "2875f6ffc8f16aa329c7d00ff48539ace682b2fe4d63d9736a4c1a9a546e04d1",
+      "seed": 20260714,
+      "trainable_parameters": 1422148
+    },
+    {
+      "checkpoint_path": "runs/v2_p23_lora_sensitivity_pilot/B_rank8_previous_block/seed_20260714/fold_1/checkpoint.pt",
+      "checkpoint_sha256": "8da76130f587a90e6380c185ba66f2f2d476343dbe3b0dd911c9bd4d24c232ec",
+      "configuration": "B_rank8_previous_block",
+      "elapsed_seconds": 1582.9965764135122,
+      "evaluated_chromosomes": "I,II,III,IV,V",
+      "evaluation_path": "results/v2_p23_lora_sensitivity_pilot/evaluations/B_rank8_previous_block/seed_20260714/fold_1.json",
+      "evaluation_sha256": "33e1aef76a803c44932c9ce212d432917633731f77aefdb79a59d8e5d868a7f5",
+      "fold": 1,
+      "gene_exon_coverage_pearson_log1p": 0.5836291410051089,
+      "locked_test_block_signal_reads": false,
+      "per_track_pearson_128bp_log1p": 0.6492598015722129,
+      "physical_gpu": 2,
+      "primary_biological_score": 0.6164444712886609,
+      "run_sha256": "63d01a9867ccda21f7943ad9d157209852cfe49444dffa403bb9e5310684b337",
+      "seed": 20260714,
+      "trainable_parameters": 1276228
+    }
+  ],
+  "locked_test_block_signal_reads": 0,
+  "phase": "P23",
+  "records_sha256": "b18e9a0487589ab484de37a4610fc08fd5bb2d9b53ea51047b28a8c3208730d2",
+  "registered_phase_command": "python -m scripts.run_v2_p23_lora_sensitivity",
+  "registered_tasks": 3,
+  "registered_tasks_completed": 3,
+  "schema_version": 1,
+  "selected_physical_gpus": [
+    2,
+    3
+  ],
+  "spec_path": "alphagenome_custom/metadata/v2/p23_lora_sensitivity_spec.json",
+  "spec_sha256": "47e2f585a59aa6e6443de44c7d651d028b9afb4850db0fb8e4928f188d09b2c6",
+  "started_at": "2026-08-23T08:42:45Z",
+  "status": "completed",
+  "working_directory": "/home/zelinli6/Alphagenome"
+}

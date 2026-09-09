@@ -1,0 +1,44 @@
+{
+  "analysis_audit": "results/v2_p13_replicate_agreement_iv/p13_replicate_agreement_audit.json",
+  "analysis_audit_sha256": "15a2e3f8d6c9e2bbbb58304601e4882b34c897830cddc2bab9bf92c1edc84138",
+  "commands": [
+    [
+      "/home/zelinli6/miniconda3/envs/alphagenome/bin/python3.12",
+      "-m",
+      "scripts.prepare_v2_p13_iv_intervals",
+      "--output-dir",
+      "results/v2_p13_iv_interval_contract"
+    ],
+    [
+      "/home/zelinli6/miniconda3/envs/alphagenome/bin/python3.12",
+      "-m",
+      "scripts.analyze_v2_p13_replicate_agreement",
+      "--interval-root",
+      "results/v2_p13_iv_interval_contract/intervals",
+      "--output-dir",
+      "results/v2_p13_replicate_agreement_iv",
+      "--max-io-workers",
+      "4"
+    ]
+  ],
+  "contract": "results/v2_p13_iv_interval_contract/p13_iv_interval_contract.json",
+  "contract_sha256": "385191ade2a9fa6919b8d7d5006c50babc2e580855e0ecabb525bd73bcd2a533",
+  "controller_invocation": "python -m scripts.v2_phase_controller run --phase P13",
+  "git_commit": "3233144d5c02f9355bd9bc6b64a3ac9769629ac1",
+  "output_sha256": {
+    "results/v2_p13_iv_interval_contract/p13_iv_interval_contract.json": "385191ade2a9fa6919b8d7d5006c50babc2e580855e0ecabb525bd73bcd2a533",
+    "results/v2_p13_replicate_agreement_iv/p13_replicate_agreement_audit.json": "15a2e3f8d6c9e2bbbb58304601e4882b34c897830cddc2bab9bf92c1edc84138",
+    "results/v2_p13_replicate_agreement_iv/p13_replicate_agreement_by_fold.tsv": "7337ec0235849ceb166e13fbc0de41c9b997b851717b90e3b600dce47e5ea492",
+    "results/v2_p13_replicate_agreement_iv/p13_replicate_agreement_per_group.tsv": "6d967df13043a40c855026a34099649abbd835c01618b2eb719244f5c40c4276",
+    "results/v2_p13_replicate_agreement_iv/p13_replicate_agreement_summary.tsv": "d3fae474bc265a18a7cb1ce628c57f4f44ae160fca75b7b2d325b376e578f696"
+  },
+  "phase": "P13",
+  "python_executable": "/home/zelinli6/miniconda3/envs/alphagenome/bin/python3.12",
+  "registered_phase_command": "python -m scripts.run_v2_p13_submission_evidence",
+  "resource_contract": "CPU-only BigWig reads; no GPU, checkpoint, training, chromosome-X or locked-test access",
+  "resume_policy": "The registered execution may reuse a complete immutable interval contract and complete analysis artifacts only after a post-processing/provenance failure; no BigWig reread or metric recomputation occurs during resume.",
+  "schema_version": 1,
+  "started_and_completed_at": "2026-08-22T17:51:33+00:00",
+  "status": "completed",
+  "working_directory": "/home/zelinli6/Alphagenome"
+}

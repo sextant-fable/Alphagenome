@@ -1,0 +1,34 @@
+{
+  "checks": [
+    {
+      "check_id": "R23.01_required_outputs",
+      "evidence": "spec, execution and pilot table",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R23.02_static_scope",
+      "evidence": "I-V-only pilot contract",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R23.03_execution_contract",
+      "evidence": "completed=3 gpus=[2, 3]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R23.04_complete_pilot_rows",
+      "evidence": "rows=3 configurations=['B_rank16_final_block', 'B_rank4_final_block', 'B_rank8_previous_block']",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R23.05_finite_metrics",
+      "evidence": "pilot metrics are finite",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P23",
+  "review": "R23 LoRA sensitivity pilot",
+  "reviewed_at": "2026-08-23T10:02:33+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

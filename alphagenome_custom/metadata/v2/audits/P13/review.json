@@ -1,0 +1,39 @@
+{
+  "checks": [
+    {
+      "check_id": "R13.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R13.02_execution_contract",
+      "evidence": "CPU-only BigWig reads; no GPU, checkpoint, training, chromosome-X or locked-test access",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R13.03_i_to_v_boundary",
+      "evidence": "folds=5",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R13.04_group_coverage",
+      "evidence": "per_group_rows=285",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R13.05_summary_coverage",
+      "evidence": "by_fold=5 summary=3",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R13.06_analysis_audit",
+      "evidence": "['No checkpoint was loaded.', 'No GPU was used.', 'No training or data generation was performed.', 'No locked final-test intervals or signals were opened.']",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P13",
+  "review": "R13 I--V replicate-agreement reference",
+  "reviewed_at": "2026-08-22T18:27:56+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "contract": "p20_eqtl_public_source_download_v1",
+  "scope": "public source acquisition only; no model inference, chromosome-X signal read or locked-test access",
+  "candidate_cohort": "PRJNA669810 / GSE186719 wild-strain transcriptomes",
+  "source_reference_note": "The published cohort and CeNDR release use a historical WS276-era coordinate context; coordinate compatibility with WBcel235 is a required downstream audit, not assumed here.",
+  "urls": {
+    "expression_counts": "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE186nnn/GSE186719/suppl/GSE186719_Celegans_208strains_609samples_rawCounts.tsv.gz",
+    "eqtl_truth_archive": "https://media.springernature.com/original/springer-static/esm/art%3A10.1038%2Fs41467-022-31208-4/MediaObjects/41467_2022_31208_MOESM4_ESM.zip",
+    "cendr_isotype_vcf": "https://caendr-open-access-data-bucket.s3.us-east-2.amazonaws.com/dataset_release/c_elegans/20200815/variation/WI.20200815.hard-filter.isotype.vcf.gz"
+  },
+  "local_candidate_registry": "results/v2_p18_eqtl_candidate_metadata_20260822T190400Z/p14_external_candidate_registry.tsv",
+  "local_collision_audit": "results/v2_p18_eqtl_collision_screen_20260822T190400Z/p14_collision_audit.json",
+  "output_dir": "shared/external_eqtl/p20_sources_v1",
+  "allowed_downstream_chromosomes": ["I", "II", "III", "IV", "V"],
+  "prohibited_claims_until_follow_up_review": [
+    "independent eQTL validation",
+    "regulatory-allele validation",
+    "cross-study regulatory generalization",
+    "unseen-condition prediction"
+  ]
+}

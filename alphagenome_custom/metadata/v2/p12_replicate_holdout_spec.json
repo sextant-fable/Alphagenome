@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "phase": "P12",
+  "contract": "replicate_holdout_v1_model_matrix",
+  "locked_before_training": true,
+  "final_test_access": "prohibited",
+  "source_p11_spec": "alphagenome_custom/metadata/v2/replicate_holdout_v1/p11_replicate_holdout_spec.json",
+  "source_p11_execution": "alphagenome_custom/metadata/v2/replicate_holdout_v1/p11_replicate_holdout_execution.json",
+  "training": {
+    "sequence_length": 131072,
+    "max_steps": 2000,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "gene_weight": 0.1,
+    "max_shift_bp": 1024,
+    "reverse_complement_probability": 0.5,
+    "hidden_channels_default": 64,
+    "means_path": "alphagenome_custom/metadata/v2/replicate_holdout_v1/track_nonzero_means.tsv",
+    "track_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/training_track_manifest.tsv",
+    "group_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/training_group_manifest.tsv",
+    "heldout_track_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_manifest.tsv",
+    "heldout_group_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_group_manifest.tsv",
+    "heldout_track_indices": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_indices.tsv",
+    "heldout_primary_track_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_primary_track_manifest.tsv",
+    "heldout_primary_group_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_primary_group_manifest.tsv",
+    "heldout_primary_track_indices": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_primary_track_indices.tsv",
+    "heldout_supplementary_track_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_supplementary_track_manifest.tsv",
+    "heldout_supplementary_group_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_supplementary_group_manifest.tsv",
+    "heldout_supplementary_track_indices": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_supplementary_track_indices.tsv"
+  },
+  "matrix": {
+    "folds": [1, 2, 3, 4, 5],
+    "seeds": [20260714, 20260715, 20260716],
+    "formal_configurations": [
+      {"id": "A_paper", "model": "A", "loss": "paper", "hidden_channels": 64},
+      {"id": "A_log1p_mse", "model": "A", "loss": "log1p_mse", "hidden_channels": 64},
+      {"id": "B_paper", "model": "B", "loss": "paper", "hidden_channels": 64},
+      {"id": "B_log1p_mse", "model": "B", "loss": "log1p_mse", "hidden_channels": 64},
+      {"id": "C_paper", "model": "C", "loss": "paper", "hidden_channels": 64},
+      {"id": "C_log1p_mse", "model": "C", "loss": "log1p_mse", "hidden_channels": 64}
+    ],
+    "ablation_configurations": [
+      {"id": "B_no_augmentation", "model": "B", "loss": "paper", "seed": 20260714, "max_shift_bp": 0, "reverse_complement_probability": 0.0, "hidden_channels": 64},
+      {"id": "B_no_gene_loss", "model": "B", "loss": "paper", "seed": 20260714, "gene_weight": 0.0, "hidden_channels": 64},
+      {"id": "A_development_pool_mean", "model": "A", "loss": "paper", "seed": 20260714, "mean_column": "development_train_nonzero_mean", "hidden_channels": 64}
+    ],
+    "component_configurations": [
+      {"id": "B_no_lora", "model": "B_no_lora", "loss": "paper", "hidden_channels": 64},
+      {"id": "B_lora_only", "model": "B_lora_only", "loss": "paper", "hidden_channels": 64},
+      {"id": "B_1bp_head_only", "model": "B_1bp_head_only", "loss": "paper", "hidden_channels": 64},
+      {"id": "C_size_matched", "model": "C_size_matched", "loss": "paper", "hidden_channels": 152}
+    ],
+    "formal_tasks": 90,
+    "ablation_tasks": 15,
+    "component_tasks": 60,
+    "total_tasks": 165
+  },
+  "evaluation": {
+    "internal": "fold-specific validation blocks against reaggregated training labels",
+    "heldout": "same checkpoint on the heldout biological-unit label using only the corresponding output heads",
+    "heldout_primary_roles": ["primary_candidate"],
+    "heldout_supplementary_roles": ["supplementary_candidate", "primary_pending_qc"],
+    "statistics_unit": "study source nested within track, genomic fold, and seed",
+    "locked_test_block_signal_reads": 0
+  },
+  "gpu_policy": {
+    "allowed_physical_indices": [2, 3],
+    "maximum_concurrent_jobs_per_gpu": 1,
+    "minimum_free_mib": 70000
+  },
+  "prohibited_inputs": [
+    "alphagenome_custom/intervals/v2/test_locked.tsv",
+    "alphagenome_custom/metadata/v2/final_test_report.json",
+    "runs/v2_p6c_six_chromosome_corefix_20260723/development_selected"
+  ]
+}

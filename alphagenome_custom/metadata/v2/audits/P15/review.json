@@ -1,0 +1,34 @@
+{
+  "checks": [
+    {
+      "check_id": "R15.01_required_outputs",
+      "evidence": "missing=[]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R15.02_execution_contract",
+      "evidence": "metadata-only interval filtering; no GPU, DNA, BigWig, checkpoint, training, chromosome-X or locked-test access",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R15.03_contract_structure",
+      "evidence": "folds=5",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R15.04_no_x_or_locked_rows",
+      "evidence": "rows=600",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R15.05_source_x_exclusion",
+      "evidence": "source manifests contain X; output contract excludes it",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P15",
+  "review": "R15 I--V-only training interval contract",
+  "reviewed_at": "2026-08-22T18:28:06+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

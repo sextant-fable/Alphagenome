@@ -1,0 +1,54 @@
+{
+  "adapter_status": "not_yet_run",
+  "audited_at": "2026-08-23T10:02:57+00:00",
+  "checks": {
+    "c_elegans_adapter_defined": {
+      "note": "No C. elegans 241-head adapter has been trained or registered yet.",
+      "observed": false,
+      "pass": false
+    },
+    "license_sha256": {
+      "observed": "3760a0dba24568a5b4a4e41e8aabe5e5e23d81422f26e7623c8ba5cf13ef6c05",
+      "pass": true
+    },
+    "native_checkpoint_fairness": {
+      "note": "Native human/mouse output heads are not task-faithful for WBcel235.",
+      "observed": false,
+      "pass": false
+    },
+    "official_commit": {
+      "expected": "5c9358222b5026abb733ed5fb84f3f6c77239b37",
+      "observed": "5c9358222b5026abb733ed5fb84f3f6c77239b37",
+      "pass": true
+    },
+    "required_source_metadata": {
+      "observed": {
+        "apache_license_text": true,
+        "human_weight_url": true,
+        "mouse_or_human_model_availability": true,
+        "native_32bp_output_documented": true,
+        "native_context_documented": true,
+        "python_3_10_documented": true,
+        "tensorflow_dependency": true
+      },
+      "pass": true
+    }
+  },
+  "chromosome_x_reads": 0,
+  "controller_invocation": "python -m scripts.v2_phase_controller run --phase P24",
+  "final_test_access": "prohibited",
+  "hostname": "hy8",
+  "license": "Apache-2.0",
+  "locked_test_block_signal_reads": 0,
+  "native_model_boundary": "human/mouse 524kb input and 32bp output; not directly comparable to WBcel235 241-head task",
+  "next_gate": "define and register a task-faithful C. elegans adapter before any Borzoi training",
+  "phase": "P24",
+  "registered_phase_command": "python -m scripts.run_v2_p24_borzoi_adapter",
+  "schema_version": 1,
+  "spec_path": "alphagenome_custom/metadata/v2/p24_borzoi_adapter_spec.json",
+  "spec_sha256": "ecf59053ad63669b2f5f307d80d4c5ab5b47706bc17b3322516a19103fd08f1b",
+  "status": "completed_feasibility_audit",
+  "vendor_commit": "5c9358222b5026abb733ed5fb84f3f6c77239b37",
+  "vendor_path": "/home/zelinli6/vendor/borzoi",
+  "working_directory": "/home/zelinli6/Alphagenome"
+}

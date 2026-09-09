@@ -1,0 +1,16 @@
+{
+  "controller_invocation": "python -m scripts.v2_phase_controller run --phase P16",
+  "git_commit": "3233144d5c02f9355bd9bc6b64a3ac9769629ac1",
+  "means": "results/v2_p16_iv_training_normalization/track_nonzero_means.tsv",
+  "means_sha256": "79e1ccd433005e9fb557741eb3990a61c9bfada984abe516d4d5a0cf8278741e",
+  "phase": "P16",
+  "registered_phase_command": "python -m scripts.run_v2_p16_iv_normalization",
+  "resource_contract": "CPU-only I-V training-aggregate BigWig means; no GPU, DNA, checkpoint, external source, chromosome-X or locked-test access",
+  "schema_version": 1,
+  "spec": "alphagenome_custom/metadata/v2/p16_iv_training_normalization_spec.json",
+  "spec_sha256": "cd49d20c9f2929950d79ba13254b1647051cbb47e96debc6fa7eac7cbb3e7507",
+  "started_and_completed_at": "2026-08-22T18:46:58+00:00",
+  "status": "completed",
+  "summary": "results/v2_p16_iv_training_normalization/track_nonzero_means_summary.json",
+  "summary_sha256": "e55a06ec2aaed630d8936a89e67da6a2944160a13163921efea6119bc0f5e2e2"
+}

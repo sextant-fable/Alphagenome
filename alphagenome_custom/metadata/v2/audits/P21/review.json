@@ -1,0 +1,39 @@
+{
+  "checks": [
+    {
+      "check_id": "R21.01_required_outputs",
+      "evidence": "execution and P20 variant manifest",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R21.02_variant_manifest_pass",
+      "evidence": "candidates=51",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R21.03_execution_contract",
+      "evidence": "completed=15",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R21.04_complete_iv_gpu_records",
+      "evidence": "jobs=15 gpus=[2, 3]",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R21.05_scoring_audits",
+      "evidence": "audits=15",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R21.06_audit_hashes",
+      "evidence": "hashed_audits=15",
+      "status": "PASS"
+    }
+  ],
+  "phase": "P21",
+  "review": "R21 external eQTL candidate variant scoring",
+  "reviewed_at": "2026-08-23T07:15:30+00:00",
+  "schema_version": 1,
+  "status": "PASS"
+}

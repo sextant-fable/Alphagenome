@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "phase": "P12",
+  "contract": "replicate_holdout_v1_model_matrix",
+  "retry_id": "P12-R1",
+  "supersedes_spec": "alphagenome_custom/metadata/v2/p12_replicate_holdout_spec.json",
+  "correction": "The held-out evaluator now serializes per-track metrics against the selected held-out manifest rows rather than the full 241-track means table.",
+  "final_test_access": "prohibited",
+  "source_p11_spec": "alphagenome_custom/metadata/v2/replicate_holdout_v1/p11_replicate_holdout_spec.json",
+  "source_p11_execution": "alphagenome_custom/metadata/v2/replicate_holdout_v1/p11_replicate_holdout_execution.json",
+  "base_spec": "alphagenome_custom/metadata/v2/p12_replicate_holdout_spec.json",
+  "base_spec_sha256": "abc79875712031278b1b38f131632e36cdfeb200047884aa2bdfefb7739e505c",
+  "run_root": "runs/v2_p12_replicate_holdout_retry_20260819",
+  "log_root": "logs/v2_p12_replicate_holdout_retry_20260819",
+  "failed_attempt_execution": "alphagenome_custom/metadata/v2/replicate_holdout_v1/p12_replicate_holdout_execution_failed_attempt1.json"
+}

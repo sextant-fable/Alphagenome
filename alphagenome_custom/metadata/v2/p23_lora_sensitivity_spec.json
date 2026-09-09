@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "phase": "P23",
+  "status": "preregistered",
+  "purpose": "I-V-only LoRA rank and target-location sensitivity pilot",
+  "allowed_chromosomes": ["I", "II", "III", "IV", "V"],
+  "final_test_access": "prohibited",
+  "locked_test_block_signal_reads": 0,
+  "folds": [1],
+  "seeds": [20260714],
+  "reference": {
+    "model": "B",
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "lora_target_set": "final_block"
+  },
+  "pilot_configurations": [
+    {"id": "B_rank4_final_block", "model": "B", "lora_rank": 4, "lora_alpha": 16, "lora_target_set": "final_block"},
+    {"id": "B_rank16_final_block", "model": "B", "lora_rank": 16, "lora_alpha": 16, "lora_target_set": "final_block"},
+    {"id": "B_rank8_previous_block", "model": "B", "lora_rank": 8, "lora_alpha": 16, "lora_target_set": "previous_block"}
+  ],
+  "training": {
+    "max_steps": 2000,
+    "sequence_length": 131072,
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "gene_weight": 0.1,
+    "loss_1bp_weight": 1.0,
+    "loss_128bp_weight": 1.0,
+    "max_shift_bp": 1024,
+    "reverse_complement_probability": 0.5,
+    "hidden_channels": 64,
+    "means_path": "results/v2_p16_iv_training_normalization/track_nonzero_means.tsv"
+  },
+  "source_contract": {
+    "interval_root": "results/v2_p15_iv_training_interval_contract/intervals",
+    "track_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/training_track_manifest.tsv",
+    "group_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/training_group_manifest.tsv",
+    "evaluation_track_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_manifest.tsv",
+    "evaluation_group_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_group_manifest.tsv",
+    "prediction_track_indices": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_indices.tsv"
+  },
+  "gpu_policy": {
+    "allowed_physical_indices": [2, 3],
+    "maximum_concurrent_jobs_per_gpu": 1,
+    "minimum_free_mib": 70000
+  },
+  "claim_status": "pilot_configuration_sensitivity; not a biological mechanism test"
+}

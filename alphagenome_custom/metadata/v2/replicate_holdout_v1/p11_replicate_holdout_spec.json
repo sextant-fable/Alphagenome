@@ -1,0 +1,39 @@
+{
+  "aggregation_policy": "decoded_signal_rescaled_to_1e8_then_raw_coverage_weighted_within_biological_unit_then_equal_mean_across_units",
+  "assignment_sha256": "27dd342723138fb2e4346f5fc004cc3901de9407d3d598cff9ec5413b67f6443",
+  "contract": "replicate_holdout_v1",
+  "counts": {
+    "primary_candidate_tracks": 57,
+    "primary_pending_qc_tracks": 1,
+    "source_groups": 241,
+    "source_runs": 482,
+    "supplementary_tracks": 22,
+    "training_only_tracks": 161
+  },
+  "duplicate_source_boundary": "every duplicate source equivalence class must remain entirely training or entirely heldout",
+  "heldout_labels_only": "heldout aggregates are evaluation-only and excluded from model selection",
+  "locked_before_generation": true,
+  "locked_test_access": "prohibited",
+  "member_roles_sha256": "a415541be217579e2298e585282f5f6be4a3c5677492fc1fc9bf77607284b214",
+  "output_root": "alphagenome_custom/tracks/rna_seq_v2_replicate_holdout_v1",
+  "p6c_lock_sha256": "602988f99a952e23e98a205ef3e264c11b94cc22e06ad2213a109339cd9cb421",
+  "p6c_report_sha256": "9c9b06c3eba15d95c30ff4e7403d97dbfe1b72cbc0e8dcd678fe98de762d3a6e",
+  "phase": "P11",
+  "schema_version": 1,
+  "selection_seed": 20260819,
+  "source_paths": {
+    "duplicates": "alphagenome_custom/metadata/v2/duplicate_source_reuse_review_v2.tsv",
+    "group_qc": "alphagenome_custom/metadata/v2/replicate_group_qc_v2_post_reprocessing.tsv",
+    "groups": "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv",
+    "members": "alphagenome_custom/metadata/v2/rna_seq_group_members_v2_final.tsv",
+    "outputs": "alphagenome_custom/metadata/v2/p3_group_outputs.tsv"
+  },
+  "source_sha256": {
+    "alphagenome_custom/metadata/v2/duplicate_source_reuse_review_v2.tsv": "02d99ca87168875bfab6f1f315ec900b82682bc57d69dc81f0872ad5b65741bd",
+    "alphagenome_custom/metadata/v2/p3_group_outputs.tsv": "4f261a4dcbb84f73be26ae2205e049550083b816a54561e6c983b048c6267a65",
+    "alphagenome_custom/metadata/v2/replicate_group_qc_v2_post_reprocessing.tsv": "f10c88517136d9e457de7d37ed7f70cb4d1c1072de16335a5e3c22bc1e5bc756",
+    "alphagenome_custom/metadata/v2/rna_seq_group_members_v2_final.tsv": "415174cd4700af729f78ff147b271e394294f7e43bffcc05922b888a48a53122",
+    "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv": "06bfc6109b08dc22007601d9c406cd4772701901f069f16ad1ea26b3d6134737"
+  },
+  "training_labels_only": "selected heldout biological units are excluded from every training aggregate"
+}

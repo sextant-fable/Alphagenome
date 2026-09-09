@@ -1,0 +1,95 @@
+{
+  "aggregation_policy": "decoded_signal_rescaled_to_1e8_then_raw_coverage_weighted_within_biological_unit_then_equal_mean_across_units",
+  "completed_at": "2026-08-18T18:15:43+00:00",
+  "contract": "replicate_holdout_v1",
+  "controller_phase": "P11",
+  "counts": {
+    "heldout_groups": 80,
+    "primary_candidate_tracks": 57,
+    "primary_pending_qc_tracks": 1,
+    "source_groups": 241,
+    "source_runs": 482,
+    "supplementary_tracks": 22,
+    "training_only_tracks": 161
+  },
+  "created_at": "2026-08-18T17:59:25+00:00",
+  "duplicate_source_classes": {
+    "SRR12483327": "duplicate_source_class_001",
+    "SRR12483328": "duplicate_source_class_002",
+    "SRR12483329": "duplicate_source_class_003",
+    "SRR13964554": "duplicate_source_class_001",
+    "SRR13964555": "duplicate_source_class_002",
+    "SRR13964556": "duplicate_source_class_003"
+  },
+  "heldout_group_manifest_sha256": "3105b3af99115206611127abe0a500336f183a642ce808b6a0ed98ae83954ad7",
+  "heldout_labels_only": "heldout aggregates are evaluation-only and are never passed to training or model selection",
+  "heldout_track_manifest_sha256": "c5e73d6a96c1f4f2dffd5f960701fdd03a61f9762dae30d2fcbeb12096b423d3",
+  "locked_test_access": "prohibited",
+  "locked_test_signal_reads": 0,
+  "means_path": "alphagenome_custom/metadata/v2/replicate_holdout_v1/track_nonzero_means.tsv",
+  "means_sha256": "db0fb21ffacdd8e73780c79e867057a3d40a636ddbffa6ea64c4c188805a4180",
+  "means_summary_path": "alphagenome_custom/metadata/v2/replicate_holdout_v1/track_nonzero_means_summary.json",
+  "means_summary_sha256": "e3dca002e0da704ab5fff0891e63fbbbe041eff3d6b40f3ed833b029e6291cfb",
+  "metadata_files": {
+    "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_group_manifest.tsv": "3105b3af99115206611127abe0a500336f183a642ce808b6a0ed98ae83954ad7",
+    "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_indices.tsv": "d6efec5788ad204e54eb54dcad65055bdb76e8d3122ff2e28746f3f8c8abc01f",
+    "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_manifest.tsv": "c5e73d6a96c1f4f2dffd5f960701fdd03a61f9762dae30d2fcbeb12096b423d3",
+    "alphagenome_custom/metadata/v2/replicate_holdout_v1/holdout_assignments.tsv": "27dd342723138fb2e4346f5fc004cc3901de9407d3d598cff9ec5413b67f6443",
+    "alphagenome_custom/metadata/v2/replicate_holdout_v1/member_roles.tsv": "a415541be217579e2298e585282f5f6be4a3c5677492fc1fc9bf77607284b214",
+    "alphagenome_custom/metadata/v2/replicate_holdout_v1/training_group_manifest.tsv": "7e26ad6846f37d51b65daf772a253f46a597db1c09369e9d0727e04f321f03f0",
+    "alphagenome_custom/metadata/v2/replicate_holdout_v1/training_track_manifest.tsv": "52605d07d1f52615fb82382f54fb892932ff48a6f42023a1ee452c5ed8a1d1a4"
+  },
+  "output_roots": {
+    "heldout": "alphagenome_custom/tracks/rna_seq_v2_replicate_holdout_v1/heldout",
+    "training": "alphagenome_custom/tracks/rna_seq_v2_replicate_holdout_v1/training"
+  },
+  "p6c_lock_sha256": "602988f99a952e23e98a205ef3e264c11b94cc22e06ad2213a109339cd9cb421",
+  "p6c_lock_test_consumed": true,
+  "p6c_report_schema_version": 2,
+  "p6c_report_sha256": "9c9b06c3eba15d95c30ff4e7403d97dbfe1b72cbc0e8dcd678fe98de762d3a6e",
+  "phase": "P11",
+  "role_manifest_views": {
+    "primary": {
+      "group_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_primary_group_manifest.tsv",
+      "track_count": 58,
+      "track_indices": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_primary_track_indices.tsv",
+      "track_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_primary_track_manifest.tsv"
+    },
+    "supplementary": {
+      "group_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_supplementary_group_manifest.tsv",
+      "track_count": 22,
+      "track_indices": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_supplementary_track_indices.tsv",
+      "track_manifest": "alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_supplementary_track_manifest.tsv"
+    }
+  },
+  "schema_version": 1,
+  "selection_seed": 20260819,
+  "source_audit": {
+    "member_count": 482,
+    "sha256_checked": 482,
+    "sha256_mismatches": 0
+  },
+  "source_group_declared_vs_member_derived_mismatches": [
+    "RNA_V2_G0004",
+    "RNA_V2_G0007",
+    "RNA_V2_G0008",
+    "RNA_V2_G0009",
+    "RNA_V2_G0013",
+    "RNA_V2_G0014",
+    "RNA_V2_G0037",
+    "RNA_V2_G0065",
+    "RNA_V2_G0066",
+    "RNA_V2_G0067",
+    "RNA_V2_G0068",
+    "RNA_V2_G0069",
+    "RNA_V2_G0070"
+  ],
+  "source_groups": "alphagenome_custom/metadata/v2/rna_seq_groups_v2_final.tsv",
+  "source_members": "alphagenome_custom/metadata/v2/rna_seq_group_members_v2_final.tsv",
+  "source_outputs": "alphagenome_custom/metadata/v2/p3_group_outputs.tsv",
+  "spec_sha256": "a2fb75d5b79c6b3bb1ae0459356bea7a302bacd2778e082ed8866bfd06a3a320",
+  "status": "complete",
+  "training_group_manifest_sha256": "7e26ad6846f37d51b65daf772a253f46a597db1c09369e9d0727e04f321f03f0",
+  "training_labels_only": "training aggregates exclude the selected heldout biological unit for every group with >=2 derived units",
+  "training_track_manifest_sha256": "52605d07d1f52615fb82382f54fb892932ff48a6f42023a1ee452c5ed8a1d1a4"
+}

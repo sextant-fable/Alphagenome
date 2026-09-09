@@ -1,0 +1,269 @@
+{
+  "completed_at": "2026-08-18T18:42:51+00:00",
+  "contract": "replicate_holdout_v1_model_matrix",
+  "failures": [
+    {
+      "error": "CalledProcessError(1, ['/home/zelinli6/miniconda3/envs/alphagenome/bin/python', '-m', 'scripts.evaluate_v2_model', '--model', 'A', '--training-loss', 'paper', '--fold', '1', '--checkpoint', 'runs/v2_p12_replicate_holdout_20260819/A_paper/seed_20260714/fold_1/checkpoint.pt', '--sequence-length', '131072', '--hidden-channels', '64', '--mean-column', 'fold_1_train_nonzero_mean', '--means-path', 'alphagenome_custom/metadata/v2/replicate_holdout_v1/track_nonzero_means.tsv', '--track-manifest', 'alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_manifest.tsv', '--group-manifest', 'alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_group_manifest.tsv', '--prediction-track-indices', 'alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_indices.tsv', '--valid-intervals-path', 'alphagenome_custom/intervals/v2/fold_1/valid.tsv', '--output', 'runs/v2_p12_replicate_holdout_20260819/A_paper/seed_20260714/fold_1/validation_heldout.json', '--device', 'cuda'])",
+      "job_id": "p12:formal:A_paper:seed20260714:fold1",
+      "physical_gpu": 2
+    },
+    {
+      "error": "CalledProcessError(1, ['/home/zelinli6/miniconda3/envs/alphagenome/bin/python', '-m', 'scripts.evaluate_v2_model', '--model', 'A', '--training-loss', 'paper', '--fold', '2', '--checkpoint', 'runs/v2_p12_replicate_holdout_20260819/A_paper/seed_20260714/fold_2/checkpoint.pt', '--sequence-length', '131072', '--hidden-channels', '64', '--mean-column', 'fold_2_train_nonzero_mean', '--means-path', 'alphagenome_custom/metadata/v2/replicate_holdout_v1/track_nonzero_means.tsv', '--track-manifest', 'alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_manifest.tsv', '--group-manifest', 'alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_group_manifest.tsv', '--prediction-track-indices', 'alphagenome_custom/metadata/v2/replicate_holdout_v1/heldout_track_indices.tsv', '--valid-intervals-path', 'alphagenome_custom/intervals/v2/fold_2/valid.tsv', '--output', 'runs/v2_p12_replicate_holdout_20260819/A_paper/seed_20260714/fold_2/validation_heldout.json', '--device', 'cuda'])",
+      "job_id": "p12:formal:A_paper:seed20260714:fold2",
+      "physical_gpu": 3
+    }
+  ],
+  "final_test_access": "prohibited",
+  "gpu_wait_snapshots": [
+    {
+      "commands": [
+        [
+          "nvidia-smi",
+          "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+          "--format=csv,noheader,nounits"
+        ],
+        [
+          "nvidia-smi",
+          "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+          "--format=csv,noheader,nounits"
+        ]
+      ],
+      "gpus": [
+        {
+          "index": 0,
+          "memory_free_mib": 3055,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 78099,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+        },
+        {
+          "index": 1,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+        },
+        {
+          "index": 2,
+          "memory_free_mib": 72596,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 8557,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 50,
+          "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+        },
+        {
+          "index": 3,
+          "memory_free_mib": 72596,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 8557,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 80,
+          "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+        }
+      ],
+      "observed_at": "2026-08-18T18:16:33+00:00",
+      "processes": [
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 2103240,
+          "process_name": "VLLM::EngineCore",
+          "used_memory_mib": 70588
+        },
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 769215,
+          "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+          "used_memory_mib": 7496
+        },
+        {
+          "gpu_uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322",
+          "pid": 996150,
+          "process_name": "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+          "used_memory_mib": 8548
+        },
+        {
+          "gpu_uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0",
+          "pid": 996149,
+          "process_name": "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+          "used_memory_mib": 8548
+        }
+      ]
+    },
+    {
+      "commands": [
+        [
+          "nvidia-smi",
+          "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+          "--format=csv,noheader,nounits"
+        ],
+        [
+          "nvidia-smi",
+          "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+          "--format=csv,noheader,nounits"
+        ]
+      ],
+      "gpus": [
+        {
+          "index": 0,
+          "memory_free_mib": 3055,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 78099,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+        },
+        {
+          "index": 1,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+        },
+        {
+          "index": 2,
+          "memory_free_mib": 72596,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 8557,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 53,
+          "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+        },
+        {
+          "index": 3,
+          "memory_free_mib": 72596,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 8557,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 58,
+          "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+        }
+      ],
+      "observed_at": "2026-08-18T18:17:34+00:00",
+      "processes": [
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 2103240,
+          "process_name": "VLLM::EngineCore",
+          "used_memory_mib": 70588
+        },
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 769215,
+          "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+          "used_memory_mib": 7496
+        },
+        {
+          "gpu_uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322",
+          "pid": 996150,
+          "process_name": "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+          "used_memory_mib": 8548
+        },
+        {
+          "gpu_uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0",
+          "pid": 996149,
+          "process_name": "/home/zelinli6/miniconda3/envs/alphagenome/bin/python",
+          "used_memory_mib": 8548
+        }
+      ]
+    },
+    {
+      "commands": [
+        [
+          "nvidia-smi",
+          "--query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu",
+          "--format=csv,noheader,nounits"
+        ],
+        [
+          "nvidia-smi",
+          "--query-compute-apps=gpu_uuid,pid,process_name,used_memory",
+          "--format=csv,noheader,nounits"
+        ]
+      ],
+      "gpus": [
+        {
+          "index": 0,
+          "memory_free_mib": 3055,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 78099,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48"
+        },
+        {
+          "index": 1,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-ac6049cd-0f86-19a4-d000-fd1242b84f18"
+        },
+        {
+          "index": 2,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-e9656894-24d9-fe24-66a4-81d86bf21322"
+        },
+        {
+          "index": 3,
+          "memory_free_mib": 81153,
+          "memory_total_mib": 81920,
+          "memory_used_mib": 0,
+          "name": "NVIDIA A100 80GB PCIe",
+          "utilization_percent": 0,
+          "uuid": "GPU-60e47212-872b-c290-35a6-01c569d1c8c0"
+        }
+      ],
+      "observed_at": "2026-08-18T18:18:34+00:00",
+      "processes": [
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 2103240,
+          "process_name": "VLLM::EngineCore",
+          "used_memory_mib": 70588
+        },
+        {
+          "gpu_uuid": "GPU-d7d033f9-c433-a5ae-2cea-47aa3b861c48",
+          "pid": 769215,
+          "process_name": "/home/ips/demo/Backend-Drogon/IndoorNavigateServer",
+          "used_memory_mib": 7496
+        }
+      ]
+    }
+  ],
+  "hostname": "hy8",
+  "implementation_sha256": {
+    "scripts/build_v2_replicate_holdout.py": "585d1c8fcd85b307f21c54a9c0f9a027f131554c932d551a7cdbeb71a8099e8d",
+    "scripts/compute_v2_replicate_holdout_means.py": "fb8233521a6e780e65588070ddec77e7b5a13a5b19ba31988d440242fc541223",
+    "scripts/evaluate_v2_model.py": "fd6fc7b2e50d86a9d1f1899a893025a2c136860a686fbaeec94dcb6308042742",
+    "scripts/run_v2_p11_replicate_holdout.py": "2dc85f0b17a37c33dd89daeddb20a74b6b63bbdac5aeeaf1cf6dafbfb512dcbb",
+    "scripts/run_v2_p12_replicate_holdout.py": "80838944c4f41ec38c34bce47d256749fad1097274a222629e3dee0113bb7128",
+    "scripts/train_v2_model.py": "6482e175fa6d1b124af92e65763a3a53e3c7e103ae873b4838d1d64825c180eb",
+    "scripts/v2_bigwig_dataset.py": "06e20dfe0e9b3b979da6f119464ae6ac81ab58302af4968e2051966da26562d9",
+    "scripts/v2_training_components.py": "20e1eb984a35ba41299edc44ad89829d76815e9be8aa5337687a30c2d8a5d381"
+  },
+  "jobs": [],
+  "locked_test_block_signal_reads": 0,
+  "phase": "P12",
+  "registered_tasks": 165,
+  "schema_version": 1,
+  "selected_physical_gpus": [
+    2,
+    3
+  ],
+  "spec_path": "alphagenome_custom/metadata/v2/p12_replicate_holdout_spec.json",
+  "spec_sha256": "abc79875712031278b1b38f131632e36cdfeb200047884aa2bdfefb7739e505c",
+  "started_at": "2026-08-18T18:18:34+00:00",
+  "status": "failed",
+  "working_directory": "/home/zelinli6/Alphagenome"
+}

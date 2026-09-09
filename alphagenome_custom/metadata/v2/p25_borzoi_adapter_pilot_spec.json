@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "phase": "P25",
+  "status": "preregistered",
+  "purpose": "Task-faithful C. elegans adapter pilot using the official Borzoi trunk",
+  "source_phase": "P24",
+  "official_repository": "https://github.com/calico/borzoi",
+  "official_commit": "5c9358222b5026abb733ed5fb84f3f6c77239b37",
+  "native_checkpoint_policy": "load native trunk weights only; never compare native human/mouse output heads",
+  "input": {
+    "reference": "WBcel235",
+    "sequence_length_bp": 131072,
+    "allowed_chromosomes": ["I", "II", "III", "IV", "V"],
+    "interval_contract": "results/v2_p15_iv_training_interval_contract/intervals",
+    "normalization_contract": "results/v2_p16_iv_training_normalization"
+  },
+  "adapter_architecture": {
+    "native_crop_bins": 5120,
+    "adapted_crop_bins": 1280,
+    "reason": "preserve the proportional crop when reducing the native 524-kb input to 131 kb",
+    "expected_native_output_bins": 4096
+  },
+  "target": {
+    "head_name": "head_c_elegans",
+    "n_tracks": 241,
+    "native_borzoi_resolution_bp": 32,
+    "reported_resolution_bp": 128,
+    "aggregation": "sum four adjacent native 32-bp bins",
+    "one_bp_endpoint": "not available from this pilot; do not include in the Model B primary composite"
+  },
+  "pilot": {
+    "folds": [1],
+    "seed": 20260823,
+    "max_steps": 200,
+    "batch_size": 1,
+    "training_policy": "new 241-head adapter, frozen pretrained trunk for pilot feasibility",
+    "validation_policy": "same fold-1 validation intervals and metric implementation as P17/P19 where the 128-bp endpoint is defined"
+  },
+  "gpu_policy": {
+    "physical_gpus": [2, 3],
+    "minimum_free_mib": 70000,
+    "chromosome_x_reads": 0,
+    "locked_test_reads": 0
+  },
+  "interpretation": {
+    "eligible_comparison": "128-bp task-faithful Borzoi adapter comparator",
+    "not_claimable": [
+      "native Borzoi human/mouse performance on C. elegans",
+      "1-bp superiority or necessity",
+      "cross-species zero-shot generalization",
+      "causal regulatory validation"
+    ],
+    "promotion_rule": "Only a successful pilot with finite loss, valid 241-head output, I-V-only audit and reproducible validation may justify a larger I-V adapter matrix."
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "commands": [
+    [
+      "/home/zelinli6/miniconda3/envs/alphagenome/bin/python3.12",
+      "-m",
+      "scripts.prepare_v2_p15_iv_training_intervals",
+      "--output-dir",
+      "results/v2_p15_iv_training_interval_contract"
+    ]
+  ],
+  "contract": "results/v2_p15_iv_training_interval_contract/p15_iv_training_interval_contract.json",
+  "contract_sha256": "029539142b60329121072dd40a4298f5b2e5d8c42bb921da3e1e6798f49b9aed",
+  "controller_invocation": "python -m scripts.v2_phase_controller run --phase P15",
+  "git_commit": "3233144d5c02f9355bd9bc6b64a3ac9769629ac1",
+  "output_sha256": {
+    "results/v2_p15_iv_training_interval_contract/intervals/fold_1/train.tsv": "1fdf85fdf1927c6c8c9f636630bc850fabc242ff464b07dec1a4228e67233ad2",
+    "results/v2_p15_iv_training_interval_contract/intervals/fold_1/valid.tsv": "0fc5b0dafbb07a714b34755d55161efec91839285b3d27d63ce6e6ed5cce6036",
+    "results/v2_p15_iv_training_interval_contract/intervals/fold_2/train.tsv": "722aa7a8be578c92da7709ab9c751e6d8ef26ee76b202d89a633566e00f331b6",
+    "results/v2_p15_iv_training_interval_contract/intervals/fold_2/valid.tsv": "44a8db2316db9142bbab9b6085b16b86fcec8033d5b289dae8710997e36faf77",
+    "results/v2_p15_iv_training_interval_contract/intervals/fold_3/train.tsv": "6fe305effecba0186d2cfdbf67390d5e83a9effb2c504abc9bb11164b70f3b49",
+    "results/v2_p15_iv_training_interval_contract/intervals/fold_3/valid.tsv": "01a69afcf6134282fb945ea2362d126e305a8ee0a4832cc925ad4429b3529e66",
+    "results/v2_p15_iv_training_interval_contract/intervals/fold_4/train.tsv": "99494cd5a127b4e38ee26505181f7238712bf94a11eb853ee462b0d504cd0af5",
+    "results/v2_p15_iv_training_interval_contract/intervals/fold_4/valid.tsv": "1103262f7a7ce544002d69d7f180b072a616263ad1b4d8489b300d93e39bb87e",
+    "results/v2_p15_iv_training_interval_contract/intervals/fold_5/train.tsv": "54e339cfc0b646842ac0b81bc56ee6acc24c6e7338e8f410b069b26f1449359c",
+    "results/v2_p15_iv_training_interval_contract/intervals/fold_5/valid.tsv": "b4e59e58e583243860df44c8a23d2850c82c12e7f1649bc579f1262dbe0752b6"
+  },
+  "phase": "P15",
+  "python_executable": "/home/zelinli6/miniconda3/envs/alphagenome/bin/python3.12",
+  "registered_phase_command": "python -m scripts.run_v2_p15_iv_training_contract",
+  "resource_contract": "metadata-only interval filtering; no GPU, DNA, BigWig, checkpoint, training, chromosome-X or locked-test access",
+  "schema_version": 1,
+  "started_and_completed_at": "2026-08-22T18:28:06+00:00",
+  "status": "completed",
+  "working_directory": "/home/zelinli6/Alphagenome"
+}

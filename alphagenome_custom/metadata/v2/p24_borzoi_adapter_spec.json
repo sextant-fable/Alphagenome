@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "phase": "P24",
+  "status": "preregistered",
+  "purpose": "Official Borzoi source, weight, API and task-adaptation feasibility audit",
+  "official_repository": "https://github.com/calico/borzoi",
+  "official_commit": "5c9358222b5026abb733ed5fb84f3f6c77239b37",
+  "vendor_path": "/home/zelinli6/vendor/borzoi",
+  "license": "Apache-2.0",
+  "native_input_context_bp": 524288,
+  "native_output_resolution_bp": 32,
+  "native_species": ["human", "mouse"],
+  "allowed_chromosomes_for_any_adapter": ["I", "II", "III", "IV", "V"],
+  "final_test_access": "prohibited",
+  "adapter_claim": "conditional task-faithful C. elegans adapter only; no native checkpoint leaderboard",
+  "required_gates": [
+    "official source and license verified",
+    "Python/TensorFlow dependency isolation",
+    "WBcel235 sequence input compatibility",
+    "241-head C. elegans target adapter defined",
+    "same I-V splits, normalization and primary metric",
+    "checkpoint redistribution terms recorded"
+  ],
+  "human_weight_url": "https://storage.googleapis.com/seqnn-share/borzoi/f0/model0_best.h5",
+  "human_weight_etag": "ef83ad59b43765413f73767d87a717df",
+  "human_weight_expected_bytes": 744112468
+}
